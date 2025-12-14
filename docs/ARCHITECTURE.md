@@ -32,11 +32,15 @@
 | **除外条件** | 1. Bot自身のメッセージ。 2. `config.CODE_CHANNEL_ID` **ではない**チャンネルからのメッセージ。 3. `CODE_PATTERN` (8桁の英数字) に**完全に一致する**メッセージ。 |
 | **アクション** | 除外条件に当てはまらない場合、`message.delete()` を実行し、`send_admin_dm` で削除ログを送信。 |
 
+![エアライダーオレマシン置き場のロジック](./assets/filter_operation.png)
+
 #### 2.2.2. エラー耐性
 
 * `try...except discord.Forbidden`: Botにメッセージ削除権限がない場合でも、クラッシュを防ぎ、その旨を管理者にDMで通知します。
 
 ### 2.3. 通知マスミュート (`cogs/mass_mute.py`)
+
+![通知マスミュートのロジック](./assets/mass-mute_operation.png)
 
 #### 2.3.1. 権限適用ロジック (`_apply_notification_mute_to_channel`)
 
@@ -50,6 +54,7 @@
 | :--- | :--- | :--- |
 | **`on_guild_channel_create`** | チャンネル作成イベント。 | `MUTE_CHANNEL_NAMES` に一致するチャンネルが作成された際、Botがすぐにミュートを適用し、ミュート適用漏れを防ぎます。 |
 | **`daily_mute_check`** | 毎日 **16:00 JST**。 | 定期的に全ての対象チャンネルを巡回し、設定が何らかの理由で変更されていないかを確認し、再適用します。 |
+
 
 ## 3. 運用・デバッグ履歴（教訓）
 
@@ -67,3 +72,31 @@ Botのログ（`systemd`）は、**標準出力（`print`）**と**標準エラ�
 
 * **時刻管理**: `mass_mute.py` の定時タスクは、`datetime.time(tzinfo=JST)` を使用し、日本時間（JST, UTC+9）で正確に実行されるように設計されています。
 * **トークンの扱い**: トークンは `token.txt` に保存され、`.gitignore` で厳重に管理されているため、GitHubへのプッシュ時も安全です。
+
+## 4. 実行環境とデプロイメント
+
+本 Bot は、Linux VM上に構築された専用環境で稼働しています。
+
+### 4.1. 環境概要図
+
+Botの実行環境、権限、および外部サービス（Discord API, GitHub, systemd）との連携を示す全体図です。
+
+![実行環境の全体図](./assets/runtime_architecture.png)
+
+### 4.2. デプロイメント構成
+
+| 項目 | 詳細 | 備考 |
+| :--- | :--- | :--- |
+| **プラットフォーム** | Linux VM (Ubuntu/Debian系) | サーバーOSとして採用。 |
+| **Python環境** | 仮想環境 (`venv`) | ホストOSの環境から分離し、依存関係を独立して管理。 |
+| **永続化** | `systemd` サービス | サーバー起動時自動実行、クラッシュ時の自動再起動 (Restart=always) を設定済み。サービス名は `discord-awaji-empire-agent-bot.service`。 |
+| **設定/秘密情報** | `config.py` / `token.txt` | 設定値とトークンを分離し、トークンは Git 管理から除外（`.gitignore`）。 |
+| **外部依存** | Discord Developer Portal | **Presence/Members/Message Content Intent**の有効化が必須。 |
+
+### 4.3. 運用・ログ管理
+
+* **ログ確認**: `journalctl` により、サービスログ、コグのロード状況、タスク実行ログを確認します。
+    ```bash
+    sudo journalctl -u discord-awaji-empire-agent-bot.service -f
+    ```
+* **Git連携**: VM上で直接 Git を操作し、GitHubリポジトリとコード・ドキュメントを同期します。
