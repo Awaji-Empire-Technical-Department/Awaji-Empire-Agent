@@ -1,33 +1,42 @@
+# .github/workflows/first_workflow.yml
+
 name: CI/CD Pipeline
 
-# どのイベントでこのワークフローを実行するかを定義
 on:
   push:
     branches:
-      - master # masterブランチにプッシュされたときに実行
+      - master
   pull_request:
     branches:
       - master
 
-# 実行するジョブの定義
 jobs:
-  build:
-    # VMではなく、GitHubが用意する仮想環境（ここではUbuntuの最新版）で実行
+  build_and_document: # ジョブ名を変更
     runs-on: ubuntu-latest
 
     steps:
-      # 1. リポジトリのコードをチェックアウト
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Python環境のセットアップ（バージョンを指定）
       - name: Set up Python 3.x
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      # 3. 動作確認のためのメッセージ（ここは後でLinterやテストに置き換えます）
-      - name: Display environment
+      - name: Install dependencies (必要であれば、`pip install discord.py`などをここに記述)
         run: |
-          echo "GitHub Actions環境でPythonのセットアップが完了しました。"
-          python --version
+          # 仮想環境ではないため、依存関係があればここにインストールコマンドを追記
+
+      - name: Generate and update ARCHITECTURE.md
+        run: |
+          # 作成した Python スクリプトを実行
+          python doc_generator.py
+
+      - name: Commit and push updated document (自動コミット)
+        # stefanzweifel/git-auto-commit-action を使用して変更を自動でコミット
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          # doc_generator.py と更新された ARCHITECTURE.md の変更をコミット
+          commit_message: 'docs: Auto update functional details after code change'
+          file_pattern: 'doc_generator.py docs/ARCHITECTURE.md'
+          # GitHub Actionsが自動で提供するトークンを使用
