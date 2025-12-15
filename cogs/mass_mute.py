@@ -11,7 +11,6 @@ from typing import List, Optional
 MUTE_OVERWRITE = discord.PermissionOverwrite(
     read_messages=True,  
     send_messages=True,  
-    # 通知を抑制するための設定
     mention_everyone=False, 
     manage_webhooks=False, 
 )
@@ -32,7 +31,7 @@ class MassMuteCog(commands.Cog):
     
     # --- ヘルパー関数 ---
     def _get_owner_id_int(self, admin_id_str: str) -> Optional[int]:
-        """設定ファイルから読み込んだID文字列を整数に変換する"""
+        """設定ファイルから読み込んだID文字列を整数に変換するヘルパー"""
         try:
             return int(admin_id_str)
         except ValueError:
@@ -75,6 +74,7 @@ class MassMuteCog(commands.Cog):
         対象チャンネルの通知権限を操作し、DMでログを送信する共通ロジック。
         """
         
+        # Botがサーバーに接続しているかチェック
         if not self.bot.guilds:
             await self._send_error_dm("サーバー未接続", "Botが接続しているサーバーが見つかりませんでした。")
             return
@@ -84,19 +84,17 @@ class MassMuteCog(commands.Cog):
         everyone_role = guild.default_role
         
         # 常に通知オフの権限を適用
-        overwrite_to_apply = MUTE_OVERWRITE 
+        overwrite_to_apply = MUTE_OVERWRITE
         action_desc = "通知オフ (常時抑制)"
         
         channels_updated = 0
         error_messages = []
 
         for channel_name in self.target_channel_names:
-            # チャンネル名の検索
             channel = discord.utils.get(guild.text_channels, name=channel_name)
             
             if channel:
                 try:
-                    # チャンネルの @everyone ロールの権限を上書き
                     await channel.set_permissions(everyone_role, overwrite=overwrite_to_apply)
                     channels_updated += 1
                 except discord.Forbidden:
@@ -123,15 +121,7 @@ class MassMuteCog(commands.Cog):
 
 
     # ----------------------------------------------------
-    # 2. 起動時イベント
-    # ----------------------------------------------------
-    @commands.Cog.listener()
-    async def on_ready(self):
-        print("Bot is ready. Executing initial mute check (Startup)...")
-        await self.execute_mute_logic("Startup")
-        
-    # ----------------------------------------------------
-    # 3. 固定時刻タスク
+    # 2. 固定時刻タスク
     # ----------------------------------------------------
     @tasks.loop(time=[
         datetime.time(0, 0, tzinfo=datetime.timezone.utc),   # JST 9:00
