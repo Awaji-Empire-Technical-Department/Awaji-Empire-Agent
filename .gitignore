@@ -3,3 +3,6 @@ token.txt
 
 # Virtual Environment
 venv/
+
+# Local Configuration
+config.py

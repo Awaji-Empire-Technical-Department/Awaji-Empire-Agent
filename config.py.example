@@ -9,11 +9,11 @@
 
 # 2. 管理者ユーザー ID (DMログ送信先)
 # IDは文字列 ("") で定義
-ADMIN_USER_ID = "738880478823841932"
+ADMIN_USER_ID = "YOUR_ADMIN_USER_ID"
 
 # 3. オレマシンコードチャンネル ID (フィルタリング対象)
 # IDは文字列 ("") で定義
-CODE_CHANNEL_ID = "1447584603425476720"
+CODE_CHANNEL_ID = "YOUR_CODE_CHANNEL_ID"
 
 # ----------------------------------------
 # 🎯 通知ミュート機能用設定
