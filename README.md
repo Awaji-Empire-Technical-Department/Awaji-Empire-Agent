@@ -35,6 +35,30 @@ Botのコードは、高い保守性を保つため、コア、設定、機能�
     * `MUTE_ONLY_CHANNEL_NAMES`: 通知のみを抑制したいチャンネル名リスト（例: `["配信コメント", "メインチャンネル"]`）。
     * `READ_ONLY_MUTE_CHANNEL_NAMES`: ログ系のチャンネル名リスト（メッセージ送信の可否は既存のカテゴリ設定に依存）。
 
+### 3.2 Bot トークンと設定ファイルの準備
+
+1.  **Bot トークンの取得とファイル (`token.txt`) の作成**:
+    **Discord Developer Portal** にてアプリケーションのBotセクションからトークンを取得し、プロジェクトルートディレクトリ（`/discord_bot/`）に `token.txt` ファイルを新規作成して、トークンを**一行目のみ**に記述して保存します。
+    
+    ```
+    YOUR_DISCORD_BOT_TOKEN_HERE
+    ```
+
+2.  **設定ファイル (`config.py`) の準備**:
+    リポジトリに含まれている `config.py.example` をコピーし、ファイル名を **`config.py`** に変更してください。
+    
+    ```bash
+    cp config.py.example config.py
+    ```
+
+3.  **設定ファイル (`config.py`) の編集**:
+    新しく作成した `config.py` を開き、以下の項目を設定してください。IDはすべて**文字列** (`""`) で囲む必要があります。
+    
+    * `ADMIN_USER_ID`: Botの起動ログやエラー通知を受け取る管理者（あなたの）ユーザーID。
+    * `CODE_CHANNEL_ID`: フィルタリングを適用するオレマシンコードチャンネルのID。
+    * `MUTE_ONLY_CHANNEL_NAMES`: 通知のみを抑制したいチャンネル名リスト。
+    * `READ_ONLY_MUTE_CHANNEL_NAMES`: ログ系のチャンネル名リスト。
+
 ## 4. 運用に必要なDiscord権限 (重要)
 
 本Botの機能が正常に動作するためには、Botに付与されたロールが以下の権限を持っている必要があります。
