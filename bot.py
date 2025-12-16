@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 import asyncio
-# 🚨 修正点: DISCORD_BOT_TOKENはconfig.pyから削除し、ADMIN_USER_IDのみインポート
 from config import ADMIN_USER_ID
 
 # コグ（拡張機能）のリスト
@@ -47,7 +46,7 @@ async def on_ready():
     print('Bot ID: {0.user.id}'.format(bot))
     print('-------------------------------------')
     
-    # --- 1. 起動完了DMを管理者へ送信 (fetch_userで確実に取得) ---
+    # --- 1. 起動完了DMを管理者へ送信 ---
     owner = None
     try:
         owner_id_int = int(ADMIN_USER_ID)
@@ -76,7 +75,6 @@ async def on_ready():
     if 'cogs.mass_mute' in bot.extensions:
         mass_mute_cog = bot.get_cog("MassMuteCog")
         if mass_mute_cog:
-            # mass_muteコグのexecute_mute_logicを直接呼び出す
             await mass_mute_cog.execute_mute_logic("Startup (via bot.py)")
             print("Initial Startup Mute Check Triggered.")
         else:
