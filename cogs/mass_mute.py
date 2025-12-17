@@ -4,19 +4,18 @@ import asyncio
 import datetime
 from config import ADMIN_USER_ID, MUTE_ONLY_CHANNEL_NAMES, READ_ONLY_MUTE_CHANNEL_NAMES
 
-# 1. 【許可用】通知オフ + メッセージ送信「可」 (配信コメント等)
+# 権限オブジェクトの定義
 SEND_OK_OVERWRITE = discord.PermissionOverwrite(
     read_messages=True,
-    send_messages=True,     # 明示的に許可
-    mention_everyone=False, # 通知抑制
+    send_messages=True,
+    mention_everyone=False,
     manage_webhooks=False
 )
 
-# 2. 【禁止用】通知オフ + メッセージ送信「不可」 (参加ログ等)
 SEND_NG_OVERWRITE = discord.PermissionOverwrite(
     read_messages=True,
-    send_messages=False,    # 明示的に禁止
-    mention_everyone=False, # 通知抑制
+    send_messages=False,
+    mention_everyone=False,
     manage_webhooks=False
 )
 
@@ -26,46 +25,92 @@ class MassMuteCog(commands.Cog):
         self.owner_id = int(ADMIN_USER_ID)
         self.daily_mute_check.start()
 
-    def cog_unload(self):
-        self.daily_mute_check.cancel()
+    async def _send_admin_dm(self, embed: discord.Embed):
+        """管理者にDMを送信するヘルパー"""
+        try:
+            owner = await self.bot.fetch_user(self.owner_id)
+            if owner:
+                await owner.send(embed=embed)
+        except Exception as e:
+            print(f"[DM ERROR] {e}")
+
+    @commands.Cog.listener()
+    async def on_guild_channel_create(self, channel):
+        if not isinstance(channel, discord.TextChannel): return
+        
+        target = None
+        mode = ""
+        if channel.name in MUTE_ONLY_CHANNEL_NAMES:
+            target, mode = SEND_OK_OVERWRITE, "送信許可"
+        elif channel.name in READ_ONLY_MUTE_CHANNEL_NAMES:
+            target, mode = SEND_NG_OVERWRITE, "送信禁止"
+
+        if target:
+            await asyncio.sleep(1)
+            try:
+                await channel.set_permissions(channel.guild.default_role, overwrite=target)
+                embed = discord.Embed(
+                    title="🆕 チャンネル自動設定完了",
+                    description=f"新しく作成されたチャンネル **#{channel.name}** を検知し、権限を自動適用しました。\n設定モード: `{mode}`",
+                    color=0x3498db
+                )
+                await self._send_admin_dm(embed)
+            except Exception as e:
+                print(f"[AUTO-MUTE ERROR] {e}")
 
     async def execute_mute_logic(self, trigger: str):
         if not self.bot.guilds: return
         guild = self.bot.guilds[0]
         everyone_role = guild.default_role
         
-        success_count = 0
-        errors = []
+        success_list = []
+        error_list = []
 
-        # A. 送信を許可するチャンネルの処理
+        # 1. 送信許可チャンネルの処理
         for name in MUTE_ONLY_CHANNEL_NAMES:
             channel = discord.utils.get(guild.text_channels, name=name)
             if channel:
                 try:
                     await channel.set_permissions(everyone_role, overwrite=SEND_OK_OVERWRITE)
-                    success_count += 1
+                    success_list.append(f"#{name} (許可)")
                 except Exception as e:
-                    errors.append(f"#{name}: {e}")
+                    error_list.append(f"#{name}: {e}")
 
-        # B. 送信を禁止するチャンネルの処理
+        # 2. 送信禁止チャンネルの処理
         for name in READ_ONLY_MUTE_CHANNEL_NAMES:
             channel = discord.utils.get(guild.text_channels, name=name)
             if channel:
                 try:
                     await channel.set_permissions(everyone_role, overwrite=SEND_NG_OVERWRITE)
-                    success_count += 1
+                    success_list.append(f"#{name} (禁止)")
                 except Exception as e:
-                    errors.append(f"#{name}: {e}")
+                    error_list.append(f"#{name}: {e}")
 
-        # 結果をDM送信
-        owner = await self.bot.fetch_user(self.owner_id)
-        if owner:
-            msg = f"🛡️ **通知制御実行** ({trigger})\n成功: {success_count}件"
-            if errors:
-                msg += f"\n❌ エラー:\n" + "\n".join(errors)
-            await owner.send(msg)
+        # --- 🚨 修正点: 管理者への完了通知DMを作成 🚨 ---
+        embed = discord.Embed(
+            title="🛡️ 通知抑制処理 完了報告",
+            description=f"実行トリガー: **{trigger}**",
+            color=0x4caf50 if not error_list else 0xff9800,
+            timestamp=discord.utils.utcnow()
+        )
+        
+        if success_list:
+            embed.add_field(name="✅ 成功", value="\n".join(success_list), inline=False)
+        
+        if error_list:
+            embed.add_field(name="❌ エラー", value="\n".join(error_list), inline=False)
+            embed.color = 0xf44336
 
-    @tasks.loop(time=[datetime.time(0, 0, tzinfo=datetime.timezone.utc)]) # 適宜時間は調整
+        if not success_list and not error_list:
+            embed.description += "\n対象のチャンネルが見つかりませんでした。"
+
+        await self._send_admin_dm(embed)
+
+    @tasks.loop(time=[
+        datetime.time(0, 0, tzinfo=datetime.timezone.utc),
+        datetime.time(8, 0, tzinfo=datetime.timezone.utc),
+        datetime.time(16, 0, tzinfo=datetime.timezone.utc)
+    ])
     async def daily_mute_check(self):
         await self.execute_mute_logic("Daily Task")
 
