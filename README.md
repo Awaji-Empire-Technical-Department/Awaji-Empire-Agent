@@ -75,3 +75,22 @@ Botのコードは、高い保守性を保つため、コア、設定、機能�
 > 
 > [**➡️ 詳細設計と運用ドキュメント (ARCHITECTURE.md) へ**](./docs/ARCHITECTURE.md)
 ---
+
+
+## 更新履歴 (2025-12-20)
+
+### 概要
+Discord認証を用いたWeb管理ダッシュボードの実装およびネットワーク環境の最適化を行いました。これにより、Bot利用者が自身のアンケートをブラウザから安全に管理できるようになりました。
+
+### 🚀 新機能 (Features)
+* **Web Dashboard:** Flaskを使用したアンケート管理画面の実装。
+* **Authentication:** Discord OAuth2によるログイン機能の実装。
+* **Authorization:** 指定したDiscordサーバー（淡路帝国）のメンバーのみアクセスを許可する権限チェック機能。
+* **Data Isolation:** ログインユーザーが作成したアンケートのみを表示・編集・削除できるようにデータを分離。
+* **Network Fix:** IPv6無効化パッチおよびMTU調整による通信タイムアウト問題の解消。
+
+### 🗄️ データベース変更 (Database Schema)
+`surveys` テーブルに作成者を識別するための `owner_id` カラムを追加しました。
+
+```sql
+ALTER TABLE surveys ADD COLUMN owner_id VARCHAR(255) DEFAULT NULL;

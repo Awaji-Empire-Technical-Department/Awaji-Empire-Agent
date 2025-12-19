@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アンケート編集 - Awaji Empire Agent Menu</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">アンケート編集 (ID: {{ survey.id }})</h4>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                
+                <div class="mb-3">
+                    <label for="title" class="form-label fw-bold">アンケートタイトル</label>
+                    <input type="text" class="form-control" id="title" name="title" 
+                           value="{{ survey.title }}" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="is_active" class="form-label fw-bold">ステータス</label>
+                    <select class="form-select" id="is_active" name="is_active">
+                        <option value="1" {% if survey.is_active %}selected{% endif %}>有効 (回答受付中)</option>
+                        <option value="0" {% if not survey.is_active %}selected{% endif %}>無効 (停止中)</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="questions" class="form-label fw-bold">質問内容 (JSON形式)</label>
+                    <textarea class="form-control font-monospace" id="questions" name="questions" rows="10" required>{{ survey.questions }}</textarea>
+                    <div class="form-text text-muted">
+                        JSON形式で記述してください。<br>
+                        例: <code>["好きな食べ物は？", "趣味は何ですか？"]</code><br>
+                        ※ ダブルクォーテーション <code>"</code> とカンマ <code>,</code> の位置に注意してください。
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">キャンセルして戻る</a>
+                    <button type="submit" class="btn btn-success">変更を保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

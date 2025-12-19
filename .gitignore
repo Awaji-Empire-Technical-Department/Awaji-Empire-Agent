@@ -6,3 +6,6 @@ venv/
 
 # Local Configuration
 config.py
+
+#.envファイル
+.env

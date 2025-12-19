@@ -1,12 +1,19 @@
 import discord
 from discord.ext import commands
 import asyncio
-from config import ADMIN_USER_ID
+import os
+import mysql.connector
+from dotenv import load_dotenv
+from config import ADMIN_USER_ID, GUILD_ID
+
+# .envファイルを読み込む
+load_dotenv()
 
 # コグ（拡張機能）のリスト
 COGS = [
     "cogs.filter",
-    "cogs.mass_mute"
+    "cogs.mass_mute",
+    "cogs.survey"
 ]
 
 class MyBot(commands.Bot):
@@ -20,7 +27,6 @@ class MyBot(commands.Bot):
     async def setup_hook(self):
         """
         Bot起動時に一度だけ実行される初期化処理。
-        コグのロードをここで行うことで、再接続時の二重ロードエラーを防止します。
         """
         for cog_name in COGS:
             try:
@@ -29,6 +35,34 @@ class MyBot(commands.Bot):
             except Exception as e:
                 print(f"ERROR: {cog_name} のロードに失敗しました。")
                 print(f"Traceback: {e}")
+
+        # config.py の GUILD_ID をチェック
+        if GUILD_ID:
+            try:
+                # 特定のサーバー(ギルド)にだけコマンドを登録・同期
+                guild = discord.Object(id=int(GUILD_ID))
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
+                print(f"Command tree synced to guild {GUILD_ID} successfully.")
+            except Exception as e:
+                print(f"Failed to sync to guild: {e}")
+        else:
+            # IDがない場合は、これまで通りグローバル同期
+            try:
+                await self.tree.sync()
+                print("Command tree synced globally.")
+            except Exception as e:
+                print(f"Failed to global sync: {e}")
+
+    # --- 追加: DB接続用メソッド ---
+    def get_db_connection(self):
+        """MySQLへの接続オブジェクトを返す"""
+        return mysql.connector.connect(
+            host=os.getenv('DB_HOST'),
+            database=os.getenv('DB_NAME'),
+            user=os.getenv('DB_USER'),
+            password=os.getenv('DB_PASS')
+        )
 
 # Botインスタンスの作成
 bot = MyBot()
@@ -48,15 +82,21 @@ def get_token_from_file(filename="token.txt"):
 
 @bot.event
 async def on_ready():
-    """
-    BotがDiscordに接続・再接続したときに実行される。
-    ※コグのロード処理は setup_hook に移動したため、ここからは削除されています。
-    """
+    """BotがDiscordに接続・再接続したときに実行される"""
     print('-------------------------------------')
     print('Bot Name: {0.user.name}'.format(bot))
     print('Bot ID: {0.user.id}'.format(bot))
     print('-------------------------------------')
     
+    # --- DB接続テスト (起動時に一度だけ確認) ---
+    try:
+        conn = bot.get_db_connection()
+        if conn.is_connected():
+            print("✅ Database connection successful!")
+            conn.close()
+    except Exception as e:
+        print(f"❌ Database connection failed: {e}")
+
     # --- 1. 起動/再接続DMを管理者へ送信 ---
     owner = None
     try:
@@ -77,11 +117,10 @@ async def on_ready():
         except Exception as e:
             print(f"Failed to send status DM to owner: {e}")
     
-    # --- 2. mass_mute の実行 (接続のたびに最新の状態に保つため) ---
+    # --- 2. mass_mute の実行 ---
     if 'cogs.mass_mute' in bot.extensions:
         mass_mute_cog = bot.get_cog("MassMuteCog")
         if mass_mute_cog:
-            # 非同期で実行
             asyncio.create_task(mass_mute_cog.execute_mute_logic("Startup/Reconnected"))
 
 
