@@ -1,116 +1,72 @@
-# 🤖 Awaji Empire Agent Bot
+# 🤖 Awaji Empire Agent
 
-## 1. 概要
+淡路帝国のコミュニティ運営を支える、多機能 Discord Bot & 管理ダッシュボードプラットフォーム。
 
-本プロジェクトは、Discordサーバーの管理と監視を目的とした Bot です。特に、特定のチャンネルへの不正な投稿のフィルタリングと、メンバーへの通知負荷を軽減するためのチャンネル権限管理（マスミュート）機能を自動化します。また、これらは簡単に機能追加が可能となっています。このプロジェクトはMITライセンスの下、自由にお使いいただけます。本プロジェクトの更新情報は、READMEに随時追加していきます。
+## 🌟 プロジェクトの概要
+本プロジェクトは、Discord Bot (`discord.py`) と Web ダッシュボード (`Quart`) を MariaDB で統合した、コミュニティ管理システムです。
+単なる Bot ではなく、インフラ（Proxmox / Cloudflare Tunnel）からフロントエンドまでを一貫して内製しており、高度な柔軟性とセキュリティを両立しています。
 
-## 2. 🌟 主要機能
+## 🚀 主要機能
+本システムは主に 3 つのコア機能を提供します。
 
-Botは以下の2つの主要な監視・管理タスクを自動実行します。
-
-| 機能 | 目的 | 動作詳細 |
+| 機能 | 概要 | 詳細ドキュメント |
 | :--- | :--- | :--- |
-| **コード提出フィルタリング** | 特定チャンネルの投稿内容を監視し、決められた形式以外の投稿を自動削除します。 | 8桁の英数字パターン（カービィのエアライダーのオレマシンコード形式）に**一致しない**メッセージを削除し、削除ログを管理者DMに送信します。 |
-| **通知マスミュート** | 特定のチャンネル（雑談、配信コメントなど）について、`@everyone` の「メッセージ送信」権限を無効化します。 | **1. 新規作成時**: 対象チャンネルが作成された際、即座にミュートを適用しDM通知。   **2. 定期確認**: 毎日1:00, 9:00, 17:00(JST)にすべての対象チャンネルの設定を再チェックし、維持します。 |
-| **起動・エラー通知** | Botの起動、コグのロード失敗、フィルタリング時の権限エラーなどを管理者DMに通知します。 | 共通の `send_admin_dm` 関数を通じて、Botの稼働状況をリアルタイムで確認可能。 |
+| **🛡️ メッセージフィルタ** | 特定チャンネルでの不正投稿（コード形式以外）を自動排除 | [詳細はこちら](./docs/FEATURE_FILTER.md) |
+| **🔔 通知マスミュート** | 大規模サーバーの通知騒音を防ぐ権限自動管理 | [詳細はこちら](./docs/FEATURE_MASS_MUTE.md) |
+| **📝 内製アンケート** | Webで作成しDiscordで答える、完全独自のフォームシステム | [詳細はこちら](./docs/FEATURE_SURVEY.md) |
 
-## 3. 📐 プロジェクト構造
+## 🏗️ システムアーキテクチャ
+物理サーバー上に構築された仮想化環境と、Zero Trust ネットワークを組み合わせた堅牢な構成を採用しています。
 
-Botのコードは、高い保守性を保つため、コア、設定、機能（コグ）に分離されています。
+### 🖥️ Hardware Spec
+- **CPU**: Intel Core i3 9100F
+- **GPU**: NVIDIA GeForce GT 710 (**望まれざる客**)
+- **RAM**: 16GB
+- **SSD**: 500GB
 
-### 3.1 Bot トークンと設定ファイルの準備
+### 🌐 Infrastructure
+- **Virtualization**: Proxmox VE 9.1
+- **OS**: Ubuntu 24.04 LTS / MariaDB (LXC)
+- **Networking**: Cloudflare Tunnel (HTTPS 化 / 固定 IP 不要)
 
-1.  **Bot トークンファイル (`token.txt`) の作成**:
-    プロジェクトルートディレクトリ（`/discord_bot/`）に `token.txt` ファイルを新規作成し、Botトークンを**一行目のみ**に記述して保存します。
-    
-    ```
-    YOUR_DISCORD_BOT_TOKEN_HERE
-    ```
+> [!IMPORTANT]
+> インフラ構成図および詳細なネットワークフローについては [ARCHITECTURE.md](./docs/ARCHITECTURE.md) を参照してください。
 
-2.  **設定ファイル (`config.py`) の編集**:
-    `config.py` を開き、以下の項目を設定してください。IDはすべて**文字列** (`""`) で囲む必要があります。
-    
-    * `ADMIN_USER_ID`: Botの起動ログやエラー通知を受け取る管理者（あなたの）ユーザーID。
-    * `CODE_CHANNEL_ID`: フィルタリングを適用するオレマシンコードチャンネルのID。
-    * `MUTE_ONLY_CHANNEL_NAMES`: 通知のみを抑制したいチャンネル名リスト（例: `["配信コメント", "メインチャンネル"]`）。
-    * `READ_ONLY_MUTE_CHANNEL_NAMES`: ログ系のチャンネル名リスト（メッセージ送信の可否は既存のカテゴリ設定に依存）。
+## 🛠️ セットアップ（クイックスタート）
 
-### 3.2 Bot トークンと設定ファイルの準備
+### 1. 環境変数の設定
+`.env` ファイルを作成し、必要な情報を設定します。
+```ini
+# Database
+DB_HOST=192.168.50.91
+DB_NAME=bot_db
+DB_USER=bot_user
+DB_PASS=your_password
 
-1.  **Bot トークンの取得とファイル (`token.txt`) の作成**:
-    **Discord Developer Portal** にてアプリケーションのBotセクションからトークンを取得し、プロジェクトルートディレクトリ（`/discord_bot/`）に `token.txt` ファイルを新規作成して、トークンを**一行目のみ**に記述して保存します。
-    
-    ```
-    YOUR_DISCORD_BOT_TOKEN_HERE
-    ```
-
-2.  **設定ファイル (`config.py`) の準備**:
-    リポジトリに含まれている `config.py.example` をコピーし、ファイル名を **`config.py`** に変更してください。
-    
-    ```bash
-    cp config.py.example config.py
-    ```
-
-3.  **設定ファイル (`config.py`) の編集**:
-    新しく作成した `config.py` を開き、以下の項目を設定してください。IDはすべて**文字列** (`""`) で囲む必要があります。
-    
-    * `ADMIN_USER_ID`: Botの起動ログやエラー通知を受け取る管理者（あなたの）ユーザーID。
-    * `CODE_CHANNEL_ID`: フィルタリングを適用するオレマシンコードチャンネルのID。
-    * `MUTE_ONLY_CHANNEL_NAMES`: 通知のみを抑制したいチャンネル名リスト。
-    * `READ_ONLY_MUTE_CHANNEL_NAMES`: ログ系のチャンネル名リスト。
-
-## 4. 運用に必要なDiscord権限 (重要)
-
-本Botの機能が正常に動作するためには、Botに付与されたロールが以下の権限を持っている必要があります。
-
-| 機能名 | 権限 | 適用範囲 | 理由 |
-| :--- | :--- | :--- | :--- |
-| **コードチャンネル フィルタ** | **メッセージの管理** | フィルタリング対象のチャンネル | 添付ファイルがないメッセージを自動削除するため。 |
-| **通知抑制 (常時ミュート)** | **権限の管理** | サーバー全体 または 対象チャンネル | `@everyone` ロールのチャンネル権限を上書きするために必須。 |
-
----
-> **🚀 開発者・運用者向け**
-> 
-> 本 Bot の**コード構造、詳細な機能ロジック、および運用環境**については、以下のドキュメントにすべて記載されています。
-> 
-> [**➡️ 詳細設計と運用ドキュメント (ARCHITECTURE.md) へ**](./docs/ARCHITECTURE.md)
----
-
-##  更新履歴 (2025-12-20)
-- **Webダッシュボードの改善:** HTMLとJavaScriptを分離し、保守性を向上させました。
-- **回答機能の実装:** Discord上で対話形式（ウィザード）でアンケートに回答できるようになりました。
-- **Cloudflare Tunnel対応:** `cloudflared` を導入し、セキュアな外部公開に対応しました。
-
-### 🛠️ データベース設定 (追加)
-回答データを保存するために、以下のテーブルが必要です。
-
-```sql
-CREATE TABLE survey_responses (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    survey_id INT NOT NULL,
-    user_id VARCHAR(255) NOT NULL,
-    user_name VARCHAR(255),
-    answers JSON,
-    answered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (survey_id) REFERENCES surveys(id) ON DELETE CASCADE
-);
+# Discord OAuth2
+DISCORD_CLIENT_ID=1446462054423855144
+DISCORD_CLIENT_SECRET=your_client_secret
+DISCORD_REDIRECT_URI=[https://dashboard.awajiempire.net/callback](https://dashboard.awajiempire.net/callback)
 ```
 
-## 更新履歴 (2025-12-20)
-
-### 概要
-Discord認証を用いたWeb管理ダッシュボードの実装およびネットワーク環境の最適化を行いました。これにより、Bot利用者が自身のアンケートをブラウザから安全に管理できるようになりました。
-
-### 🚀 新機能 (Features)
-* **Web Dashboard:** Flaskを使用したアンケート管理画面の実装。
-* **Authentication:** Discord OAuth2によるログイン機能の実装。
-* **Authorization:** 指定したDiscordサーバー（淡路帝国）のメンバーのみアクセスを許可する権限チェック機能。
-* **Data Isolation:** ログインユーザーが作成したアンケートのみを表示・編集・削除できるようにデータを分離。
-* **Network Fix:** IPv6無効化パッチおよびMTU調整による通信タイムアウト問題の解消。
-
-### 🗄️ データベース変更 (Database Schema)
-`surveys` テーブルに作成者を識別するための `owner_id` カラムを追加しました。
-
-```sql
-ALTER TABLE surveys ADD COLUMN owner_id VARCHAR(255) DEFAULT NULL;
+### 2. 依存関係のインストール
+```Bash
+pip install -r requirements.txt
 ```
+
+### 3. サービスの起動
+```Bash
+# Botの起動
+python bot.py
+
+# Webダッシュボードの起動
+python webapp.py
+```
+
+## 更新内容
+詳細な更新内容は[CHANGELOG.md](./CHANGELOG.md)
+
+##📜 ライセンス
+このプロジェクトは MIT ライセンスの下で公開されています。
+
+© 2025 Awaji Empire Technical Department
