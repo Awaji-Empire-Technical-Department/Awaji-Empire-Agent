@@ -38,7 +38,7 @@
 `.env` ファイルを作成し、必要な情報を設定します。
 ```ini
 # Database
-DB_HOST=192.168.50.91
+DB_HOST=db_ip
 DB_NAME=bot_db
 DB_USER=bot_user
 DB_PASS=your_password
