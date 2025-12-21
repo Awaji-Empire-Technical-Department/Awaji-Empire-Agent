@@ -2,73 +2,46 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>アンケート編集 - Awaji Empire Agent Menu</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <style>
-        .question-card { border-left: 5px solid #0d6efd; transition: all 0.3s; margin-bottom: 1rem; }
-        .question-card:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    </style>
+    <title>アンケート編集</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
 </head>
-<body class="bg-light">
-
-<div class="container mt-5 mb-5">
-    <div class="card shadow-lg" style="max-width: 900px; margin: 0 auto;">
-        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
-            <h4 class="mb-0"><i class="bi bi-sliders"></i> アンケート設計エディタ</h4>
-            <span class="badge bg-primary">ID: {{ survey.id }}</span>
+<body>
+    <div class="container" style="max-width: 800px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2><i class="fas fa-edit"></i> アンケート編集 (ID: {{ survey['id'] }})</h2>
+            <a href="/" class="btn btn-gray">戻る</a>
         </div>
-        <div class="card-body bg-white">
-            
-            <form method="POST" id="surveyForm">
-                
-                <div class="row mb-4 g-3">
-                    <div class="col-md-8">
-                        <label class="form-label fw-bold">タイトル</label>
-                        <input type="text" class="form-control form-control-lg" name="title" value="{{ survey.title }}" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold">ステータス</label>
-                        <select class="form-select form-select-lg" name="is_active">
-                            <option value="1" {% if survey.is_active %}selected{% endif %}>🟢 有効 (公開中)</option>
-                            <option value="0" {% if not survey.is_active %}selected{% endif %}>🔴 無効 (停止中)</option>
-                        </select>
-                    </div>
-                </div>
 
-                <hr class="my-4">
+        <form action="/save_survey" method="post" id="surveyForm">
+            <input type="hidden" name="survey_id" value="{{ survey['id'] }}">
+            <input type="hidden" name="questions_json" id="questionsJson">
 
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold"><i class="bi bi-list-ul"></i> 質問項目</h5>
-                    <button type="button" class="btn btn-primary" onclick="addQuestion()">
-                        <i class="bi bi-plus-circle"></i> 新しい質問を追加
-                    </button>
-                </div>
+            <div class="form-group">
+                <label>アンケートタイトル</label>
+                <input type="text" name="title" value="{{ survey['title'] }}" required style="font-size: 1.2em; font-weight: bold;">
+            </div>
 
-                <div id="questions-container" class="vstack gap-3">
-                    </div>
+            <h3 style="margin-top: 30px; border-bottom: 1px solid #eee; padding-bottom: 10px;">質問リスト</h3>
+            <div id="questionsContainer"></div>
 
-                <input type="hidden" name="questions" id="hidden-json">
+            <div class="button-group" style="justify-content: center; margin-top: 20px;">
+                <button type="button" class="btn btn-blue" onclick="addQuestion()">
+                    <i class="fas fa-plus"></i> 質問を追加
+                </button>
+            </div>
 
-                <hr class="my-5">
-
-                <div class="d-flex justify-content-end gap-2">
-                    <a href="/" class="btn btn-secondary">キャンセル</a>
-                    <button type="submit" class="btn btn-success btn-lg px-5 fw-bold">
-                        <i class="bi bi-save"></i> 設計を保存する
-                    </button>
-                </div>
-            </form>
-        </div>
+            <div style="margin-top: 40px; text-align: right; border-top: 1px solid #eee; padding-top: 20px;">
+                <button type="submit" class="btn btn-green" style="padding: 12px 30px; font-size: 1.1em;">
+                    <i class="fas fa-save"></i> 保存して戻る
+                </button>
+            </div>
+        </form>
     </div>
-</div>
 
-<div id="raw-data" style="display:none;">{{ survey.questions }}</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<script src="{{ url_for('static', filename='js/edit_survey.js') }}"></script>
-
+    <script>
+        window.initialQuestions = {{ questions | tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='js/edit_survey.js') }}"></script>
 </body>
 </html>

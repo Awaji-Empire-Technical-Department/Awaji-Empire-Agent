@@ -1,26 +1,85 @@
-body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; background-color: #f5f7fa; color: #333; }
-.container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 8px; }
+/* --- 画像の内容を再現 --- */
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    padding: 20px;
+    background-color: #f5f7fa;
+    color: #333;
+}
 
-h1 { border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 30px; color: #2c3e50; }
-h2 { color: #34495e; margin-bottom: 15px; border-left: 5px solid #3498db; padding-left: 10px; }
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    padding: 30px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-radius: 8px;
+}
+
+h1 {
+    border-bottom: 2px solid #eee;
+    padding-bottom: 15px;
+    margin-bottom: 30px;
+    color: #2c3e50;
+}
+
+h2 {
+    color: #34495e;
+    margin-bottom: 15px;
+    border-left: 5px solid #3498db;
+    padding-left: 10px;
+}
 
 /* テーブル設定 */
-table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-th, td { border: 1px solid #e1e4e8; padding: 12px 15px; text-align: left; vertical-align: middle; }
-th { background-color: #f8f9fa; font-weight: bold; color: #555; }
-tr:hover { background-color: #f1f1f1; }
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+th, td {
+    border: 1px solid #e1e4e8;
+    padding: 12px 15px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #555;
+}
+
+tr:hover {
+    background-color: #f1f1f1;
+}
 
 /* バッジ */
-.status-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.85em; font-weight: bold; color: white; display: inline-block; }
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: bold;
+    color: white;
+    display: inline-block;
+}
+
 .status-badge.active { background-color: #2ecc71; } /* 緑 */
 .status-badge.closed { background-color: #95a5a6; } /* グレー */
 
 /* ボタン共通 */
-.btn { 
-    padding: 8px 16px; text-decoration: none; border-radius: 4px; 
-    font-weight: bold; display: inline-block; font-size: 0.9em; 
-    transition: background-color 0.2s; border: none; cursor: pointer; color: white;
+.btn {
+    padding: 8px 16px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: bold;
+    display: inline-block;
+    font-size: 0.9em;
+    transition: background-color 0.2s;
+    border: none;
+    cursor: pointer;
+    color: white;
 }
+
 .actions .btn { margin-right: 5px; margin-bottom: 5px; }
 
 .btn-green { background-color: #27ae60; }
@@ -38,11 +97,54 @@ tr:hover { background-color: #f1f1f1; }
 /* フォーム周り */
 .form-group { margin-bottom: 20px; }
 .form-group label { display: block; margin-bottom: 8px; font-weight: bold; }
-.form-group input[type="text"], 
+.form-group input[type="text"],
 .form-group textarea {
-    width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;
-    font-size: 1em; box-sizing: border-box;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1em;
+    box-sizing: border-box;
 }
+
 .button-group { margin-top: 30px; display: flex; gap: 10px; }
 
-.no-data { color: #7f8c8d; font-style: italic; padding: 20px; text-align: center; background: #f9f9f9; border-radius: 4px; }
+.no-data {
+    color: #7f8c8d;
+    font-style: italic;
+    padding: 20px;
+    text-align: center;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+/* --- 追加: ログイン画面用の修正 --- */
+/* ログイン画面の背景を暗くし、中央寄せにする */
+body.login-page {
+    background-color: #2c3e50; /* 暗い背景 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+}
+
+/* ログイン画面のタイトル文字色を白にする */
+.login-title {
+    color: #ffffff !important;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* ログインカードの調整 */
+.login-card {
+    background: white;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    width: 400px;
+    text-align: center;
+}
+.login-card h3 {
+    /* カード内の見出しは元の色に戻す */
+    color: #2c3e50; 
+}

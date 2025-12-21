@@ -1,123 +1,93 @@
 /**
- * edit_survey.js
- * アンケート編集画面の動的UI制御
+ * アンケート編集画面用スクリプト
  */
 
-let questions = [];
+// グローバル変数 (HTML側から初期データを受け取る)
+let questions = window.initialQuestions || [];
 
-// ページ読み込み完了時に実行
-document.addEventListener('DOMContentLoaded', () => {
-    // HTML内の隠し要素から生データを取得
-    const rawDataElement = document.getElementById('raw-data');
-    if (rawDataElement) {
-        const raw = rawDataElement.textContent;
-        try {
-            const parsed = JSON.parse(raw);
-            // 古いデータ形式(ただの文字列配列)への互換性対応
-            if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
-                questions = parsed.map(q => ({ type: 'text', question: q, options: [] }));
-            } else {
-                questions = parsed || [];
-            }
-        } catch(e) {
-            console.error("JSON Parse Error:", e);
-            questions = [];
-        }
-    }
+document.addEventListener('DOMContentLoaded', function() {
+    renderQuestions();
 
-    // データが空ならデフォルトで1つ追加
-    if (questions.length === 0) {
-        addQuestion();
-    } else {
-        renderAll();
-    }
-
-    // 送信ボタンのイベントリスナー
+    // フォーム送信時の処理
     const form = document.getElementById('surveyForm');
     if (form) {
-        form.addEventListener('submit', () => {
-            document.getElementById('hidden-json').value = JSON.stringify(questions);
-        });
+        form.onsubmit = function() {
+            // JSON文字列に変換してhidden inputにセット
+            document.getElementById('questionsJson').value = JSON.stringify(questions);
+            return true;
+        };
     }
 });
 
-// --- 以下、HTML内のonclick等から呼ばれる関数群 ---
-// windowオブジェクトに紐付けることで、動的生成されたHTMLからも呼び出せるようにする
+// 質問リストを描画
+function renderQuestions() {
+    const container = document.getElementById('questionsContainer');
+    if (!container) return;
 
-window.addQuestion = function() {
-    questions.push({ type: 'text', question: '', options: [] });
-    renderAll();
-};
-
-window.removeQuestion = function(index) {
-    if(!confirm('この質問を削除しますか？')) return;
-    questions.splice(index, 1);
-    renderAll();
-};
-
-window.updateData = function(index, key, value) {
-    questions[index][key] = value;
-    renderAll(); // タイプ変更時のUI切り替えのため再描画
-};
-
-window.updateOptions = function(index, value) {
-    // 全角カンマを半角に変換し、配列化して保存
-    const opts = value.replace(/、/g, ',').split(',').map(s => s.trim()).filter(s => s);
-    questions[index].options = opts;
-};
-
-// 描画関数 (Reactライクな再描画ロジック)
-function renderAll() {
-    const container = document.getElementById('questions-container');
     container.innerHTML = '';
-
+    
     questions.forEach((q, index) => {
-        const card = document.createElement('div');
-        card.className = 'card question-card bg-light';
-        
-        // テンプレートリテラルでHTMLを構築
-        card.innerHTML = `
-            <div class="card-body">
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="badge bg-secondary">Q${index + 1}</span>
-                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeQuestion(${index})">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
-                
-                <div class="row g-2">
-                    <div class="col-md-8">
-                        <input type="text" class="form-control fw-bold" placeholder="質問文を入力 (例: 参加しますか？)" 
-                            value="${escapeHtml(q.question)}" onchange="updateData(${index}, 'question', this.value)">
-                    </div>
-                    <div class="col-md-4">
-                        <select class="form-select" onchange="updateData(${index}, 'type', this.value)">
-                            <option value="text" ${q.type === 'text' ? 'selected' : ''}>📝 記述式 (自由入力)</option>
-                            <option value="radio" ${q.type === 'radio' ? 'selected' : ''}>🔘 ラジオボタン (単一)</option>
-                            <option value="checkbox" ${q.type === 'checkbox' ? 'selected' : ''}>☑️ チェックボックス (複数)</option>
-                        </select>
-                    </div>
-                </div>
+        let qText = q.question || q; 
+        let qType = q.type || 'text';
+        let options = q.options || [];
 
-                <div class="mt-3 ${q.type === 'text' ? 'd-none' : ''}">
-                    <label class="form-label small text-muted">選択肢 (カンマ区切りで入力)</label>
-                    <input type="text" class="form-control form-control-sm" placeholder="例: はい, いいえ, 多分"
-                        value="${q.options ? escapeHtml(q.options.join(', ')) : ''}" 
-                        onchange="updateOptions(${index}, this.value)">
+        // CSSクラスに合わせてHTMLを生成
+        const html = `
+        <div class="form-group" style="padding: 15px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 15px; background: #fff;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <span class="status-badge closed">Q${index + 1}</span>
+                <button type="button" class="btn btn-orange" style="padding: 2px 8px; font-size: 0.8em;" onclick="removeQuestion(${index})">削除</button>
+            </div>
+            
+            <div class="form-group">
+                <input type="text" placeholder="質問文を入力" value="${escapeHtml(qText)}" 
+                       onchange="updateQ(${index}, 'question', this.value)">
+            </div>
+            
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                    <select class="form-control" style="width:100%; padding:10px; border-radius:4px; border:1px solid #ddd;" 
+                            onchange="updateQ(${index}, 'type', this.value)">
+                        <option value="text" ${qType==='text'?'selected':''}>記述式</option>
+                        <option value="radio" ${qType==='radio'?'selected':''}>ラジオボタン</option>
+                        <option value="checkbox" ${qType==='checkbox'?'selected':''}>チェックボックス</option>
+                    </select>
+                </div>
+                <div style="flex:2;">
+                    <input type="text" placeholder="選択肢 (カンマ区切り: 赤,青,黄)" 
+                           value="${escapeHtml(options.join(','))}" 
+                           ${qType==='text' ? 'disabled' : 'style="background:white;"'}
+                           onchange="updateQ(${index}, 'options', this.value)">
                 </div>
             </div>
-        `;
-        container.appendChild(card);
+        </div>`;
+        container.insertAdjacentHTML('beforeend', html);
     });
 }
 
-// XSS対策用の簡易エスケープ関数
+// 質問追加
+window.addQuestion = function() {
+    questions.push({ type: 'text', question: '', options: [] });
+    renderQuestions();
+};
+
+// 質問削除
+window.removeQuestion = function(index) {
+    questions.splice(index, 1);
+    renderQuestions();
+};
+
+// データ更新
+window.updateQ = function(index, field, value) {
+    if (field === 'options') {
+        questions[index].options = value.split(',').map(s => s.trim()).filter(s => s);
+    } else {
+        questions[index][field] = value;
+    }
+    if (field === 'type') renderQuestions();
+};
+
 function escapeHtml(text) {
     if (!text) return "";
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    return text.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
