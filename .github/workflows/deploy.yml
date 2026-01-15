@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: 01sv-ubuntu # 先ほど設定したランナー
+    runs-on: self-hosted # 先ほど設定したランナー
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
