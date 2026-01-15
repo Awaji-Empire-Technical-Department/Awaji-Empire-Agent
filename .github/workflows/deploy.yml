@@ -10,8 +10,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          path: '/discord_bot'
+
+      - name: Sync to production directory
+        run:  |
+          sudo rsync -av --exclude='.git' ./ /discord_bot/
 
       - name: Install dependencies
         run: |
