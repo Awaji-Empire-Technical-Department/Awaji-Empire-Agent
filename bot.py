@@ -13,7 +13,8 @@ load_dotenv()
 COGS = [
     "cogs.filter",
     "cogs.mass_mute",
-    "cogs.survey"
+    "cogs.survey",
+    "cogs.voice_keeper"
 ]
 
 class MyBot(commands.Bot):
