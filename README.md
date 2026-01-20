@@ -17,6 +17,7 @@
 | **🔔 通知マスミュート** | 大規模サーバーの通知騒音を防ぐ権限自動管理 | [詳細はこちら](./docs/FEATURE_MASS_MUTE.md) |
 | **📝 内製アンケート** | Webで作成しDiscordで答える、完全独自のフォームシステム | [詳細はこちら](./docs/FEATURE_SURVEY.md) |
 | **😴 寝落ち切断** | 特定ユーザーがVCから退出して一定時間経過しても、まだVCに残っているユーザーを「寝落ち」と判定し、自動的に切断（Kick）する機能。また、切断した人数を集計し、テキストチャンネルに報告する。 | [詳細はこちら](./docs/FEATURE_VOICE_KEEPER.md) |
+| **😴 寝落ち切断** | 特定ユーザーがVCから退出して一定時間経過しても、まだVCに残っているユーザーを「寝落ち」と判定し、自動的に切断（Kick）する機能。また、切断した人数を集計し、テキストチャンネルに報告する。 | [詳細はこちら](./docs/FEATURE_VOICE_KEEPER.md) |
 
 ## 🏗️ システムアーキテクチャ
 
@@ -52,14 +53,20 @@ DB_USER=bot_user
 DB_PASS=your_password
 
 # Discord OAuth2
-DISCORD_CLIENT_ID=CLIENT_ID
-DISCORD_CLIENT_SECRET=CLIENT_SECRET
-DISCORD_REDIRECT_URI=https://dashboard.awajiempire.net/callback
+DISCORD_CLIENT_ID=bot_client_id
+DISCORD_CLIENT_SECRET=your_client_secret
+DISCORD_REDIRECT_URI=[https://dashboard.awajiempire.net/callback](https://dashboard.awajiempire.net/callback)
 
-TARGET_USER_ID=TARGET_USER_ID #ホストのユーザーID
-ACTIVE_START_HOUR=ACTIVE_START_HOUR #稼働開始時間
-ACTIVE_END_HOUR=ACTIVE_END_HOUR #稼働終了時間
-REPORT_CHANNEL_NAME=REPORT_CHANNEL_NAME #レポート送信先チャンネル名
+# ★追加: 淡路帝国サーバーのID (数字のみ)
+DISCORD_GUILD_ID=server_id
+
+# Web Dashboard URL (Bot案内用)
+DASHBOARD_URL=https://dashboard.awajiempire.net
+
+# ★追加: AFK監視設定
+TARGET_USER_ID=target_user_id #監視対象ユーザー
+AFK_TIMEOUT_SECONDS=300          #AFKタイムアウト時間（秒）
+REPORT_CHANNEL_NAME=配信コメント   #レポート送信先チャンネル名
 ```
 
 ### 2. 依存関係のインストール
@@ -86,4 +93,4 @@ python webapp.py
 
 このプロジェクトは MIT ライセンスの下で公開されています。
 
-© 2025 Awaji Empire Technical Department
+© 2026 Awaji Empire Technical Department
