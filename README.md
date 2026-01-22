@@ -86,6 +86,11 @@ python bot.py
 python webapp.py
 ```
 
+## 共通ロジックの説明
+
+詳細な説明は[common/README.md](./common/README.md)を参照してください。
+
+
 ## 更新内容
 
 詳細な更新内容は[CHANGELOG.md](./CHANGELOG.md)
