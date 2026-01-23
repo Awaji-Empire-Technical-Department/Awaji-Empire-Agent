@@ -4,6 +4,7 @@ import aiomysql
 from quart import Quart, render_template, request, redirect, url_for, session
 from quart_cors import cors
 from dotenv import load_dotenv
+import httpx
 
 # Blueprintの読み込み
 from routes.survey import survey_bp
@@ -88,32 +89,37 @@ async def callback():
     }
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
-    try:
-        r = requests.post(token_url, data=payload, headers=headers)
-        if r.status_code != 200: return f"Auth Failed: {r.text}", 400
-        
-        token_data = r.json()
-        auth_header = {'Authorization': f'Bearer {token_data.get("access_token")}'}
+    async with httpx.AsyncClient() as client:
+        try:
+            # 1. トークン取得を非同期で行う
+            r = await client.post(token_url, data=payload, headers=headers)
+            if r.status_code != 200: return f"Auth Failed: {r.text}", 400
+            
+            token_data = r.json()
+            auth_header = {'Authorization': f'Bearer {token_data.get("access_token")}'}
 
-        if Config.TARGET_GUILD_ID:
-            r_guilds = requests.get('https://discord.com/api/users/@me/guilds', headers=auth_header)
-            if r_guilds.status_code == 200:
-                guild_ids = [g['id'] for g in r_guilds.json()]
-                if str(Config.TARGET_GUILD_ID) not in guild_ids:
-                    return await render_template('access_denied.html'), 403
+            # 2. ギルド確認とユーザー情報取得を並列、もしくは非同期で実行
+            # ここを await することで、待機中に他のユーザーの処理を邪魔しなくなります
+            if Config.TARGET_GUILD_ID:
+                r_guilds = await client.get('https://discord.com/api/users/@me/guilds', headers=auth_header)
+                if r_guilds.status_code == 200:
+                    guild_ids = [g['id'] for g in r_guilds.json()]
+                    if str(Config.TARGET_GUILD_ID) not in guild_ids:
+                        return await render_template('access_denied.html'), 403
 
-        r_user = requests.get('https://discord.com/api/users/@me', headers=auth_header)
-        user_data = r_user.json()
+            r_user = await client.get('https://discord.com/api/users/@me', headers=auth_header)
+            user_data = r_user.json()
 
-        session['discord_user'] = {
-            'id': user_data['id'],
-            'name': user_data['username'],
-            'avatar_url': f"https://cdn.discordapp.com/avatars/{user_data['id']}/{user_data['avatar']}.png"
-        }
-        return redirect(url_for('index'))
+            # セッション保存処理（以下略）
+            session['discord_user'] = {
+                'id': user_data['id'],
+                'name': user_data['username'],
+                'avatar_url': f"https://cdn.discordapp.com/avatars/{user_data['id']}/{user_data['avatar']}.png"
+            }
+            return redirect(url_for('index'))
 
-    except Exception as e:
-        return f"Error: {e}", 500
+        except Exception as e:
+            return f"Error: {e}", 500
 
 @app.route('/logout')
 async def logout():
