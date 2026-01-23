@@ -142,6 +142,11 @@ async def delete_survey(survey_id):
 
 @survey_bp.route('/form/<int:survey_id>')
 async def view_form(survey_id):
+    user = session.get('discord_user')
+    if not user:
+        session['next_url'] = request.url
+        return redirect(url_for('login'))
+
     try:
         pool = await get_db_pool()
         async with pool.acquire() as conn:
@@ -155,16 +160,19 @@ async def view_form(survey_id):
         return "<h3>Not Found or Inactive</h3><p>このアンケートは現在受け付けていません。</p>", 404
 
     questions = parse_questions(survey['questions'])
-    return await render_template('form.html', survey=survey, questions=questions)
+    return await render_template('form.html', survey=survey, questions=questions, user=user)
 
 @survey_bp.route('/submit_response', methods=['POST'])
 async def submit_response():
+    user = session.get('discord_user')
+    if not user:
+        return "Unauthorized: Please login first", 401
+
     form = await request.form
     survey_id = form.get('survey_id')
-    user = session.get('discord_user')
     
-    u_id = user['id'] if user else None
-    u_name = user['name'] if user else 'Guest'
+    u_id = user['id']
+    u_name = user['name']
 
     answers = {}
     for key in form:

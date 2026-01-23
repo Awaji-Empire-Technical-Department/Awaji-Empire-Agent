@@ -137,6 +137,9 @@ async def callback():
             }
             
             # リダイレクト
+            next_url = session.pop('next_url', None)
+            if next_url:
+                return redirect(next_url)
             return redirect(url_for('index'))
 
         except httpx.TimeoutException:
