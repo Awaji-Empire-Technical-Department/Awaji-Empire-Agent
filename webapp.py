@@ -1,5 +1,4 @@
 import os
-import requests
 import aiomysql
 from quart import Quart, render_template, request, redirect, url_for, session
 from quart_cors import cors
