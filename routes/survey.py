@@ -250,7 +250,7 @@ async def download_csv(survey_id):
     try:
         pool = await get_db_pool()
         async with pool.acquire() as conn:
-            async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
                 await cur.execute("SELECT * FROM surveys WHERE id=%s", (survey_id,))
                 survey = await cur.fetchone()
                 if not survey or str(survey['owner_id']) != str(user['id']): return "Forbidden", 403
