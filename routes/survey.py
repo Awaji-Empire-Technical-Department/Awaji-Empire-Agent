@@ -1,5 +1,6 @@
 from quart import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
 import json
+import aiomysql
 from collections import Counter
 from utils import log_operation
 import csv
@@ -120,7 +121,7 @@ async def edit_survey(survey_id):
 
     pool = current_app.db_pool
     async with pool.acquire() as conn:
-        async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute("SELECT * FROM surveys WHERE id=%s", (survey_id,))
             survey = await cur.fetchone()
 
@@ -164,7 +165,7 @@ async def toggle_status(survey_id):
 
     pool = current_app.db_pool
     async with pool.acquire() as conn:
-        async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute("SELECT owner_id, is_active FROM surveys WHERE id=%s", (survey_id,))
             row = await cur.fetchone()
             if row and str(row['owner_id']) == str(user['id']):
@@ -181,7 +182,7 @@ async def delete_survey(survey_id):
 
     pool = current_app.db_pool
     async with pool.acquire() as conn:
-        async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute("SELECT owner_id FROM surveys WHERE id=%s", (survey_id,))
             row = await cur.fetchone()
             if row and str(row['owner_id']) == str(user['id']):
@@ -198,7 +199,7 @@ async def delete_survey(survey_id):
 async def view_form(survey_id):
     pool = current_app.db_pool
     async with pool.acquire() as conn:
-        async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute("SELECT * FROM surveys WHERE id=%s", (survey_id,))
             survey = await cur.fetchone()
 
@@ -214,7 +215,7 @@ async def view_form(survey_id):
     if user:
         pool = current_app.db_pool
         async with pool.acquire() as conn:
-            async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
                 await cur.execute(
                     "SELECT answers FROM survey_responses WHERE survey_id=%s AND user_id=%s",
                     (survey_id, user['id'])
@@ -261,7 +262,7 @@ async def submit_response():
 
     pool = current_app.db_pool
     async with pool.acquire() as conn:
-        async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
             # 既に回答があるかチェック
             await cur.execute(
                 "SELECT id FROM survey_responses WHERE survey_id=%s AND user_id=%s",
@@ -315,7 +316,7 @@ async def view_results(survey_id):
 
     pool = current_app.db_pool
     async with pool.acquire() as conn:
-        async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
             # アンケート取得
             await cur.execute("SELECT * FROM surveys WHERE id=%s", (survey_id,))
             survey = await cur.fetchone()
@@ -367,7 +368,7 @@ async def download_csv(survey_id):
 
     pool = current_app.db_pool
     async with pool.acquire() as conn:
-        async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
             # アンケート情報取得
             await cur.execute("SELECT * FROM surveys WHERE id=%s", (survey_id,))
             survey = await cur.fetchone()
