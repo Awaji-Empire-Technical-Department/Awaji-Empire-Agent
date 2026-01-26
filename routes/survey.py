@@ -230,7 +230,7 @@ async def view_form(survey_id):
     if user:
         pool = current_app.db_pool
         async with pool.acquire() as conn:
-            async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
                 await cur.execute(
                     "SELECT answers FROM survey_responses WHERE survey_id=%s AND user_id=%s",
                     (survey_id, user['id'])
@@ -274,7 +274,7 @@ async def submit_response():
 
     pool = current_app.db_pool
     async with pool.acquire() as conn:
-        async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
             # 既に回答があるかチェック
             await cur.execute(
                 "SELECT id FROM survey_responses WHERE survey_id=%s AND user_id=%s",
