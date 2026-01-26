@@ -4,6 +4,8 @@ from collections import Counter
 from utils import log_operation
 import csv
 import io
+import httpx
+import os
 from quart import make_response
 
 # Blueprintの定義
@@ -12,6 +14,64 @@ survey_bp = Blueprint('survey', __name__)
 # ------------------------------------------------------------------
 #  ヘルパー関数
 # ------------------------------------------------------------------
+
+# Load Bot Token
+try:
+    with open('token.txt', 'r', encoding='utf-8') as f:
+        DISCORD_BOT_TOKEN = f.read().strip()
+except FileNotFoundError:
+    DISCORD_BOT_TOKEN = None
+    print("WARNING: token.txt not found.")
+
+async def send_dm_notification(user_id, survey_title, survey_id, answers_text=""):
+    """
+    ユーザーにDMで回答控えと編集用リンクを送信する
+    """
+    if not DISCORD_BOT_TOKEN:
+        print("Token missing, cannot send DM.")
+        return False
+
+    url = f"https://discord.com/api/v10/users/@me/channels"
+    headers = {
+        "Authorization": f"Bot {DISCORD_BOT_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    # 1. DMチャンネルを作成/取得
+    async with httpx.AsyncClient() as client:
+        try:
+            r = await client.post(url, json={"recipient_id": user_id}, headers=headers)
+            if r.status_code not in (200, 201):
+                print(f"Failed to create DM channel: {r.text}")
+                return False
+            channel_id = r.json().get('id')
+            
+            # 2. メッセージ送信
+            msg_url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
+            edit_url = f"http://localhost:5000/form/{survey_id}" # 本番環境ではドメイン変更が必要
+            
+            content = (
+                f"**アンケート回答ありがとうございます**\n"
+                f"「{survey_title}」への回答を受け付けました。\n\n"
+                f"**回答の修正はこちらから:**\n{edit_url}\n"
+            )
+            
+            payload = {
+                "content": content,
+                # "embeds": [...] # 必要なら埋め込みにする
+            }
+            
+            r_msg = await client.post(msg_url, json=payload, headers=headers)
+            if r_msg.status_code in (200, 201):
+                return True
+            else:
+                print(f"Failed to send DM: {r_msg.text}")
+                return False
+                
+        except Exception as e:
+            print(f"Exception in send_dm_notification: {e}")
+            return False
+
 def parse_questions(json_str):
     """
     JSON文字列を安全にパースし、必須キーが欠けている場合はデフォルト値を埋める
@@ -147,8 +207,26 @@ async def view_form(survey_id):
 
     # ここでもヘルパーを使って安全に読み込む
     questions = parse_questions(survey['questions'])
+    
+    # 既存の回答を取得（ログインユーザーのみ）
+    existing_answers = {}
+    user = session.get('discord_user')
+    if user:
+        pool = current_app.db_pool
+        async with pool.acquire() as conn:
+            async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+                await cur.execute(
+                    "SELECT answers FROM survey_responses WHERE survey_id=%s AND user_id=%s",
+                    (survey_id, user['id'])
+                )
+                row = await cur.fetchone()
+                if row:
+                    try:
+                        existing_answers = json.loads(row['answers'])
+                    except:
+                        pass
 
-    return await render_template('form.html', survey=survey, questions=questions)
+    return await render_template('form.html', survey=survey, questions=questions, existing_answers=existing_answers)
 
 @survey_bp.route('/submit_response', methods=['POST'])
 async def submit_response():
@@ -183,13 +261,52 @@ async def submit_response():
 
     pool = current_app.db_pool
     async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
+        async with conn.cursor(current_app.aiomysql.DictCursor) as cur:
+            # 既に回答があるかチェック
             await cur.execute(
-                "INSERT INTO survey_responses (survey_id, user_id, user_name, answers, submitted_at) VALUES (%s, %s, %s, %s, NOW())",
-                (survey_id, u_id, u_name, json.dumps(answers, ensure_ascii=False))
+                "SELECT id FROM survey_responses WHERE survey_id=%s AND user_id=%s",
+                (survey_id, u_id)
             )
+            existing_row = await cur.fetchone()
+            
+            answers_json = json.dumps(answers, ensure_ascii=False)
+            response_id = None
+            
+            if existing_row:
+                # UPDATE
+                response_id = existing_row['id']
+                await cur.execute(
+                    """
+                    UPDATE survey_responses 
+                    SET answers=%s, submitted_at=NOW(), dm_sent=FALSE 
+                    WHERE id=%s
+                    """,
+                    (answers_json, response_id)
+                )
+            else:
+                # INSERT
+                await cur.execute(
+                    """
+                    INSERT INTO survey_responses (survey_id, user_id, user_name, answers, submitted_at, dm_sent) 
+                    VALUES (%s, %s, %s, %s, NOW(), FALSE)
+                    """,
+                    (survey_id, u_id, u_name, answers_json)
+                )
+                response_id = cur.lastrowid
+                
+            # アンケートタイトル取得（DM用）
+            await cur.execute("SELECT title FROM surveys WHERE id=%s", (survey_id,))
+            s_row = await cur.fetchone()
+            survey_title = s_row['title'] if s_row else "アンケート"
 
-    return "<h3>回答ありがとうございました！</h3><p>Your response has been recorded.</p>"
+            # DM送信処理 (非同期で待つか、バックグラウンドにするか。要件は「非同期で実行」だがawaitでも良い)
+            # ここではシンプルにawaitして結果をDBに反映する
+            is_sent = await send_dm_notification(u_id, survey_title, survey_id)
+            
+            if is_sent:
+                await cur.execute("UPDATE survey_responses SET dm_sent=TRUE WHERE id=%s", (response_id,))
+
+    return await render_template('submitted.html')
 
 @survey_bp.route('/results/<int:survey_id>')
 async def view_results(survey_id):

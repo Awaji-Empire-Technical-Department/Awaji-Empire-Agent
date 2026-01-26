@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
 </head>
+
 <body style="background:#eef2f5;">
     <div class="container-sm">
         <form action="{{ url_for('survey.submit_response') }}" method="POST">
@@ -18,67 +20,88 @@
             </div>
 
             {% for q in questions %}
-            <div class="card q-panel {% if q.logic %}hidden{% endif %}" 
-                 id="p_{{loop.index0}}" 
-                 data-idx="{{loop.index0}}" 
-                 {% if q.logic %}data-trg="{{q.logic.trigger_idx}}" data-val="{{q.logic.trigger_val}}"{% endif %}>
-                
+            <div class="card q-panel {% if q.logic %}hidden{% endif %}" id="p_{{loop.index0}}"
+                data-idx="{{loop.index0}}" {% if q.logic %}data-trg="{{q.logic.trigger_idx}}"
+                data-val="{{q.logic.trigger_val}}" {% endif %}>
+
                 <label style="margin-bottom:1rem; font-size:1.05rem;">
                     <span style="color:var(--success);">Q{{loop.index}}.</span> {{q.text}}
-                    {% if q.type!='text' %}<span class="badge badge-danger" style="background:var(--danger); font-size:0.6rem; vertical-align:middle; margin-left:5px;">必須</span>{% endif %}
+                    {% if q.type!='text' %}<span class="badge badge-danger"
+                        style="background:var(--danger); font-size:0.6rem; vertical-align:middle; margin-left:5px;">必須</span>{%
+                    endif %}
                 </label>
 
+                {% set q_idx = loop.index0 | string %}
+                {% set ans = existing_answers.get(q_idx) %}
+
                 {% if q.type=='text' %}
-                    <textarea name="q_{{loop.index0}}" class="form-control" rows="3" placeholder="回答を入力..."></textarea>
+                <textarea name="q_{{loop.index0}}" class="form-control" rows="3"
+                    placeholder="回答を入力...">{{ ans if ans else '' }}</textarea>
 
                 {% elif q.type=='radio' %}
-                    {% for opt in q.options %}
-                    <label class="option-item">
-                        <input type="radio" name="q_{{loop.index0}}" value="{{opt}}" required onchange="checkLogic()">
-                        <span>{{opt}}</span>
-                    </label>
-                    {% endfor %}
-                    {% if q.has_other %}
-                    <label class="option-item">
-                        <input type="radio" name="q_{{loop.index0}}" value="__other__" onchange="checkLogic()">
-                        <span style="margin-right:10px;">その他:</span>
-                        <input type="text" name="q_{{loop.index0}}_other" class="form-control" style="width:auto; flex:1; padding:4px;" disabled>
-                    </label>
-                    {% endif %}
+                {% for opt in q.options %}
+                <label class="option-item">
+                    <input type="radio" name="q_{{loop.index0}}" value="{{opt}}" required onchange="checkLogic()" {% if
+                        ans==opt %}checked{% endif %}>
+                    <span>{{opt}}</span>
+                </label>
+                {% endfor %}
+                {% if q.has_other %}
+                {% set is_other = ans and ans not in q.options %}
+                <label class="option-item">
+                    <input type="radio" name="q_{{loop.index0}}" value="__other__" onchange="checkLogic()" {% if
+                        is_other %}checked{% endif %}>
+                    <span style="margin-right:10px;">その他:</span>
+                    <input type="text" name="q_{{loop.index0}}_other" class="form-control"
+                        style="width:auto; flex:1; padding:4px;" {% if not is_other %}disabled{% endif %}
+                        value="{{ ans if is_other else '' }}">
+                </label>
+                {% endif %}
 
                 {% elif q.type=='checkbox' %}
-                    {% for opt in q.options %}
-                    <label class="option-item">
-                        <input type="checkbox" name="q_{{loop.index0}}[]" value="{{opt}}">
-                        <span>{{opt}}</span>
-                    </label>
-                    {% endfor %}
-                    {% if q.has_other %}
-                    <label class="option-item">
-                        <input type="checkbox" name="q_{{loop.index0}}[]" value="__other__" onchange="toggleOther(this)">
-                        <span style="margin-right:10px;">その他:</span>
-                        <input type="text" name="q_{{loop.index0}}_other" class="form-control" style="width:auto; flex:1; padding:4px;" disabled>
-                    </label>
-                    {% endif %}
+                {% set ans_list = ans if ans is iterable and ans is not string else [] %}
+                {% for opt in q.options %}
+                <label class="option-item">
+                    <input type="checkbox" name="q_{{loop.index0}}[]" value="{{opt}}" {% if opt in ans_list %}checked{%
+                        endif %}>
+                    <span>{{opt}}</span>
+                </label>
+                {% endfor %}
+                {% if q.has_other %}
+                {% set other_vals = [] %}
+                {% for v in ans_list %}
+                {% if v not in q.options %}{% set _ = other_vals.append(v) %}{% endif %}
+                {% endfor %}
+                {% set is_other = other_vals|length > 0 %}
+                <label class="option-item">
+                    <input type="checkbox" name="q_{{loop.index0}}[]" value="__other__" onchange="toggleOther(this)" {%
+                        if is_other %}checked{% endif %}>
+                    <span style="margin-right:10px;">その他:</span>
+                    <input type="text" name="q_{{loop.index0}}_other" class="form-control"
+                        style="width:auto; flex:1; padding:4px;" {% if not is_other %}disabled{% endif %}
+                        value="{{ other_vals[0] if is_other else '' }}">
+                </label>
+                {% endif %}
                 {% endif %}
             </div>
             {% endfor %}
 
-            <button type="submit" class="btn btn-success btn-block" style="padding:1rem; font-size:1.1rem; box-shadow:0 4px 15px rgba(39, 174, 96, 0.3);">
-                送信する
+            <button type="submit" class="btn btn-success btn-block"
+                style="padding:1rem; font-size:1.1rem; box-shadow:0 4px 15px rgba(39, 174, 96, 0.3);">
+                {% if existing_answers %}回答を更新{% else %}回答を送信{% endif %}
             </button>
         </form>
     </div>
 
     <script>
-        function checkLogic(){
-            const ans={};
-            document.querySelectorAll('input[type=radio]:checked').forEach(r=>{ ans[r.name.split('_')[1]] = r.value; });
-            
-            document.querySelectorAll('.q-panel').forEach(p=>{
+        function checkLogic() {
+            const ans = {};
+            document.querySelectorAll('input[type=radio]:checked').forEach(r => { ans[r.name.split('_')[1]] = r.value; });
+
+            document.querySelectorAll('.q-panel').forEach(p => {
                 const tIdx = p.dataset.trg, tVal = p.dataset.val;
-                if(tIdx) {
-                    if(ans[tIdx] === tVal) {
+                if (tIdx) {
+                    if (ans[tIdx] === tVal) {
                         p.classList.remove('hidden');
                         p.classList.add('fade-in');
                         toggleReq(p, true);
@@ -89,21 +112,22 @@
                     }
                 }
             });
-            document.querySelectorAll('input[value=__other__]').forEach(r=>{
+            document.querySelectorAll('input[value=__other__]').forEach(r => {
                 const txt = r.parentElement.querySelector('input[type=text]');
-                if(txt) { txt.disabled = !r.checked; if(r.checked) txt.focus(); }
+                if (txt) { txt.disabled = !r.checked; if (r.checked) txt.focus(); }
             });
         }
-        function toggleOther(chk){
+        function toggleOther(chk) {
             const txt = chk.parentElement.querySelector('input[type=text]');
-            if(txt) { txt.disabled = !chk.checked; if(chk.checked) txt.focus(); }
+            if (txt) { txt.disabled = !chk.checked; if (chk.checked) txt.focus(); }
         }
-        function toggleReq(p, req){
-            p.querySelectorAll('input[type=radio]').forEach(i=>{ 
-                if(req) i.setAttribute('required',''); else i.removeAttribute('required'); 
+        function toggleReq(p, req) {
+            p.querySelectorAll('input[type=radio]').forEach(i => {
+                if (req) i.setAttribute('required', ''); else i.removeAttribute('required');
             });
         }
         window.onload = checkLogic;
     </script>
 </body>
+
 </html>
