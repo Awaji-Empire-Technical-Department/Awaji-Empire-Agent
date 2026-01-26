@@ -48,7 +48,7 @@ async def send_dm_notification(user_id, survey_title, survey_id, answers_text=""
             
             # 2. メッセージ送信
             msg_url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
-            edit_url = f"http://localhost:5000/form/{survey_id}" # 本番環境ではドメイン変更が必要
+            edit_url = f"http://dashboard.awajiempire.net/form/{survey_id}" # 本番環境ではドメイン変更が必要
             
             content = (
                 f"**アンケート回答ありがとうございます**\n"
