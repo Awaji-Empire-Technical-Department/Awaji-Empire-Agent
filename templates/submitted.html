@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回答完了</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+</head>
+<body style="background:#eef2f5;">
+    <div class="container-sm">
+        <div class="submission-card">
+            <div style="text-align: center;">
+                <i class="fas fa-check-circle success-icon"></i>
+                <h1 style="margin-top: 1rem; color: #333;">回答ありがとうございました</h1>
+                <p class="note-text">
+                    回答の控えと編集用リンクをDMで送信しました。<br>
+                    修正が必要な場合はDM内のリンクからアクセスしてください。
+                </p>
+                <div style="margin-top: 2rem;">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary" style="text-decoration: none; padding: 10px 20px;">
+                        ホームへ戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
