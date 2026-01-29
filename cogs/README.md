@@ -22,7 +22,7 @@ cogs/
 
 ## 3. ファイルの役割と責務
 
-### cog.py **(The Interface)**
+### `cog.py` **(The Interface)**
 
 役割: Discordコマンド・イベント定義（インターフェース）を定義します。
 
@@ -32,7 +32,7 @@ cogs/
 - レスポンス返却 (`await ctx.send(...)`)
 - 具体的な処理は記述せず, logic.py へ委譲する
 
-### logic.py **(The Business Logic)**
+### `logic.py` **(The Business Logic)**
 
 役割: 具体的な処理を定義します。
 
