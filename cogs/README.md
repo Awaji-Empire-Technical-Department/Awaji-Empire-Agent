@@ -30,7 +30,7 @@ cogs/
 - イベント定義 (`@commands.Cog.listener`)
 - 引数の受け取りとバリデーション
 - レスポンス返却 (`await ctx.send(...)`)
-- 具体的な処理は記述せず, logic.py へ委譲する
+- 具体的な処理は記述せず, `logic.py` へ委譲する
 
 ### `logic.py` **(The Business Logic)**
 
