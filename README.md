@@ -86,10 +86,11 @@ python bot.py
 python webapp.py
 ```
 
-## 共通ロジックの説明
+## 各ディレクトリの詳細な説明
 
-詳細な説明は[common/README.md](./common/README.md)を参照してください。
-
+- 共通ロジック: [common/README.md](./common/README.md)
+- サービス層: [services/README.md](./services/README.md)
+- コマンド層: [cogs/README.md](./cogs/README.md)
 
 ## 更新内容
 
