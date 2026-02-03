@@ -3,6 +3,16 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
+## [1.2.4] - 2026-02-03
+
+### Changed
+
+- **フォルダ構成変更**:  
+`cogs/bk_mass_mute.py`を `cogs/bk_mass_mute.py`に変更。
+`cogs/mass_mute/*` の追加。
+`services/permission.py` と `services/__init__.py` を追加。
+
+
 ## [1.2.3] - 2026-01-26
 
 ### Added
