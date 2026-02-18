@@ -49,8 +49,7 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          # パスを通すのではなく、バイナリを直接指定して実行
-          /home/devuser/.local/bin/uv sync
+          uv sync
 
       - name: Restart Services
         run: |
