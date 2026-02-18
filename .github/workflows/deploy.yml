@@ -11,15 +11,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug Path
-        run: |
-          ls -l /home/devuser/.local/bin/uv
-          whoami
-          pwd
-          ls -la /home/devuser
-          ls -la /home/devuser/.local/bin
-          ls -la /home/devuser/.cargo/bin
-
       - name: Ensure uv is installed
         run: |
           # インストール先ディレクトリを確実に作成し、所有権を自分にする
