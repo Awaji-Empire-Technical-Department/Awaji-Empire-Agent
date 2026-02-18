@@ -13,8 +13,10 @@ jobs:
 
       - name: Setup Environment
         run: |
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # 現在の実行ユーザーのホームを確実に取得して追加
+          USER_HOME=$(getent passwd $USER | cut -d: -f6)
+          echo "$USER_HOME/.local/bin" >> $GITHUB_PATH
+          echo "$USER_HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build Rust bridge
         working-directory: ./database_bridge
