@@ -11,6 +11,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Debug Path
+        run: |
+          ls -l /home/devuser/.local/bin/uv
+          whoami
+          pwd
+          ls -la /home/devuser
+          ls -la /home/devuser/.local/bin
+          ls -la /home/devuser/.cargo/bin
+
       - name: Setup Environment
         run: |
           # 現在の実行ユーザーのホームを確実に取得して追加
@@ -28,7 +37,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
-        run: uv sync
+        run: |
+          # パスを通すのではなく、バイナリを直接指定して実行
+          /home/devuser/.local/bin/uv sync
 
       - name: Restart Services
         run: |
