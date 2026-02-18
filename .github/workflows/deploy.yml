@@ -11,27 +11,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Ensure uv is installed
-        run: |
-          # インストール先ディレクトリを確実に作成し、所有権を自分にする
-          sudo mkdir -p /home/devuser/.local/bin
-          sudo chown -R devuser:devuser /home/devuser/.local
-
-          if [ ! -f "/home/devuser/.local/bin/uv" ]; then
-            echo "📦 uv をインストールします..."
-            # インストールスクリプト自体を sudo で実行するか、
-            # 実行後にバイナリの移動・権限設定を sudo で行う
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            
-            # インストール直後に実行権限を念押しで付与
-            chmod +x /home/devuser/.local/bin/uv
-          fi
-
-          echo "/home/devuser/.local/bin" >> $GITHUB_PATH
-
       - name: Build Rust bridge
         working-directory: ./database_bridge
-        run: cargo build --release
+        run: |
+          # Rust の環境変数を読み込んでビルド
+          source "$HOME/.cargo/env"
+          cargo build --release
 
       - name: Sync to production directory
         run: |
@@ -40,6 +25,7 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
+          # /usr/local/bin にある uv をそのまま使用
           uv sync
 
       - name: Restart Services
