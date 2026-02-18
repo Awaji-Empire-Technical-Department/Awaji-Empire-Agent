@@ -1,0 +1,29 @@
+name: CI/CD Deploy
+
+on:
+  push:
+    branches: [ master ] # masterにマージされたら実行
+
+jobs:
+  deploy:
+    runs-on: self-hosted # 先ほど設定したランナー
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Sync to production directory
+        run:  |
+          sudo rsync -av --exclude='.git' ./ /discord_bot/
+
+      - name: Install dependencies
+        run: |
+          cd /discord_bot
+          ./venv/bin/python3 -m pip install -r requirements.txt
+
+      - name: Restart Bot Service
+        run: |
+          sudo systemctl restart discord_bot.service
+
+      - name: Restart Web App Service
+        run: |
+          sudo systemctl restart discord_webapp.service

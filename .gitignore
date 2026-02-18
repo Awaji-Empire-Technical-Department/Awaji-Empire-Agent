@@ -22,3 +22,4 @@ config.py          # config.py.example を元に作成する実体
 .DS_Store
 .vscode/
 .idea/
+token.txt
