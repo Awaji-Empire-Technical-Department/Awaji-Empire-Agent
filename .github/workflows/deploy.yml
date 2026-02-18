@@ -2,28 +2,34 @@ name: CI/CD Deploy
 
 on:
   push:
-    branches: [ master ] # masterにマージされたら実行
+    branches: [master, test]
 
 jobs:
   deploy:
-    runs-on: self-hosted # 先ほど設定したランナー
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Environment
+        run: |
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Build Rust bridge
+        working-directory: ./database_bridge
+        run: cargo build --release
+
       - name: Sync to production directory
-        run:  |
-          sudo rsync -av --exclude='.git' ./ /discord_bot/
+        run: |
+          sudo rsync -av --exclude='.git' ./ /Awaji-Empire-Agent/
 
       - name: Install dependencies
-        run: |
-          cd /discord_bot
-          ./venv/bin/python3 -m pip install -r requirements.txt
+        working-directory: /Awaji-Empire-Agent/discord_bot
+        run: uv sync
 
-      - name: Restart Bot Service
+      - name: Restart Services
         run: |
+          sudo systemctl daemon-reload
           sudo systemctl restart discord_bot.service
-
-      - name: Restart Web App Service
-        run: |
           sudo systemctl restart discord_webapp.service
