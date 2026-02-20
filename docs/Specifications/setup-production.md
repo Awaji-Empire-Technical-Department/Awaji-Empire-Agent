@@ -109,42 +109,111 @@
 
 ```bash
 #!/bin/bash
-set -e
 
-echo "🚀 本番環境の再構築を開始します..."
+# =================================================================
+# 淡路帝国エージェント：モノレポ移行 & systemd 自動更新スクリプト
+# 役割: ディレクトリ整理、Rust/uv初期化、サービスパスの一括修正
+# =================================================================
 
-# 1. インフラ導入 (uv)
-if ! command -v uv &> /dev/null; then
-    echo "📦 uv をインストールしています..."
-    curl -LsSf [https://astral.sh/uv/install.sh](https://astral.sh/uv/install.sh) | sh
-    source $HOME/.local/bin/env
+set -e # エラーが発生したら即座に停止
+
+# --- 設定項目 ---
+PARENT_DIR="/Awaji-Empire-Agent"
+PYTHON_DIR="$PARENT_DIR/discord_bot"
+RUST_DIR="$PARENT_DIR/database_bridge"
+SERVICES=("discord_bot.service" "discord_webapp.service")
+
+echo "🚀 モノレポ構成への移行を開始します..."
+
+# 1. 親ディレクトリの作成とファイル移動
+if [ ! -d "$PARENT_DIR" ]; then
+    echo "📂 親ディレクトリ $PARENT_DIR を作成中..."
+    sudo mkdir -p "$PYTHON_DIR"
+
+    echo "🚚 既存ファイルを $PYTHON_DIR へ移動中..."
+    # 隠しファイルを含め、このスクリプト自身以外の全ファイルを移動
+    sudo find . -maxdepth 1 ! -name "." ! -name "$(basename "$0")" -exec mv {} "$PYTHON_DIR/" \;
+
+    # 所有権を自分（現在のユーザー）に変更
+    sudo chown -R $USER:$USER "$PARENT_DIR"
+else
+    echo "⚠️ すでに $PARENT_DIR が存在します。移動をスキップします。"
 fi
 
-# 2. リポジトリの最新化
-cd /Awaji-Empire-Agent
-git fetch origin
-git checkout master
-git pull origin master
+cd "$PARENT_DIR"
 
-# 3. Python環境構築
-echo "🐍 Python 仮想環境を構築しています..."
-cd /Awaji-Empire-Agent/discord_bot
-uv sync
+# 2. Rust ブリッジの初期化 (Rust採用に向けた第一歩)
+if [ ! -d "$RUST_DIR" ]; then
+    echo "🦀 Rust プロジェクトを初期化中..."
+    mkdir -p "$RUST_DIR"
+    cd "$RUST_DIR"
+    cargo init --bin
+    cd ..
+fi
 
-# 4. Service ファイルのパス自動修正
-echo "⚙️  systemd サービスファイルをモノレポ構造に更新しています..."
-SERVICE_FILE="/etc/systemd/system/discord_bot.service"
+# 3. uv (Rust製パッケージマネージャー) の導入
+echo "⚡ uv をセットアップ中..."
+if ! command -v uv &> /dev/null; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# WorkingDirectory と ExecStart のパスを修正
-sudo sed -i "s|^WorkingDirectory=.*|WorkingDirectory=/Awaji-Empire-Agent/discord_bot|" $SERVICE_FILE
-sudo sed -i "s|^ExecStart=.*|ExecStart=/Awaji-Empire-Agent/discord_bot/.venv/bin/python3 bot.py|" $SERVICE_FILE
+    # パスを即時反映（インストーラーの指示に従う）
+    if [ -f "$HOME/.local/bin/env" ]; then
+        source "$HOME/.local/bin/env"
+    fi
+    #念のため、PATHにも直接追加しておく
+    export PATH="$HOME/.local/bin:$PATH"
+fi
 
-# 5. 反映と再起動
+# Python環境の初期化
+cd "$PYTHON_DIR"
+uv init
+# 既存の依存関係を pyproject.toml ベースへ
+if [ -f "requirements.txt" ]; then
+    echo "📦 requirements.txt から依存関係をインポート中..."
+    uv pip compile requirements.txt -o requirements.txt
+fi
+cd ..
+
+# 4. systemd サービスのパス自動書き換え
+echo "⚙️ systemd サービスを更新中..."
+for SERVICE in "${SERVICES[@]}"; do
+    SYSTEMD_PATH="/etc/systemd/system/$SERVICE"
+
+    if [ -f "$SYSTEMD_PATH" ]; then
+        echo "🔄 $SERVICE のパスを置換中..."
+        # バックアップ作成
+        sudo cp "$SYSTEMD_PATH" "${SYSTEMD_PATH}.bak"
+
+        # WorkingDirectory と ExecStart 内のディレクトリパスを置換
+        sudo sed -i "s|WorkingDirectory=.*|WorkingDirectory=$PYTHON_DIR|g" "$SYSTEMD_PATH"
+        sudo sed -i "s|/discord_bot/|/Awaji-Empire-Agent/discord_bot/|g" "$SYSTEMD_PATH"
+
+        echo "✅ $SERVICE の更新完了（バックアップ: ${SERVICE}.bak）"
+    else
+        echo "❌ エラー: $SYSTEMD_PATH が見つかりません。"
+    fi
+done
+
+# 5. systemd 設定の反映と再起動
+echo "🔄 サービスを再起動中..."
 sudo systemctl daemon-reload
-sudo systemctl restart discord_bot.service
+for SERVICE in "${SERVICES[@]}"; do
+    sudo systemctl restart "$SERVICE"
+    echo "🚀 $SERVICE が再起動しました。"
+done
 
-echo "✅ セットアップが完了しました！"
-systemctl status discord_bot.service --no-pager
+# 6. Git ブランチ設定
+echo "🌿 Git ブランチを 'test' に切り替え中..." # <- これはtest環境の話,本番環境であればいらない
+if [ ! -d ".git" ]; then
+    git init
+fi
+# masterに影響を与えないよう test ブランチを作成 <- これはtest環境の話
+# 本番環境はmaster
+git checkout test
+
+echo "✨ 全ての工程が完了しました！"
+echo "現在のディレクトリ構造:"
+ls -R | grep ":$" | sed -e 's/:$//' -e 's/[^-][^\/]*\//--/g' -e 's/^/   /
 ```
 
 ## 3. GitHub Actions による自動デプロイ設定
@@ -153,6 +222,25 @@ systemctl status discord_bot.service --no-pager
 
 - **`working-directory` の設定**: 各ジョブ（`deploy` など）内で `working-directory: discord_bot` を指定し、正しいディレクトリでコマンドが実行されるようにします。
 - **`uv` の利用**: `pip` の代わりに `uv` コマンド（`uv sync`, `uv run`）を使用するように変更します。
+
+`rsync` コマンドと `systemctl` コマンドをパスワード無しで使えるようにします。
+これをしなければ、GitHub Actions からデプロイする際にパスワードを入力する必要があります。
+
+1. 設定ファイルを開く
+
+```bash
+sudo visudo -f /etc/sudoers.d/github-actions
+```
+
+※ `/etc/sudoers.d/` 配下に新しいファイルを作るのが、システムを汚さない最も安全な方法です。
+
+1. 以下を追加
+
+```bash
+your_github_actions_user ALL=(ALL) NOPASSWD: /usr/bin/rsync, /bin/systemctl
+```
+
+※ YAML で `sudo` を使っているのは `rsync` と `systemctl` だけなので、これらだけを指定するのがセキュリティ上望ましいです。
 
 ## 4. 確認事項
 
