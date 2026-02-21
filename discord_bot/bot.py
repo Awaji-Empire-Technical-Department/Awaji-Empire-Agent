@@ -11,10 +11,10 @@ load_dotenv()
 
 # コグ（拡張機能）のリスト
 COGS = [
-    "cogs.filter",
-    "cogs.mass_mute",
-    "cogs.survey",
-    "cogs.voice_keeper"
+    # "cogs.filter" は Phase 2 仕様変更により削除
+    "cogs.mass_mute",     # ディレクトリ化（__init__.py 経由）
+    "cogs.survey",        # ディレクトリ化（__init__.py 経由）
+    "cogs.voice_keeper",  # 変更なし
 ]
 
 class MyBot(commands.Bot):

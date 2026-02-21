@@ -23,3 +23,11 @@ config.py          # config.py.example を元に作成する実体
 .vscode/
 .idea/
 token.txt
+
+# --- Test / Build Artifacts ---
+test_output.txt
+test_result.txt
+.pytest_cache/
+
+# --- Gemini Antigravity ---
+.gemini/antigravity/
