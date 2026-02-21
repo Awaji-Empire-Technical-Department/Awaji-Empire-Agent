@@ -38,7 +38,7 @@ try:
 except FileNotFoundError:
     DISCORD_BOT_TOKEN = None
 
-DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'http://dashboard.awajiempire.net')
+DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
 
 
 # ------------------------------------------------------------------
