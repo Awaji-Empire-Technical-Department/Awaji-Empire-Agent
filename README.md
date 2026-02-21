@@ -9,14 +9,16 @@
 
 ## 🚀 主要機能
 
-本システムは主に 4 つのコア機能を提供します。
+本システムは主に 3 つのコア機能を提供します。
 
 | 機能 | 概要 | 詳細ドキュメント |
 | :--- | :--- | :--- |
-| **🛡️ メッセージフィルタ** | 特定チャンネルでの不正投稿（コード形式以外）を自動排除 | [詳細はこちら](./docs/FEATURE_FILTER.md) |
-| **🔔 通知マスミュート** | 大規模サーバーの通知騒音を防ぐ権限自動管理 | [詳細はこちら](./docs/FEATURE_MASS_MUTE.md) |
-| **📝 内製アンケート** | Webで作成しDiscordで答える、完全独自のフォームシステム | [詳細はこちら](./docs/FEATURE_SURVEY.md) |
-| **😴 寝落ち切断** | 特定ユーザーがVCから退出して一定時間経過しても、まだVCに残っているユーザーを「寝落ち」と判定し、自動的に切断（Kick）する機能。また、切断した人数を集計し、テキストチャンネルに報告する。 | [詳細はこちら](./docs/FEATURE_VOICE_KEEPER.md) |
+| **通知マスミュート** | 大規模サーバーの通知騒音を防ぐ権限自動管理 | [詳細はこちら](./docs/FEATURE_MASS_MUTE.md) |
+| **内製アンケート** | Webで作成しDiscordで答える、完全独自のフォームシステム | [詳細はこちら](./docs/FEATURE_SURVEY.md) |
+| **寝落ち切断** | 特定ユーザーがVCから退出して一定時間経過しても、まだVCに残っているユーザーを「寝落ち」と判定し、自動的に切断（Kick）する機能。また、切断した人数を集計し、テキストチャンネルに報告する。 | [詳細はこちら](./docs/FEATURE_VOICE_KEEPER.md) |
+
+> [!NOTE]
+> **メッセージフィルタ機能**（特定チャンネルでの不正投稿を自動排除）は、ホストの意向により廃止されました（Phase 2, 2026-02-21）。
 
 ## 🏗️ システムアーキテクチャ
 
@@ -94,13 +96,18 @@ python webapp.py
 - **型安全性の担保**: コンパイル時におけるSQL検証とメモリ安全性の確保により、ランタイムエラーを根絶。
 - **パフォーマンス最適化**: Proxmox上のリソース消費を抑えつつ、Discord BotとWebアプリ間のデータ整合性を強化。
 
-## 共通ロジックの説明
+## 各ディレクトリの説明
 
-詳細な説明は[common/README.md](./common/README.md)を参照してください。
+詳細な説明は以下のディレクトリのREADME.mdを参照してください。
+
+- [discord_bot/common/README.md](./discord_bot/common/README.md)
+- [discord_bot/services/README.md](./discord_bot/services/README.md)
+- [discord_bot/routes/README.md](./discord_bot/routes/README.md)
+- [discord_bot/cogs/README.md](./discord_bot/cogs/README.md)
 
 ## 更新内容
 
-詳細な更新内容は[CHANGELOG.md](./CHANGELOG.md)
+詳細な更新内容は[CHANGELOG.md](./CHANGELOG.md)を参照してください。
 
 ## 📜 ライセンス
 
