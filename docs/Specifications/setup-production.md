@@ -202,7 +202,32 @@ for SERVICE in "${SERVICES[@]}"; do
     echo "🚀 $SERVICE が再起動しました。"
 done
 
-# 6. Git ブランチ設定
+# 6. .gitignore の config.py 除外設定を確実に反映
+echo "🔒 .gitignore への config.py 除外設定を確認中..."
+cd "$PARENT_DIR"
+
+# .gitignore にエントリがなければ追記
+# パターンが存在しない場合のみ追加
+if ! grep -qF 'config.py' .gitignore 2>/dev/null; then
+    echo 'discord_bot/config.py' >> .gitignore
+    echo '**/config.py'          >> .gitignore
+    echo "✅ .gitignore に config.py の除外ルールを追加しました。"
+else
+    echo "⚠️  config.py の除外ルールはすでに .gitignore に存在します。"
+fi
+
+# 追跡済みの config.py がある場合はキャッシュから削除
+CACHED_CONFIGS=$(git ls-files --error-unmatch 'discord_bot/config.py' '**/config.py' 2>/dev/null || true)
+if [ -n "$CACHED_CONFIGS" ]; then
+    echo "🗑️  git インデックスから config.py を除去中..."
+    git ls-files --error-unmatch 'discord_bot/config.py' '**/config.py' 2>/dev/null \
+        | xargs -r git rm --cached --
+    echo "✅ git rm --cached 完了。実体ファイルはサーバー上にそのまま残ります。"
+else
+    echo "✅ config.py は git に追跡されていません。"
+fi
+
+# 7. Git ブランチ設定
 echo "🌿 Git ブランチを 'test' に切り替え中..." # <- これはtest環境の話,本番環境であればいらない
 if [ ! -d ".git" ]; then
     git init
