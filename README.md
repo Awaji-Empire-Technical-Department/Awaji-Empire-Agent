@@ -94,13 +94,18 @@ python webapp.py
 - **型安全性の担保**: コンパイル時におけるSQL検証とメモリ安全性の確保により、ランタイムエラーを根絶。
 - **パフォーマンス最適化**: Proxmox上のリソース消費を抑えつつ、Discord BotとWebアプリ間のデータ整合性を強化。
 
-## 共通ロジックの説明
+## 各ディレクトリの説明
 
-詳細な説明は[common/README.md](./common/README.md)を参照してください。
+詳細な説明は以下のディレクトリのREADME.mdを参照してください。
+
+- [discord_bot/common/README.md](./discord_bot/common/README.md)
+- [discord_bot/services/README.md](./discord_bot/services/README.md)
+- [discord_bot/routes/README.md](./discord_bot/routes/README.md)
+- [discord_bot/cogs/README.md](./discord_bot/cogs/README.md)
 
 ## 更新内容
 
-詳細な更新内容は[CHANGELOG.md](./CHANGELOG.md)
+詳細な更新内容は[CHANGELOG.md](./CHANGELOG.md)を参照してください。
 
 ## 📜 ライセンス
 
