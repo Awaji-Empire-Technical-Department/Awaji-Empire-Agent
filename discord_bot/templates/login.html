@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - Awaji Empire Agent</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+</head>
+<body class="auth-page">
+    <div class="auth-box">
+        <div style="font-size:3rem; margin-bottom:1rem;">👹</div>
+        <h1 class="auth-title">AWAJI EMPIRE</h1>
+        <p class="auth-sub">執務システム ログイン</p>
+        
+        <a href="{{ auth_url }}" class="btn btn-primary btn-block" style="background:#5865F2; padding:12px; font-size:1.1rem;">
+            <i class="fab fa-discord"></i> Discordでログイン
+        </a>
+    </div>
+</body>
+</html>

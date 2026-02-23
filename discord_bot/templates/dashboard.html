@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Awaji Agent</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><i class="fas fa-robot"></i> Awaji Empire Agent</div>
+        <div class="user-menu">
+            <img src="{{ user['avatar_url'] }}" class="user-avatar" alt="Avatar">
+            <span>{{ user['name'] }}</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,0.3); color:white;">ログアウト</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% for cat, msg in get_flashed_messages(with_categories=true) %}
+            <div class="alert"><i class="fas fa-check-circle" style="margin-right:10px;"></i> {{ msg }}</div>
+        {% endfor %}
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">📜 アンケート管理</h2>
+                <form action="{{ url_for('survey.create_new') }}" method="post" style="margin:0;">
+                    <button class="btn btn-success"><i class="fas fa-plus"></i> 新規作成</button>
+                </form>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th width="60">ID</th>
+                            <th>タイトル</th>
+                            <th width="100">ステータス</th>
+                            <th width="160">作成日時</th>
+                            <th width="240">アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in surveys %}
+                        <tr>
+                            <td style="font-family:monospace; color:var(--gray);">#{{ '%03d' % s['id'] }}</td>
+                            <td>
+                                <strong>{{ s['title'] }}</strong>
+                                {% if not s['title'] %}<span style="color:var(--gray); font-style:italic;">(無題)</span>{% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {{ 'badge-success' if s['is_active'] else 'badge-secondary' }}">
+                                    {{ '受付中' if s['is_active'] else '停止中' }}
+                                </span>
+                            </td>
+                            <td style="font-size:0.85rem; color:var(--gray);">{{ s['created_at'] }}</td>
+                            <td>
+                                <div class="btn-toolbar">
+                                    <form action="{{ url_for('survey.toggle_status', survey_id=s['id']) }}" method="post">
+                                        <button class="btn btn-icon {{ 'btn-warning' if s['is_active'] else 'btn-success' }}" 
+                                                title="{{ '停止する' if s['is_active'] else '再開する' }}">
+                                            <i class="fas {{ 'fa-pause' if s['is_active'] else 'fa-play' }}"></i>
+                                        </button>
+                                    </form>
+
+                                    <a href="{{ url_for('survey.edit_survey', survey_id=s['id']) }}" class="btn btn-primary btn-icon" title="編集">
+                                        <i class="fas fa-pen"></i>
+                                    </a>
+                                    <a href="{{ url_for('survey.view_results', survey_id=s['id']) }}" class="btn btn-primary btn-icon" title="集計">
+                                        <i class="fas fa-chart-pie"></i>
+                                    </a>
+
+                                    <a href="{{ url_for('survey.download_csv', survey_id=s['id']) }}" class="btn btn-secondary btn-icon" title="CSV DL">
+                                        <i class="fas fa-file-csv"></i>
+                                    </a>
+                                    <a href="{{ url_for('survey.view_form', survey_id=s['id']) }}" target="_blank" class="btn btn-outline btn-icon" title="プレビュー">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+
+                                    <form action="{{ url_for('survey.delete_survey', survey_id=s['id']) }}" method="post" onsubmit="return confirm('本当に削除しますか？');">
+                                        <button class="btn btn-danger btn-icon" title="削除"><i class="fas fa-trash"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" style="text-align:center; padding:3rem; color:var(--gray);">アンケートがまだありません</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

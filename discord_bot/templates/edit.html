@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>編集 - {{ survey['title'] }}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">アンケート編集</div>
+        <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline" style="color:white; border-color:white;">
+            <i class="fas fa-arrow-left"></i> ダッシュボードへ戻る
+        </a>
+    </nav>
+
+    <div class="container" style="max-width: 800px;">
+        <form action="{{ url_for('survey.save_survey') }}" method="post" id="surveyForm">
+            <input type="hidden" name="survey_id" value="{{ survey['id'] }}">
+            <input type="hidden" name="questions_json" id="questionsJson">
+
+            <div class="card">
+                <div class="form-group">
+                    <label>アンケートタイトル</label>
+                    <input type="text" name="title" value="{{ survey['title'] }}" class="form-control" style="font-size:1.2rem; font-weight:bold;" required placeholder="タイトルを入力">
+                </div>
+            </div>
+
+            <div id="questionsContainer"></div>
+
+            <div style="text-align:center; margin-top:2rem; margin-bottom:4rem;">
+                <button type="button" class="btn btn-primary" onclick="addQuestion()" style="margin-right:10px;">
+                    <i class="fas fa-plus-circle"></i> 質問を追加
+                </button>
+                <button type="submit" class="btn btn-success btn-lg" style="min-width:200px;">
+                    <i class="fas fa-save"></i> 保存して完了
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>window.initialQuestions = {{ questions | tojson }};</script>
+    <script src="{{ url_for('static', filename='js/edit_survey.js') }}?v={{ css_ver }}"></script>
+</body>
+</html>
