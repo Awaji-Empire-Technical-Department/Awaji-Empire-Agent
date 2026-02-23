@@ -14,7 +14,7 @@ ENV/
 # ライブラリ開発の場合は含めないのが一般的ですが、今回は含める方針でOKです。
 
 # --- Application Specific ---
-config.py          # config.py.example を元に作成する実体
+discord_bot/config.py          # config.py.example を元に作成する実体
 *.log
 *.sqlite3
 
@@ -23,3 +23,11 @@ config.py          # config.py.example を元に作成する実体
 .vscode/
 .idea/
 token.txt
+
+# --- Test / Build Artifacts ---
+test_output.txt
+test_result.txt
+.pytest_cache/
+
+# --- Gemini Antigravity ---
+.gemini/antigravity/

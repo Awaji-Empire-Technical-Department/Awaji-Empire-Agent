@@ -1,133 +1,89 @@
-from quart import Blueprint, render_template, request, redirect, url_for, session, flash, current_app, make_response
-import json
-import aiomysql
-from collections import Counter
-from utils import log_operation
+# routes/survey.py
+# Role: Web Interface Layer (routes/README.md 準拠)
+# - リクエストの受付 → Service呼び出し → レスポンス返却の「交通整理」に徹する
+# - DB操作は services/survey_service.py、DM送信は services/notification_service.py に委譲
+# - parse_questions は common/survey_utils.py に移動済み
 import csv
 import io
-import httpx
+import json
 import os
-from quart import make_response
+from collections import Counter
+
+from quart import (
+    Blueprint,
+    current_app,
+    flash,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+
+from common.survey_utils import parse_questions
+from services.log_service import LogService
+from services.notification_service import NotificationService
+from services.survey_service import SurveyService
 
 # Blueprintの定義
 survey_bp = Blueprint('survey', __name__)
 
-# ------------------------------------------------------------------
-#  ヘルパー関数
-# ------------------------------------------------------------------
-
-# Load Bot Token
+# Bot Token の読み込み
+# Why: DM送信時にBot Tokenが必要。routes 層では読み込みのみ行い、
+#      実際の送信処理は NotificationService に委譲する。
 try:
     with open('token.txt', 'r', encoding='utf-8') as f:
         DISCORD_BOT_TOKEN = f.read().strip()
 except FileNotFoundError:
     DISCORD_BOT_TOKEN = None
-    print("WARNING: token.txt not found.")
 
-async def send_dm_notification(user_id, survey_title, survey_id, answers_text=""):
-    """
-    ユーザーにDMで回答控えと編集用リンクを送信する
-    """
-    if not DISCORD_BOT_TOKEN:
-        print("Token missing, cannot send DM.")
-        return False
+DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
 
-    url = f"https://discord.com/api/v10/users/@me/channels"
-    headers = {
-        "Authorization": f"Bot {DISCORD_BOT_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
-    # 1. DMチャンネルを作成/取得
-    async with httpx.AsyncClient() as client:
-        try:
-            r = await client.post(url, json={"recipient_id": user_id}, headers=headers)
-            if r.status_code not in (200, 201):
-                print(f"Failed to create DM channel: {r.text}")
-                return False
-            channel_id = r.json().get('id')
-            
-            # 2. メッセージ送信
-            msg_url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
-            edit_url = f"http://dashboard.awajiempire.net/form/{survey_id}" # 本番環境ではドメイン変更が必要
-            
-            content = (
-                f"**アンケート回答ありがとうございます**\n"
-                f"「{survey_title}」への回答を受け付けました。\n\n"
-                f"**回答の修正はこちらから:**\n{edit_url}\n"
-            )
-            
-            payload = {
-                "content": content,
-                # "embeds": [...] # 必要なら埋め込みにする
-            }
-            
-            r_msg = await client.post(msg_url, json=payload, headers=headers)
-            if r_msg.status_code in (200, 201):
-                return True
-            else:
-                print(f"Failed to send DM: {r_msg.text}")
-                return False
-                
-        except Exception as e:
-            print(f"Exception in send_dm_notification: {e}")
-            return False
 
-def parse_questions(json_str):
-    try:
-        data = json.loads(json_str)
-        if not isinstance(data, list): return []
-        sanitized = []
-        for q in data:
-            if not isinstance(q, dict): continue
-            q['text'] = q.get('text', '(無題の質問)')
-            q['type'] = q.get('type', 'text')
-            q['options'] = q.get('options', [])
-            sanitized.append(q)
-        return sanitized
-    except:
-        return []
-
+# ------------------------------------------------------------------
+#  ヘルパー
+# ------------------------------------------------------------------
 async def get_db_pool():
     """DBプールを安全に取得するヘルパー"""
     pool = current_app.db_pool
     if not pool:
-        # ここで例外を投げると、Quartのエラーハンドラで500/503を返せる
         raise RuntimeError("Database connection pool is not initialized.")
     return pool
 
-# --- ルート定義 ---
+
+# ------------------------------------------------------------------
+#  ルート定義
+# ------------------------------------------------------------------
 
 @survey_bp.route('/create_new', methods=['POST'])
 async def create_new():
     user = session.get('discord_user')
-    if not user: return redirect(url_for('login'))
+    if not user:
+        return redirect(url_for('login'))
 
     try:
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                sql = "INSERT INTO surveys (owner_id, title, questions, is_active, created_at) VALUES (%s, '無題のアンケート', '[]', FALSE, NOW())"
-                await cur.execute(sql, (user['id'],))
-                new_id = cur.lastrowid
-                await log_operation(pool, user, "CREATE", f"ID:{new_id} を新規作成")
+        new_id = await SurveyService.create_survey(pool, user['id'])
+        if new_id is None:
+            return "Database Error", 503
+        await LogService.log_operation(pool, user['id'], user['name'], "CREATE", f"ID:{new_id} を新規作成")
         return redirect(url_for('survey.edit_survey', survey_id=new_id))
     except Exception as e:
         current_app.logger.error(f"Error in create_new: {e}")
         return "Database Error", 503
 
+
 @survey_bp.route('/edit/<int:survey_id>')
 async def edit_survey(survey_id):
     user = session.get('discord_user')
-    if not user: return redirect(url_for('login'))
+    if not user:
+        return redirect(url_for('login'))
 
     try:
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                await cur.execute("SELECT * FROM surveys WHERE id=%s", (survey_id,))
-                survey = await cur.fetchone()
-    except Exception as e:
+        survey = await SurveyService.get_survey(pool, survey_id)
+    except Exception:
         return "Database Error", 503
 
     if not survey or str(survey['owner_id']) != str(user['id']):
@@ -136,10 +92,12 @@ async def edit_survey(survey_id):
     questions = parse_questions(survey['questions'])
     return await render_template('edit.html', user=user, survey=survey, questions=questions)
 
+
 @survey_bp.route('/save_survey', methods=['POST'])
 async def save_survey():
     user = session.get('discord_user')
-    if not user: return redirect(url_for('login'))
+    if not user:
+        return redirect(url_for('login'))
 
     form = await request.form
     sid = form.get('survey_id')
@@ -148,58 +106,55 @@ async def save_survey():
 
     try:
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT owner_id FROM surveys WHERE id=%s", (sid,))
-                row = await cur.fetchone()
-                if not row or str(row[0]) != str(user['id']): return "Forbidden", 403
+        # オーナーチェック
+        owner_id = await SurveyService.get_owner_id(pool, int(sid))
+        if not owner_id or owner_id != str(user['id']):
+            return "Forbidden", 403
 
-                await cur.execute("UPDATE surveys SET title=%s, questions=%s WHERE id=%s", (title, q_json, sid))
-                await log_operation(pool, user, "UPDATE", f"ID:{sid} を更新")
+        success = await SurveyService.update_survey(pool, int(sid), title, q_json)
+        if not success:
+            return "Error", 500
+        await LogService.log_operation(pool, user['id'], user['name'], "UPDATE", f"ID:{sid} を更新")
     except Exception as e:
         return f"Error: {e}", 500
 
     await flash("保存しました", "success")
     return redirect(url_for('index'))
 
+
 @survey_bp.route('/toggle_status/<int:survey_id>', methods=['POST'])
 async def toggle_status(survey_id):
     user = session.get('discord_user')
-    if not user: return redirect(url_for('login'))
+    if not user:
+        return redirect(url_for('login'))
 
     try:
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                await cur.execute("SELECT owner_id, is_active FROM surveys WHERE id=%s", (survey_id,))
-                row = await cur.fetchone()
-                if row and str(row['owner_id']) == str(user['id']):
-                    new_status = not row['is_active']
-                    await cur.execute("UPDATE surveys SET is_active=%s WHERE id=%s", (new_status, survey_id))
-                    await log_operation(pool, user, "TOGGLE", f"ID:{survey_id} ステータス -> {new_status}")
+        success = await SurveyService.toggle_status(pool, survey_id, user['id'])
+        if success:
+            await LogService.log_operation(pool, user['id'], user['name'], "TOGGLE", f"ID:{survey_id} ステータス変更")
     except Exception as e:
         return f"Error: {e}", 500
 
     return redirect(url_for('index'))
+
 
 @survey_bp.route('/delete_survey/<int:survey_id>', methods=['POST'])
 async def delete_survey(survey_id):
     user = session.get('discord_user')
-    if not user: return redirect(url_for('login'))
+    if not user:
+        return redirect(url_for('login'))
 
     try:
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                await cur.execute("SELECT owner_id FROM surveys WHERE id=%s", (survey_id,))
-                row = await cur.fetchone()
-                if row and str(row['owner_id']) == str(user['id']):
-                    await cur.execute("DELETE FROM surveys WHERE id=%s", (survey_id,))
-                    await log_operation(pool, user, "DELETE", f"ID:{survey_id} を削除")
+        success = await SurveyService.delete_survey(pool, survey_id, user['id'])
+        if success:
+            await LogService.log_operation(pool, user['id'], user['name'], "DELETE", f"ID:{survey_id} を削除")
     except Exception as e:
         return f"Error: {e}", 500
 
     return redirect(url_for('index'))
+
 
 # --- 回答・集計 ---
 
@@ -212,10 +167,7 @@ async def view_form(survey_id):
 
     try:
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                await cur.execute("SELECT * FROM surveys WHERE id=%s", (survey_id,))
-                survey = await cur.fetchone()
+        survey = await SurveyService.get_survey(pool, survey_id)
     except Exception:
         return "Database Unavailable", 503
 
@@ -223,26 +175,10 @@ async def view_form(survey_id):
         return "<h3>Not Found or Inactive</h3><p>このアンケートは現在受け付けていません。</p>", 404
 
     questions = parse_questions(survey['questions'])
-    
-    # 既存の回答を取得（ログインユーザーのみ）
-    existing_answers = {}
-    user = session.get('discord_user')
-    if user:
-        pool = current_app.db_pool
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                await cur.execute(
-                    "SELECT answers FROM survey_responses WHERE survey_id=%s AND user_id=%s",
-                    (survey_id, user['id'])
-                )
-                row = await cur.fetchone()
-                if row:
-                    try:
-                        existing_answers = json.loads(row['answers'])
-                    except:
-                        pass
+    existing_answers = await SurveyService.get_existing_answers(pool, survey_id, user['id'])
 
     return await render_template('form.html', survey=survey, questions=questions, existing_answers=existing_answers)
+
 
 @survey_bp.route('/submit_response', methods=['POST'])
 async def submit_response():
@@ -252,16 +188,16 @@ async def submit_response():
 
     form = await request.form
     survey_id = form.get('survey_id')
-    
     u_id = user['id']
     u_name = user['name']
 
+    # フォームデータからの回答抽出
     answers = {}
     for key in form:
         if key.startswith('q_') and not key.endswith('_other'):
             q_idx = key.split('_')[1]
             val = form.getlist(key) if key.endswith('[]') else form.get(key)
-            
+
             if val == '__other__':
                 other_text = form.get(f'q_{q_idx}_other', '').strip()
                 val = other_text if other_text else 'その他'
@@ -269,80 +205,50 @@ async def submit_response():
                 val.remove('__other__')
                 other_text = form.get(f'q_{q_idx}_other', '').strip()
                 val.append(other_text if other_text else 'その他')
-            
+
             answers[q_idx] = val
 
-    pool = current_app.db_pool
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            # 既に回答があるかチェック
-            await cur.execute(
-                "SELECT id FROM survey_responses WHERE survey_id=%s AND user_id=%s",
-                (survey_id, u_id)
-            )
-            existing_row = await cur.fetchone()
-            
-            answers_json = json.dumps(answers, ensure_ascii=False)
-            response_id = None
-            
-            if existing_row:
-                # UPDATE
-                response_id = existing_row['id']
-                await cur.execute(
-                    """
-                    UPDATE survey_responses 
-                    SET answers=%s, submitted_at=NOW(), dm_sent=FALSE 
-                    WHERE id=%s
-                    """,
-                    (answers_json, response_id)
-                )
-            else:
-                # INSERT
-                await cur.execute(
-                    """
-                    INSERT INTO survey_responses (survey_id, user_id, user_name, answers, submitted_at, dm_sent) 
-                    VALUES (%s, %s, %s, %s, NOW(), FALSE)
-                    """,
-                    (survey_id, u_id, u_name, answers_json)
-                )
-                response_id = cur.lastrowid
-                
-            # アンケートタイトル取得（DM用）
-            await cur.execute("SELECT title FROM surveys WHERE id=%s", (survey_id,))
-            s_row = await cur.fetchone()
-            survey_title = s_row['title'] if s_row else "アンケート"
+    pool = await get_db_pool()
+    response_id = await SurveyService.save_response(pool, int(survey_id), u_id, u_name, answers)
 
-            # DM送信処理 (非同期で待つか、バックグラウンドにするか。要件は「非同期で実行」だがawaitでも良い)
-            # ここではシンプルにawaitして結果をDBに反映する
-            is_sent = await send_dm_notification(u_id, survey_title, survey_id)
-            
-            if is_sent:
-                await cur.execute("UPDATE survey_responses SET dm_sent=TRUE WHERE id=%s", (response_id,))
+    if response_id is not None:
+        # アンケートタイトル取得
+        survey = await SurveyService.get_survey(pool, int(survey_id))
+        survey_title = survey['title'] if survey else "アンケート"
+
+        # DM送信
+        is_sent = await NotificationService.send_dm(
+            bot_token=DISCORD_BOT_TOKEN,
+            user_id=u_id,
+            survey_title=survey_title,
+            survey_id=int(survey_id),
+            dashboard_base_url=DASHBOARD_URL,
+        )
+        if is_sent:
+            await SurveyService.mark_dm_sent(pool, response_id)
 
     return await render_template('submitted.html')
+
 
 @survey_bp.route('/results/<int:survey_id>')
 async def view_results(survey_id):
     user = session.get('discord_user')
-    if not user: return redirect(url_for('login'))
+    if not user:
+        return redirect(url_for('login'))
 
     try:
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                await cur.execute("SELECT * FROM surveys WHERE id=%s", (survey_id,))
-                survey = await cur.fetchone()
-                if not survey or str(survey['owner_id']) != str(user['id']): return "Forbidden", 403
-                
-                await cur.execute("SELECT * FROM survey_responses WHERE survey_id=%s ORDER BY submitted_at DESC", (survey_id,))
-                responses = await cur.fetchall()
+        survey = await SurveyService.get_survey(pool, survey_id)
+        if not survey or str(survey['owner_id']) != str(user['id']):
+            return "Forbidden", 403
+
+        responses = await SurveyService.get_responses(pool, survey_id)
     except Exception:
         return "Database Unavailable", 503
 
     questions = parse_questions(survey['questions'])
     stats = {}
-    
-    # ... (集計ロジックは変更なし) ...
+
     for i, q in enumerate(questions):
         q_idx = str(i)
         q_text = q.get('text', '(無題の質問)')
@@ -353,11 +259,14 @@ async def view_results(survey_id):
         for r in responses:
             try:
                 ans_json = json.loads(r['answers'])
-            except: continue
+            except Exception:
+                continue
             val = ans_json.get(q_idx)
             if val:
-                if isinstance(val, list): raw_values.extend(val)
-                else: raw_values.append(val)
+                if isinstance(val, list):
+                    raw_values.extend(val)
+                else:
+                    raw_values.append(val)
 
         stats[q_idx]['total'] = len(raw_values)
         if q_type in ['radio', 'checkbox', 'select']:
@@ -367,21 +276,20 @@ async def view_results(survey_id):
 
     return await render_template('results.html', survey=survey, stats=stats, response_count=len(responses))
 
+
 @survey_bp.route('/download_csv/<int:survey_id>')
 async def download_csv(survey_id):
     user = session.get('discord_user')
-    if not user: return redirect(url_for('login'))
+    if not user:
+        return redirect(url_for('login'))
 
     try:
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                await cur.execute("SELECT * FROM surveys WHERE id=%s", (survey_id,))
-                survey = await cur.fetchone()
-                if not survey or str(survey['owner_id']) != str(user['id']): return "Forbidden", 403
-                
-                await cur.execute("SELECT * FROM survey_responses WHERE survey_id=%s ORDER BY submitted_at DESC", (survey_id,))
-                responses = await cur.fetchall()
+        survey = await SurveyService.get_survey(pool, survey_id)
+        if not survey or str(survey['owner_id']) != str(user['id']):
+            return "Forbidden", 403
+
+        responses = await SurveyService.get_responses(pool, survey_id)
     except Exception:
         return "Database Unavailable", 503
 
@@ -399,11 +307,13 @@ async def download_csv(survey_id):
         row = [str(r['submitted_at']), r['user_name']]
         try:
             ans_json = json.loads(r['answers'])
-        except: ans_json = {}
+        except Exception:
+            ans_json = {}
 
         for i in range(len(questions)):
             val = ans_json.get(str(i), '')
-            if isinstance(val, list): val = ", ".join(val)
+            if isinstance(val, list):
+                val = ", ".join(val)
             row.append(val)
         writer.writerow(row)
 
