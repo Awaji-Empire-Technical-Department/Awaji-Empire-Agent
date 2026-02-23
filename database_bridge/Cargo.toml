@@ -1,18 +1,31 @@
 [package]
 name = "database_bridge"
-version = "0.1.0"
-edition = "2024"
+version = "0.3.0"
+edition = "2021"
 
 [dependencies]
-# 非同期ランタイム（これがないと非同期処理ができません）
+# 非同期ランタイム
 tokio = { version = "1", features = ["full"] }
 
-# データベース操作（SQLxを使用。PostgreSQLなどの種類に合わせて feature を選びます）
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "macros"] }
+# データベース操作（MariaDB/MySQL 向け: mysql feature を使用）
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "mysql",    # MariaDB/MySQL 対応 (postgres から変更)
+    "macros",
+    "time",     # OffsetDateTime サポート
+] }
 
-# JSONのシリアライズ・デシリアライズ（Python側とデータをやり取りするなら必須）
+# JSON シリアライズ・デシリアライズ
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# 環境変数の読み込み（.env を使う場合）
+# 環境変数の読み込み
 dotenvy = "0.15"
+
+# エラー型定義
+thiserror = "1.0"
+
+# 構造化ログ
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
