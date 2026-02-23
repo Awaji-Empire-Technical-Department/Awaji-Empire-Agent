@@ -1,25 +1,13 @@
-# --- Python (uv / venv) ---
 __pycache__/
 *.py[cod]
-*$py.class
 .venv/
-.python-version
-venv/
-ENV/
-.env
-
-# --- Rust ---
-/target/
-# Cargo.lock はアプリケーション（バイナリ）開発の場合は通常コミットに含めます。
-# ライブラリ開発の場合は含めないのが一般的ですが、今回は含める方針でOKです。
-
-# --- Application Specific ---
-config.py          # config.py.example を元に作成する実体
-*.log
-*.sqlite3
-
-# --- System / IDE ---
+target/
 .DS_Store
-.vscode/
-.idea/
+
+# Secrets
+discord_bot/config.py
+discord_bot/token.txt
+discord_bot/.env
+.env
+config.py
 token.txt
