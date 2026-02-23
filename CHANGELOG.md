@@ -3,15 +3,71 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
-## [Unreleased]
+## [1.3.0] - 2026-02-23
+
+本番投入バージョン。Phase 2 アーキテクチャ刷新・フォームバグ修正・Rust DB ブリッジ基盤の3本柱を含む大規模リリース。
 
 ### Added
 
-- (Experimental) 次世代データアクセス層の設計検討を開始
-  - 目的: システムのメモリ安全性向上と型安全性の確保
-  - 背景: Ubuntu 26.04 LTS のコアシステム Rust 導入トレンドへの適応
-  - 参照: [Ubuntu、26.04 LTSのコアシステムにRustを導入へ - ZDNET Japan](https://japan.zdnet.com/article/35243565/)
-- `ARCHITECTURE.md` への Rust 移行ロードマップの追記
+- **Phase 2 — アーキテクチャ刷新** (`feature/phase2-architecture-refactoring`)
+  - `services/` 層を新設し、DB・権限・通知・ログ・VoiceKeeperの責務を分離
+    - `services/permission_service.py` — 権限操作サービス（自己修復の核）
+    - `services/survey_service.py` — アンケート DB CRUD
+    - `services/notification_service.py` — DM 送信サービス
+    - `services/log_service.py` — 操作ログ記録サービス
+    - `services/database.py` — DB 接続（トップレベルから移動）
+    - `services/voice_keeper_service.py` — VoiceKeeper I/O サービス
+  - `cogs/mass_mute/` をディレクトリ化し、**自己修復（Self-Healing）機能**を追加
+    - `on_guild_channel_create` — 新規チャンネル作成を即座に権限設定
+    - `on_guild_channel_update` — 外部変更を検知し定義済み権限に自動復元
+    - `on_guild_role_update` — @everyone ロール変更時に全対象チャンネルを再検証
+  - `cogs/survey/` をディレクトリ化（`cog.py` + `logic.py` 分離）
+  - `cogs/voice_keeper/` を `cog.py` + `logic.py` に統一し `services/` 層に対応
+  - `common/survey_utils.py` 新設（`parse_questions` 純粋関数）
+  - ユニットテスト 20件追加
+    - `tests/test_permission_service.py`（11件）
+    - `tests/test_survey_utils.py`（9件）
+  - 設計記録: `docs/adr/001-phase2-architecture-refactoring.md`（ADR-001）
+
+- **Phase 3-A — Rust DB Bridge スケルトン実装** (`feature/phase3-rust-bridge`)
+  - `database_bridge/` Rust クレート新設（将来の Python DB 層の Rust 移行基盤）
+    - `Cargo.toml`: sqlx (mysql feature)、thiserror、tracing を採用
+    - `src/lib.rs`: crate root（db / bot / webapp モジュール公開）
+    - `src/db/{models, connection, survey_repo, response_repo, log_repo}.rs`
+    - `src/bot/survey_handler.rs`: UPSERT + `toggle_status`（Bot 固有）
+    - `src/webapp/dashboard_query.rs`: `tokio::try_join!` 並列クエリ（Webapp 固有）
+    - `src/main.rs`: CLI ヘルスチェック・エントリポイント
+  - 設計記録: `docs/adr/002-phase3-rust-database-bridge.md`（ADR-002）
+  - 仕様書: `docs/Specifications/phase3-rust-database-bridge.md`
+
+- **Phase 3-B — Python-Rust ブリッジ方式調査** (`feature/phase3-rust-bridge`)
+  - 仕様書: `docs/Specifications/phase3b-python-rust-bridge.md`
+  - 候補 A: PyO3 (FFI)、候補 B: IPC (HTTP / Unix Socket)、候補 C: gRPC の比較表を記載
+  - ステータス: 精査待ち・実装未着手
+
+### Changed
+
+- **`routes/survey.py` 薄層化** — Service 層に委譲し 414行 → 260行 に削減
+- **`cogs/voice_keeper/`** — `cog.py` + `logic.py` 構成に一本化
+- **`DASHBOARD_URL`** — http 通信から https 通信へ変更 (`refactor`)
+- **`README.md`** — メッセージフィルタ機能の廃止を明記、Rust ロードマップ追記
+
+### Removed
+
+- **`cogs/filter.py`** — メッセージフィルタ機能を仕様変更により廃止。コードは Git 履歴で参照可能
+
+### Fixed
+
+- **フォームラジオボタン競合バグ** (`fix/form-radio-name-conflict`)
+  - Jinja2 ネストループの `loop.index0` スコープ問題を修正
+  - フォーム JS を `static/js/form.js` として外部ファイルに分離（テンプレート肥大化を防止）
+  - 仕様書: `docs/Specifications/bugfix-form-radio-name.md`
+
+### Security
+
+- **`config.py` の Git 誤追跡を修正** — DB パスワード等の秘密情報が含まれる `config.py` がリポジトリに混入するリスクを排除
+  - `.gitignore` に `**/config.py` を追加しパス変更にも堅牢化
+  - セットアップスクリプトに `git rm --cached` による既存追跡解除ステップを追加（冪等対応）
 
 ## [1.2.4] - 2026-02-03
 
