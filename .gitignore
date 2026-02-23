@@ -2,12 +2,6 @@ __pycache__/
 *.py[cod]
 .venv/
 target/
-.DS_Store
-
-# Secrets
 discord_bot/config.py
 discord_bot/token.txt
 discord_bot/.env
-.env
-config.py
-token.txt
