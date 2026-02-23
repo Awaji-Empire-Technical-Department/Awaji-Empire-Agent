@@ -27,8 +27,7 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          # /usr/local/bin にある uv をそのまま使用
-          uv sync
+          /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |
@@ -58,8 +57,7 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          # /usr/local/bin にある uv をそのまま使用
-          uv sync
+          /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |
