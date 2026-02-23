@@ -20,8 +20,15 @@
             </div>
 
             {% for q in questions %}
-            <div class="card q-panel {% if q.logic %}hidden{% endif %}" id="p_{{loop.index0}}"
-                data-idx="{{loop.index0}}" {% if q.logic %}data-trg="{{q.logic.trigger_idx}}"
+            {#
+                【重要】ここで q_idx を保存する。
+                内側の {% for opt in q.options %} ループに入ると loop 変数が
+                上書きされるため、外側ループのインデックスは必ずこの変数で参照すること。
+                (Bug: BUGFIX-FORM-RADIO-001)
+            #}
+            {% set q_idx = loop.index0 | string %}
+            <div class="card q-panel {% if q.logic %}hidden{% endif %}" id="p_{{q_idx}}"
+                data-idx="{{q_idx}}" {% if q.logic %}data-trg="{{q.logic.trigger_idx}}"
                 data-val="{{q.logic.trigger_val}}" {% endif %}>
 
                 <label style="margin-bottom:1rem; font-size:1.05rem;">
@@ -31,17 +38,17 @@
                     endif %}
                 </label>
 
-                {% set q_idx = loop.index0 | string %}
                 {% set ans = existing_answers.get(q_idx) %}
 
                 {% if q.type=='text' %}
-                <textarea name="q_{{loop.index0}}" class="form-control" rows="3"
+                <textarea name="q_{{q_idx}}" class="form-control" rows="3"
                     placeholder="回答を入力...">{{ ans if ans else '' }}</textarea>
 
                 {% elif q.type=='radio' %}
                 {% for opt in q.options %}
                 <label class="option-item">
-                    <input type="radio" name="q_{{loop.index0}}" value="{{opt}}" required onchange="checkLogic()" {% if
+                    {# name に q_idx (外側ループ値) を使用 — loop.index0 は内側ループ値なので使用禁止 #}
+                    <input type="radio" name="q_{{q_idx}}" value="{{opt}}" required onchange="checkLogic()" {% if
                         ans==opt %}checked{% endif %}>
                     <span>{{opt}}</span>
                 </label>
@@ -49,10 +56,10 @@
                 {% if q.has_other %}
                 {% set is_other = ans and ans not in q.options %}
                 <label class="option-item">
-                    <input type="radio" name="q_{{loop.index0}}" value="__other__" onchange="checkLogic()" {% if
+                    <input type="radio" name="q_{{q_idx}}" value="__other__" onchange="checkLogic()" {% if
                         is_other %}checked{% endif %}>
                     <span style="margin-right:10px;">その他:</span>
-                    <input type="text" name="q_{{loop.index0}}_other" class="form-control"
+                    <input type="text" name="q_{{q_idx}}_other" class="form-control"
                         style="width:auto; flex:1; padding:4px;" {% if not is_other %}disabled{% endif %}
                         value="{{ ans if is_other else '' }}">
                 </label>
@@ -62,7 +69,8 @@
                 {% set ans_list = ans if ans is iterable and ans is not string else [] %}
                 {% for opt in q.options %}
                 <label class="option-item">
-                    <input type="checkbox" name="q_{{loop.index0}}[]" value="{{opt}}" {% if opt in ans_list %}checked{%
+                    {# name に q_idx (外側ループ値) を使用 — loop.index0 は内側ループ値なので使用禁止 #}
+                    <input type="checkbox" name="q_{{q_idx}}[]" value="{{opt}}" {% if opt in ans_list %}checked{%
                         endif %}>
                     <span>{{opt}}</span>
                 </label>
@@ -74,10 +82,10 @@
                 {% endfor %}
                 {% set is_other = other_vals|length > 0 %}
                 <label class="option-item">
-                    <input type="checkbox" name="q_{{loop.index0}}[]" value="__other__" onchange="toggleOther(this)" {%
+                    <input type="checkbox" name="q_{{q_idx}}[]" value="__other__" onchange="toggleOther(this)" {%
                         if is_other %}checked{% endif %}>
                     <span style="margin-right:10px;">その他:</span>
-                    <input type="text" name="q_{{loop.index0}}_other" class="form-control"
+                    <input type="text" name="q_{{q_idx}}_other" class="form-control"
                         style="width:auto; flex:1; padding:4px;" {% if not is_other %}disabled{% endif %}
                         value="{{ other_vals[0] if is_other else '' }}">
                 </label>
@@ -93,41 +101,7 @@
         </form>
     </div>
 
-    <script>
-        function checkLogic() {
-            const ans = {};
-            document.querySelectorAll('input[type=radio]:checked').forEach(r => { ans[r.name.split('_')[1]] = r.value; });
-
-            document.querySelectorAll('.q-panel').forEach(p => {
-                const tIdx = p.dataset.trg, tVal = p.dataset.val;
-                if (tIdx) {
-                    if (ans[tIdx] === tVal) {
-                        p.classList.remove('hidden');
-                        p.classList.add('fade-in');
-                        toggleReq(p, true);
-                    } else {
-                        p.classList.remove('fade-in');
-                        p.classList.add('hidden');
-                        toggleReq(p, false);
-                    }
-                }
-            });
-            document.querySelectorAll('input[value=__other__]').forEach(r => {
-                const txt = r.parentElement.querySelector('input[type=text]');
-                if (txt) { txt.disabled = !r.checked; if (r.checked) txt.focus(); }
-            });
-        }
-        function toggleOther(chk) {
-            const txt = chk.parentElement.querySelector('input[type=text]');
-            if (txt) { txt.disabled = !chk.checked; if (chk.checked) txt.focus(); }
-        }
-        function toggleReq(p, req) {
-            p.querySelectorAll('input[type=radio]').forEach(i => {
-                if (req) i.setAttribute('required', ''); else i.removeAttribute('required');
-            });
-        }
-        window.onload = checkLogic;
-    </script>
+    <script src="{{ url_for('static', filename='js/form.js') }}"></script>
 </body>
 
 </html>
