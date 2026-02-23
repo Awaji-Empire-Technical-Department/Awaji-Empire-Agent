@@ -1,10 +1,12 @@
 // main.rs
-// Why: バイナリエントリポイント。
-//      Phase 3-A では「DB 接続ヘルスチェック」だけを行う CLI として機能する。
-//      将来的には管理ツールのエントリポイントになる。
+// Why: HTTP サーバーエントリエントリポイント (IPC用)。
+//      Phase 3-B では axum を使用してローカルのリクエストを受け付ける。
 
+use axum::{routing::get, Json, Router};
 use database_bridge::db::connection;
-use tracing::info;
+use serde_json::{json, Value};
+use std::net::SocketAddr;
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -12,7 +14,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("database_bridge=info".parse()?),
+                .add_directive("database_bridge=info".parse()?)
+                .add_directive("tower_http=debug".parse()?),
         )
         .init();
 
@@ -21,15 +24,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("🚀 database_bridge starting...");
 
-    let pool = connection::create_pool().await?;
-    let ok = connection::health_check(&pool).await;
+    // DB接続プールの作成
+    let pool = match connection::create_pool().await {
+        Ok(p) => p,
+        Err(e) => {
+            error!("❌ Failed to create DB pool: {}", e);
+            std::process::exit(1);
+        }
+    };
 
-    if ok {
-        info!("✅ All checks passed. database_bridge is ready.");
+    // 起動時のヘルスチェック
+    if connection::health_check(&pool).await {
+        info!("✅ Initial DB connection check passed.");
     } else {
-        eprintln!("❌ Health check failed. Check DB connection settings.");
+        error!("❌ Initial DB health check failed.");
         std::process::exit(1);
     }
+
+    // ルーターの設定
+    let app = database_bridge::api::create_router(pool);
+
+    // アドレスの設定 (デフォルト 127.0.0.1:7878)
+    let addr = SocketAddr::from(([127, 0, 0, 1], 7878));
+    info!("📡 Listening on {}", addr);
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }

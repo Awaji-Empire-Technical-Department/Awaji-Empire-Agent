@@ -42,17 +42,6 @@ DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
 
 
 # ------------------------------------------------------------------
-#  ヘルパー
-# ------------------------------------------------------------------
-async def get_db_pool():
-    """DBプールを安全に取得するヘルパー"""
-    pool = current_app.db_pool
-    if not pool:
-        raise RuntimeError("Database connection pool is not initialized.")
-    return pool
-
-
-# ------------------------------------------------------------------
 #  ルート定義
 # ------------------------------------------------------------------
 
@@ -63,15 +52,15 @@ async def create_new():
         return redirect(url_for('login'))
 
     try:
-        pool = await get_db_pool()
-        new_id = await SurveyService.create_survey(pool, user['id'])
+        # None を渡しても内部で Rust Bridge を使うため動作する
+        new_id = await SurveyService.create_survey(None, user['id'])
         if new_id is None:
-            return "Database Error", 503
-        await LogService.log_operation(pool, user['id'], user['name'], "CREATE", f"ID:{new_id} を新規作成")
+            return "Database Error (Bridge)", 503
+        await LogService.log_operation(None, user['id'], user['name'], "CREATE", f"ID:{new_id} を新規作成")
         return redirect(url_for('survey.edit_survey', survey_id=new_id))
     except Exception as e:
         current_app.logger.error(f"Error in create_new: {e}")
-        return "Database Error", 503
+        return "System Error", 503
 
 
 @survey_bp.route('/edit/<int:survey_id>')
@@ -81,10 +70,9 @@ async def edit_survey(survey_id):
         return redirect(url_for('login'))
 
     try:
-        pool = await get_db_pool()
-        survey = await SurveyService.get_survey(pool, survey_id)
+        survey = await SurveyService.get_survey(None, survey_id)
     except Exception:
-        return "Database Error", 503
+        return "System Error", 503
 
     if not survey or str(survey['owner_id']) != str(user['id']):
         return "Forbidden", 403
@@ -105,16 +93,15 @@ async def save_survey():
     q_json = form.get('questions_json')
 
     try:
-        pool = await get_db_pool()
         # オーナーチェック
-        owner_id = await SurveyService.get_owner_id(pool, int(sid))
+        owner_id = await SurveyService.get_owner_id(None, int(sid))
         if not owner_id or owner_id != str(user['id']):
             return "Forbidden", 403
 
-        success = await SurveyService.update_survey(pool, int(sid), title, q_json)
+        success = await SurveyService.update_survey(None, int(sid), title, q_json)
         if not success:
             return "Error", 500
-        await LogService.log_operation(pool, user['id'], user['name'], "UPDATE", f"ID:{sid} を更新")
+        await LogService.log_operation(None, user['id'], user['name'], "UPDATE", f"ID:{sid} を更新")
     except Exception as e:
         return f"Error: {e}", 500
 
@@ -129,10 +116,9 @@ async def toggle_status(survey_id):
         return redirect(url_for('login'))
 
     try:
-        pool = await get_db_pool()
-        success = await SurveyService.toggle_status(pool, survey_id, user['id'])
+        success = await SurveyService.toggle_status(None, survey_id, user['id'])
         if success:
-            await LogService.log_operation(pool, user['id'], user['name'], "TOGGLE", f"ID:{survey_id} ステータス変更")
+            await LogService.log_operation(None, user['id'], user['name'], "TOGGLE", f"ID:{survey_id} ステータス変更")
     except Exception as e:
         return f"Error: {e}", 500
 
@@ -146,10 +132,9 @@ async def delete_survey(survey_id):
         return redirect(url_for('login'))
 
     try:
-        pool = await get_db_pool()
-        success = await SurveyService.delete_survey(pool, survey_id, user['id'])
+        success = await SurveyService.delete_survey(None, survey_id, user['id'])
         if success:
-            await LogService.log_operation(pool, user['id'], user['name'], "DELETE", f"ID:{survey_id} を削除")
+            await LogService.log_operation(None, user['id'], user['name'], "DELETE", f"ID:{survey_id} を削除")
     except Exception as e:
         return f"Error: {e}", 500
 
@@ -166,16 +151,15 @@ async def view_form(survey_id):
         return redirect(url_for('login'))
 
     try:
-        pool = await get_db_pool()
-        survey = await SurveyService.get_survey(pool, survey_id)
+        survey = await SurveyService.get_survey(None, survey_id)
     except Exception:
-        return "Database Unavailable", 503
+        return "Bridge Unavailable", 503
 
     if not survey or not survey['is_active']:
         return "<h3>Not Found or Inactive</h3><p>このアンケートは現在受け付けていません。</p>", 404
 
     questions = parse_questions(survey['questions'])
-    existing_answers = await SurveyService.get_existing_answers(pool, survey_id, user['id'])
+    existing_answers = await SurveyService.get_existing_answers(None, survey_id, user['id'])
 
     return await render_template('form.html', survey=survey, questions=questions, existing_answers=existing_answers)
 
@@ -208,12 +192,11 @@ async def submit_response():
 
             answers[q_idx] = val
 
-    pool = await get_db_pool()
-    response_id = await SurveyService.save_response(pool, int(survey_id), u_id, u_name, answers)
+    response_id = await SurveyService.save_response(None, int(survey_id), u_id, u_name, answers)
 
     if response_id is not None:
         # アンケートタイトル取得
-        survey = await SurveyService.get_survey(pool, int(survey_id))
+        survey = await SurveyService.get_survey(None, int(survey_id))
         survey_title = survey['title'] if survey else "アンケート"
 
         # DM送信
@@ -225,7 +208,7 @@ async def submit_response():
             dashboard_base_url=DASHBOARD_URL,
         )
         if is_sent:
-            await SurveyService.mark_dm_sent(pool, response_id)
+            await SurveyService.mark_dm_sent(None, response_id)
 
     return await render_template('submitted.html')
 
@@ -237,14 +220,13 @@ async def view_results(survey_id):
         return redirect(url_for('login'))
 
     try:
-        pool = await get_db_pool()
-        survey = await SurveyService.get_survey(pool, survey_id)
+        survey = await SurveyService.get_survey(None, survey_id)
         if not survey or str(survey['owner_id']) != str(user['id']):
             return "Forbidden", 403
 
-        responses = await SurveyService.get_responses(pool, survey_id)
+        responses = await SurveyService.get_responses(None, survey_id)
     except Exception:
-        return "Database Unavailable", 503
+        return "System Error", 503
 
     questions = parse_questions(survey['questions'])
     stats = {}
@@ -258,7 +240,11 @@ async def view_results(survey_id):
         raw_values = []
         for r in responses:
             try:
-                ans_json = json.loads(r['answers'])
+                # Rust Bridge からは既に dict/list にパースされて返ってくる想定
+                # (BridgeError マッピングで JSON パースエラーはハンドリング済み)
+                ans_json = r['answers']
+                if isinstance(ans_json, str):
+                    ans_json = json.loads(ans_json)
             except Exception:
                 continue
             val = ans_json.get(q_idx)
@@ -284,14 +270,13 @@ async def download_csv(survey_id):
         return redirect(url_for('login'))
 
     try:
-        pool = await get_db_pool()
-        survey = await SurveyService.get_survey(pool, survey_id)
+        survey = await SurveyService.get_survey(None, survey_id)
         if not survey or str(survey['owner_id']) != str(user['id']):
             return "Forbidden", 403
 
-        responses = await SurveyService.get_responses(pool, survey_id)
+        responses = await SurveyService.get_responses(None, survey_id)
     except Exception:
-        return "Database Unavailable", 503
+        return "System Error", 503
 
     questions = parse_questions(survey['questions'])
     si = io.StringIO()
@@ -306,7 +291,9 @@ async def download_csv(survey_id):
     for r in responses:
         row = [str(r['submitted_at']), r['user_name']]
         try:
-            ans_json = json.loads(r['answers'])
+            ans_json = r['answers']
+            if isinstance(ans_json, str):
+                ans_json = json.loads(ans_json)
         except Exception:
             ans_json = {}
 

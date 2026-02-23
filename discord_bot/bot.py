@@ -91,14 +91,16 @@ async def on_ready():
     print('Bot ID: {0.user.id}'.format(bot))
     print('-------------------------------------')
     
-    # --- DB接続テスト (起動時に一度だけ確認) ---
+    # --- Bridge Connection Check (Rust Bridge 稼働確認) ---
     try:
-        conn = bot.get_db_connection()
-        if conn.is_connected():
-            print("✅ Database connection successful!")
-            conn.close()
+        from services.bridge_client import bridge_client
+        res = await bridge_client.request("GET", "/health")
+        if res and res.get("status") == "ok":
+            print("✅ Rust Bridge (IPC) connection successful!")
+        else:
+            print("⚠️ Rust Bridge (IPC) connection failed or returned error.")
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
+        print(f"❌ Rust Bridge connection error: {e}")
 
     # --- 1. 起動/再接続DMを管理者へ送信 ---
     owner = None

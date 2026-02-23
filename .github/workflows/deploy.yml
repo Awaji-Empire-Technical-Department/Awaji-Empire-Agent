@@ -37,7 +37,11 @@ jobs:
 
       - name: Restart Services
         run: |
-          sudo systemctl daemon-reload
+          # 権限設定（sudoers が適用されている前提）
+          sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
+
+          # 既存の Python サービス再起動
           sudo systemctl restart discord_bot.service
           sudo systemctl restart discord_webapp.service
 

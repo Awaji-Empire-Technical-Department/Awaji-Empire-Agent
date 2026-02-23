@@ -5,10 +5,8 @@
 # - ctx 非依存
 import json
 import logging
-import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
-import aiomysql
 import discord
 
 from services.survey_service import SurveyService
@@ -18,36 +16,13 @@ logger = logging.getLogger(__name__)
 
 class SurveyLogic:
     """アンケート機能のビジネスロジック。
-
-    Why: cogs/README.md の規約では @staticmethod を推奨するが、
-         DB pool のライフサイクル管理が必要なため、このクラスは
-         例外的にインスタンスメソッドを持つ。
-         ただし ctx には一切依存しない。
+    
+    Why: Phase 3-B 以降、DB 接続は Rust Bridge に集約されたため、
+         Python 側での Pool 管理は不要。
     """
 
     def __init__(self, dashboard_url: str):
         self.dashboard_url = dashboard_url
-        self.pool: Optional[aiomysql.Pool] = None
-
-    async def initialize_pool(self):
-        """DBコネクションプールを初期化する。"""
-        try:
-            self.pool = await aiomysql.create_pool(
-                host=os.getenv('DB_HOST', '127.0.0.1'),
-                user=os.getenv('DB_USER', 'root'),
-                password=os.getenv('DB_PASS', ''),
-                db=os.getenv('DB_NAME', 'bot_db'),
-                autocommit=True,
-            )
-            logger.info("SurveyCog: DB Connected")
-        except Exception as e:
-            logger.error("SurveyCog DB Error: %s", e)
-
-    async def close_pool(self):
-        """DBコネクションプールを閉じる。"""
-        if self.pool:
-            self.pool.close()
-            await self.pool.wait_closed()
 
     def build_create_response(self) -> Tuple[discord.Embed, discord.ui.View]:
         """アンケート作成ページ案内用の Embed と View を生成する。"""
@@ -69,7 +44,7 @@ class SurveyLogic:
 
     async def build_list_response(self) -> Optional[discord.Embed]:
         """稼働中アンケート一覧の Embed を生成する。なければ None。"""
-        surveys = await SurveyService.get_active_surveys(self.pool)
+        surveys = await SurveyService.get_active_surveys(None)
         if not surveys:
             return None
 
@@ -96,7 +71,7 @@ class SurveyLogic:
     async def build_my_active_response(self, user_id: str) -> Optional[discord.Embed]:
         """自分の稼働中アンケート一覧の Embed を生成する。なければ None。"""
         surveys = await SurveyService.get_surveys_by_owner(
-            self.pool, user_id, active_only=True
+            None, user_id, active_only=True
         )
         if not surveys:
             return None
@@ -124,13 +99,8 @@ class SurveyLogic:
         survey_id: int,
     ) -> Union[None, str, Tuple[discord.Embed, discord.ui.View]]:
         """アンケート周知用の Embed と View を生成する。
-
-        Returns:
-            None: アンケートが見つからない
-            "inactive": アンケートが停止中
-            (embed, view): 成功時
         """
-        survey = await SurveyService.get_survey(self.pool, survey_id)
+        survey = await SurveyService.get_survey(None, survey_id)
         if not survey:
             return None
         if not survey['is_active']:

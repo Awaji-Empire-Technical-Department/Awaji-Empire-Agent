@@ -22,10 +22,18 @@
 - [ ] `cargo build` が通ることを確認（`SQLX_OFFLINE=true` または DB 接続）
 - [ ] `questions` JSON スキーマを `form.html` / `form.js` から確認し `Question` struct を確定
 
-## Phase 3-B: Python ↔ Rust ブリッジ方式の決定
+## Phase 3-B: Python ↔ Rust ブリッジの実装 (TCP IPC + systemd 自動化)
 
-- [ ] IPC 方式の選定: **PyO3（FFI）** vs **Unix Socket** vs **gRPC** を検討
-- [ ] 選定後、仕様書に追記
+- [x] IPC 方式の選定: **候補 B (TCP IPC/HTTP)** に決定
+- [/] `docs/Specifications/phase3b-python-rust-bridge.md` のステータスを更新
+- [ ] `infra/database_bridge.service` (systemd ユニットファイル) の作成
+- [ ] `scripts/setup-systemd.sh` (systemd 自動設定スクリプト) の作成
+- [ ] `infra/sudoers_deploy` (sudoers 設定) の作成
+- [ ] `database_bridge/Cargo.toml` に `axum`, `serde`, `tower-http` を追加
+- [x] `database_bridge/src/main.rs` を HTTP サーバーとして実装
+- [x] 各 DB 操作に対応する API エンドポイントの実装
+- [ ] 疎通確認 (curl によるヘルスチェック)
+- [ ] `deploy.yml` に `setup-systemd.sh` の呼び出しを追加
 
 ## Phase 3-C: Bot 側の DB 直接呼び出しを廃止
 

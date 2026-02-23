@@ -1,7 +1,7 @@
 # Phase 3-B: Python ↔ Rust ブリッジ方式 設計仕様書
 
 - **ブランチ**: `feature/phase3-rust-bridge`
-- **ステータス**: 🔴 精査中（実装未着手）
+- **ステータス**: � 承認済み（IPC方式 候補Bを採用）
 - **作成日**: 2026-02-23
 - **前提**: Phase 3-A（Rust クレートスケルトン）が完了していること
 - **関連 ADR**: [ADR-002](../adr/002-phase3-rust-database-bridge.md)（Phase 3-B の方式は別途 ADR-003 で記録予定）

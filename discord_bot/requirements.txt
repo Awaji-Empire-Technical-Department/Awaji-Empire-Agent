@@ -12,7 +12,7 @@ aiohttp==3.13.2
     # via
     #   -r requirements.txt
     #   discord-py
-aiomysql==0.3.2
+httpx
     # via -r requirements.txt
 aiosignal==1.4.0
     # via

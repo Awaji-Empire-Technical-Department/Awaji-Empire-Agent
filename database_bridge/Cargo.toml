@@ -26,6 +26,10 @@ dotenvy = "0.15"
 # エラー型定義
 thiserror = "1.0"
 
+# HTTP サーバー (IPC 用)
+axum = "0.8"
+tower-http = { version = "0.6", features = ["trace"] }
+
 # 構造化ログ
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
