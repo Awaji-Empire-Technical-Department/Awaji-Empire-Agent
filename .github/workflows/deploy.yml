@@ -24,6 +24,12 @@ jobs:
         run: |
           sudo rsync -av --exclude='.git' ./ /Awaji-Empire-Agent/
 
+      - name: Install uv
+        run: |
+          if ! command -v /usr/local/bin/uv &> /dev/null; then
+            curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
+          fi
+
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
@@ -53,6 +59,12 @@ jobs:
       - name: Sync to production directory
         run: |
           sudo rsync -av --exclude='.git' ./ /Awaji-Empire-Agent/
+
+      - name: Install uv
+        run: |
+          if ! command -v /usr/local/bin/uv &> /dev/null; then
+            curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
+          fi
 
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
