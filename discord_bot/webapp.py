@@ -5,6 +5,7 @@ from quart_cors import cors
 from dotenv import load_dotenv
 
 from routes.survey import survey_bp
+from services.bridge_client import BridgeUnavailableError
 from services.survey_service import SurveyService
 from services.log_service import LogService
 
@@ -148,6 +149,9 @@ async def index():
 
         return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs)
         
+    except BridgeUnavailableError:
+        current_app.logger.warning("Bridge unavailable on index: rendering maintenance page")
+        return await render_template('maintenance.html'), 503
     except Exception as e:
         current_app.logger.error(f"Error in Index Dashboard: {e}")
         return f"System Error: {e}", 500

@@ -22,6 +22,7 @@ from quart import (
 )
 
 from common.survey_utils import parse_questions
+from services.bridge_client import BridgeUnavailableError
 from services.log_service import LogService
 from services.notification_service import NotificationService
 from services.survey_service import SurveyService
@@ -58,6 +59,8 @@ async def create_new():
             return "Database Error (Bridge)", 503
         await LogService.log_operation(None, user['id'], user['name'], "CREATE", f"ID:{new_id} を新規作成")
         return redirect(url_for('survey.edit_survey', survey_id=new_id))
+    except BridgeUnavailableError:
+        return await render_template('maintenance.html'), 503
     except Exception as e:
         current_app.logger.error(f"Error in create_new: {e}")
         return "System Error", 503
@@ -71,6 +74,8 @@ async def edit_survey(survey_id):
 
     try:
         survey = await SurveyService.get_survey(None, survey_id)
+    except BridgeUnavailableError:
+        return await render_template('maintenance.html'), 503
     except Exception:
         return "System Error", 503
 
@@ -152,8 +157,10 @@ async def view_form(survey_id):
 
     try:
         survey = await SurveyService.get_survey(None, survey_id)
+    except BridgeUnavailableError:
+        return await render_template('maintenance.html'), 503
     except Exception:
-        return "Bridge Unavailable", 503
+        return "System Error", 503
 
     if not survey or not survey['is_active']:
         return "<h3>Not Found or Inactive</h3><p>このアンケートは現在受け付けていません。</p>", 404
@@ -225,6 +232,8 @@ async def view_results(survey_id):
             return "Forbidden", 403
 
         responses = await SurveyService.get_responses(None, survey_id)
+    except BridgeUnavailableError:
+        return await render_template('maintenance.html'), 503
     except Exception:
         return "System Error", 503
 
@@ -275,6 +284,8 @@ async def download_csv(survey_id):
             return "Forbidden", 403
 
         responses = await SurveyService.get_responses(None, survey_id)
+    except BridgeUnavailableError:
+        return await render_template('maintenance.html'), 503
     except Exception:
         return "System Error", 503
 
