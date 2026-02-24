@@ -17,7 +17,7 @@ jobs:
         working-directory: ./database_bridge
         run: |
           source "$HOME/.cargo/env"
-          # discord_bot/.env から DATABASE_URL を読み込む（sqlx::query! マクロ用）
+          # discord_bot/.env から DATABASE_URL を読み込む（sqlx ビルド用）
           if [ -f /Awaji-Empire-Agent/discord_bot/.env ]; then
             set -a && source /Awaji-Empire-Agent/discord_bot/.env && set +a
           fi
@@ -36,19 +36,12 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          # .venv が root 所有の場合、devuser に所有権を移譲して uv sync を可能にする
-          if [ -d .venv ]; then
-            sudo chown -R "$(whoami):$(whoami)" .venv
-          fi
           /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |
-          # 権限設定（sudoers が適用されている前提）
           sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
           sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
-
-          # 既存の Python サービス再起動
           sudo systemctl restart discord_bot.service
           sudo systemctl restart discord_webapp.service
 
@@ -64,7 +57,7 @@ jobs:
         working-directory: ./database_bridge
         run: |
           source "$HOME/.cargo/env"
-          # discord_bot/.env から DATABASE_URL を読み込む（sqlx::query! マクロ用）
+          # discord_bot/.env から DATABASE_URL を読み込む（sqlx ビルド用）
           if [ -f /Awaji-Empire-Agent/discord_bot/.env ]; then
             set -a && source /Awaji-Empire-Agent/discord_bot/.env && set +a
           fi
@@ -83,10 +76,6 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          # .venv が root 所有の場合、devuser に所有権を移譲して uv sync を可能にする
-          if [ -d .venv ]; then
-            sudo chown -R "$(whoami):$(whoami)" .venv
-          fi
           /usr/local/bin/uv sync
 
       - name: Restart Services
