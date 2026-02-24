@@ -5,7 +5,7 @@
 
 use sqlx::mysql::MySqlPool;
 
-use crate::db::{models::BridgeResult, models::BridgeError, response_repo, survey_repo};
+use crate::db::{models::BridgeResult, models::BridgeError, survey_repo};
 
 /// アンケート回答を UPSERT する（UNIQUE KEY: survey_id + user_id を前提）。
 ///

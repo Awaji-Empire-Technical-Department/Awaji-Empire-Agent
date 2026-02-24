@@ -4,10 +4,10 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::MySqlPool;
-use tracing::{error, info};
+use tracing::error;
 
 use crate::db::{models::BridgeError, survey_repo, response_repo, log_repo};
 use crate::bot::survey_handler;
