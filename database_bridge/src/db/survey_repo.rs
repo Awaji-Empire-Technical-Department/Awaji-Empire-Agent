@@ -2,8 +2,11 @@
 // Why: surveys テーブルへの純粋な CRUD をここに集約する。
 //      本ファイルは Bot / Webapp 両方から呼ばれるため、
 //      Discord にも Quart にも依存しない純粋な Rust コードのみを記述する。
+//
+//      Note: sqlx::query!マクロ（コンパイル時DB検証）の代わりに
+//      sqlx::query()ランタイム関数を使用。CI環境のDATABASE_URL依存を排除する。
 
-use sqlx::mysql::MySqlPool;
+use sqlx::{mysql::MySqlPool, Row};
 use tracing::error;
 
 use super::models::{BridgeError, BridgeResult, Survey};
@@ -12,13 +15,11 @@ use super::models::{BridgeError, BridgeResult, Survey};
 ///
 /// Python: `SurveyService.create_survey()`
 pub async fn insert(pool: &MySqlPool, owner_id: &str) -> BridgeResult<i64> {
-    let result = sqlx::query!(
-        r#"
-        INSERT INTO surveys (owner_id, title, questions, is_active, created_at)
-        VALUES (?, '無題のアンケート', '[]', FALSE, NOW())
-        "#,
-        owner_id,
+    let result = sqlx::query(
+        "INSERT INTO surveys (owner_id, title, questions, is_active, created_at) \
+         VALUES (?, '無題のアンケート', '[]', FALSE, NOW())",
     )
+    .bind(owner_id)
     .execute(pool)
     .await
     .map_err(|e| {
@@ -33,7 +34,8 @@ pub async fn insert(pool: &MySqlPool, owner_id: &str) -> BridgeResult<i64> {
 ///
 /// Python: `SurveyService.get_survey()`
 pub async fn find_by_id(pool: &MySqlPool, survey_id: i64) -> BridgeResult<Survey> {
-    sqlx::query_as!(Survey, "SELECT * FROM surveys WHERE id = ?", survey_id)
+    sqlx::query_as::<_, Survey>("SELECT * FROM surveys WHERE id = ?")
+        .bind(survey_id)
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| BridgeError::NotFound(format!("survey_id={survey_id}")))
@@ -49,19 +51,17 @@ pub async fn find_by_owner(
     active_only: Option<bool>,
 ) -> BridgeResult<Vec<Survey>> {
     let surveys = if active_only == Some(true) {
-        sqlx::query_as!(
-            Survey,
+        sqlx::query_as::<_, Survey>(
             "SELECT * FROM surveys WHERE owner_id = ? AND is_active = 1 ORDER BY created_at DESC",
-            owner_id,
         )
+        .bind(owner_id)
         .fetch_all(pool)
         .await?
     } else {
-        sqlx::query_as!(
-            Survey,
+        sqlx::query_as::<_, Survey>(
             "SELECT * FROM surveys WHERE owner_id = ? ORDER BY created_at DESC",
-            owner_id,
         )
+        .bind(owner_id)
         .fetch_all(pool)
         .await?
     };
@@ -73,8 +73,7 @@ pub async fn find_by_owner(
 ///
 /// Python: `SurveyService.get_active_surveys()`
 pub async fn find_active(pool: &MySqlPool) -> BridgeResult<Vec<Survey>> {
-    let surveys = sqlx::query_as!(
-        Survey,
+    let surveys = sqlx::query_as::<_, Survey>(
         "SELECT * FROM surveys WHERE is_active = 1 ORDER BY created_at DESC",
     )
     .fetch_all(pool)
@@ -92,14 +91,12 @@ pub async fn update(
     title: &str,
     questions_json: &str,
 ) -> BridgeResult<()> {
-    sqlx::query!(
-        "UPDATE surveys SET title = ?, questions = ? WHERE id = ?",
-        title,
-        questions_json,
-        survey_id,
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE surveys SET title = ?, questions = ? WHERE id = ?")
+        .bind(title)
+        .bind(questions_json)
+        .bind(survey_id)
+        .execute(pool)
+        .await?;
 
     Ok(())
 }
@@ -114,7 +111,8 @@ pub async fn delete(pool: &MySqlPool, survey_id: i64, owner_id: &str) -> BridgeR
         return Err(BridgeError::PermissionDenied);
     }
 
-    sqlx::query!("DELETE FROM surveys WHERE id = ?", survey_id)
+    sqlx::query("DELETE FROM surveys WHERE id = ?")
+        .bind(survey_id)
         .execute(pool)
         .await?;
 
@@ -125,10 +123,11 @@ pub async fn delete(pool: &MySqlPool, survey_id: i64, owner_id: &str) -> BridgeR
 ///
 /// Python: `SurveyService.get_owner_id()`
 pub async fn get_owner_id(pool: &MySqlPool, survey_id: i64) -> BridgeResult<String> {
-    let row = sqlx::query!("SELECT owner_id FROM surveys WHERE id = ?", survey_id)
+    let row = sqlx::query("SELECT owner_id FROM surveys WHERE id = ?")
+        .bind(survey_id)
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| BridgeError::NotFound(format!("survey_id={survey_id}")))?;
 
-    Ok(row.owner_id)
+    Ok(row.try_get("owner_id").map_err(BridgeError::Sqlx)?)
 }
