@@ -1,38 +1,43 @@
 // db/models.rs
 // Why: すべての DB テーブル対応 Struct をここに集約する。
-//      bot/ も webapp/ もこのファイルだけを参照すれば型定義を得られる設計。
+//      MariaDB の JSON 型が BLOB として返される場合があるため、
+//      questions/answers カラムを Vec<u8> で受け取り、
+//      アプリケーション層で String に変換する設計に変更。
 
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use sqlx::types::time::OffsetDateTime;
 
 // ============================================================
+// Helper functions for BLOB to String conversion
+// ============================================================
+
+fn blob_to_string(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+// ============================================================
 // surveys テーブル
 // ============================================================
 
 /// surveys テーブルの 1 行に対応する Struct。
-///
-/// Why: Python 側では `Dict[str, Any]` として扱っていたが、
-///      Rust の型システムを活かしてフィールドを静的に検証する。
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Survey {
     pub id: i64,
-    /// Discord User ID。u64 だが DB では VARCHAR 保持のため String で管理。
     pub owner_id: String,
     pub title: String,
-    /// JSON 文字列。`parse_questions()` で `Vec<Question>` に変換する。
-    pub questions: String,
+    /// JSON 文字列。DB側が BLOB(LONGBLOB) のため Vec<u8> で受け取る。
+    /// Serialize 時には String に変換して出力する。
+    #[serde(with = "serde_bytes_to_string")]
+    pub questions: Vec<u8>,
     pub is_active: bool,
     pub created_at: OffsetDateTime,
 }
 
 impl Survey {
     /// `questions` JSON フィールドを型安全にパースする。
-    ///
-    /// Why: Python では `json.loads()` のエラーを `"?"` で握りつぶしていたが、
-    ///      Rust では `Result` で明示的に伝播し、呼び出し側で制御できる。
     pub fn parse_questions(&self) -> Result<Vec<Question>, serde_json::Error> {
-        serde_json::from_str(&self.questions)
+        serde_json::from_slice(&self.questions)
     }
 
     /// 質問数をゼロコスト（エラー時は 0）で返す。
@@ -48,7 +53,6 @@ pub struct Question {
     pub text: String,
     #[serde(rename = "type")]
     pub question_type: QuestionType,
-    /// ラジオ・チェックボックスの選択肢。テキスト系は None。
     pub options: Option<Vec<String>>,
 }
 
@@ -71,8 +75,9 @@ pub struct SurveyResponse {
     pub survey_id: i64,
     pub user_id: String,
     pub user_name: String,
-    /// JSON 文字列。`parse_answers()` で `HashMap<String, AnswerValue>` に変換する。
-    pub answers: String,
+    /// JSON 文字列。DB側が BLOB のため Vec<u8> で受け取る。
+    #[serde(with = "serde_bytes_to_string")]
+    pub answers: Vec<u8>,
     pub submitted_at: OffsetDateTime,
     pub dm_sent: bool,
 }
@@ -82,14 +87,10 @@ impl SurveyResponse {
     pub fn parse_answers(
         &self,
     ) -> Result<std::collections::HashMap<String, AnswerValue>, serde_json::Error> {
-        serde_json::from_str(&self.answers)
+        serde_json::from_slice(&self.answers)
     }
 }
 
-/// answers フィールドの値型。
-///
-/// Why: Python 側では `str` と `list` が混在していたため、
-///      `#[serde(untagged)]` で両方を受け付ける。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AnswerValue {
@@ -101,7 +102,6 @@ pub enum AnswerValue {
 // operation_logs テーブル
 // ============================================================
 
-/// operation_logs テーブルの 1 行に対応する Struct。
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct OperationLog {
     pub id: i64,
@@ -113,14 +113,33 @@ pub struct OperationLog {
 }
 
 // ============================================================
+// Serde helpers for Vec<u8> (BLOB) <-> String
+// ============================================================
+
+mod serde_bytes_to_string {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = String::from_utf8_lossy(bytes);
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(s.into_bytes())
+    }
+}
+
+// ============================================================
 // 共通エラー型
 // ============================================================
 
-/// `database_bridge` 全体で使う統一エラー型。
-///
-/// Why: Python 側では `try/except + None 返し` だったが、
-///      Rust では `Result<T, BridgeError>` で呼び出し元に
-///      どのエラーが起きたかを型レベルで伝播する。
 #[derive(Debug, thiserror::Error)]
 pub enum BridgeError {
     #[error("Database error: {0}")]

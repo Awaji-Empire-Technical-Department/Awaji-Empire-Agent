@@ -39,7 +39,10 @@ pub async fn find_answers_by_user(
     .fetch_optional(pool)
     .await?;
 
-    Ok(row.map(|r| r.try_get::<String, _>("answers").unwrap_or_default()))
+    Ok(row.map(|r| {
+        let bytes = r.try_get::<Vec<u8>, _>("answers").unwrap_or_default();
+        String::from_utf8_lossy(&bytes).into_owned()
+    }))
 }
 
 /// 回答レコードの DM 送信済みフラグを立てる。
