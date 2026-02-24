@@ -36,12 +36,18 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
+          # 以前の root 所有などの権限エラーを回避
+          sudo chown -R $(whoami):$(whoami) .venv || true
           /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |
+          # systemd サービスファイルの登録・更新を自動化
           sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
           sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          sudo systemctl daemon-reload
+          # 全サービスを再起動
+          sudo systemctl restart database_bridge.service
           sudo systemctl restart discord_bot.service
           sudo systemctl restart discord_webapp.service
 
@@ -76,11 +82,17 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
+          # 権限エラー回避
+          sudo chown -R $(whoami):$(whoami) .venv || true
           /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |
+          # 自動セットアップを実行
+          sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
           sudo systemctl daemon-reload
+          # 全サービスを再起動
           sudo systemctl restart database_bridge.service
           sudo systemctl restart discord_bot.service
           sudo systemctl restart discord_webapp.service
