@@ -6,7 +6,7 @@
 
 use sqlx::{mysql::MySqlPool, Row};
 
-use super::models::{BridgeError, BridgeResult, SurveyResponse};
+use super::models::{BridgeResult, SurveyResponse};
 
 /// アンケートの全回答を取得する。
 ///
@@ -52,45 +52,4 @@ pub async fn mark_dm_sent(pool: &MySqlPool, response_id: i64) -> BridgeResult<()
         .await?;
 
     Ok(())
-}
-
-/// 既存回答レコードを UPDATE する（UPSERT の UPDATE 分岐。bot/ から呼ばれる）。
-pub(crate) async fn update_response(
-    pool: &MySqlPool,
-    response_id: i64,
-    answers_json: &str,
-) -> BridgeResult<()> {
-    sqlx::query(
-        "UPDATE survey_responses SET answers = ?, submitted_at = NOW(), dm_sent = FALSE WHERE id = ?",
-    )
-    .bind(answers_json)
-    .bind(response_id)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// 新規回答レコードを INSERT する（UPSERT の INSERT 分岐。bot/ から呼ばれる）。
-pub(crate) async fn insert_response(
-    pool: &MySqlPool,
-    survey_id: i64,
-    user_id: &str,
-    user_name: &str,
-    answers_json: &str,
-) -> BridgeResult<i64> {
-    let result = sqlx::query(
-        "INSERT INTO survey_responses \
-             (survey_id, user_id, user_name, answers, submitted_at, dm_sent) \
-         VALUES (?, ?, ?, ?, NOW(), FALSE)",
-    )
-    .bind(survey_id)
-    .bind(user_id)
-    .bind(user_name)
-    .bind(answers_json)
-    .execute(pool)
-    .await
-    .map_err(BridgeError::Sqlx)?;
-
-    Ok(result.last_insert_id() as i64)
 }

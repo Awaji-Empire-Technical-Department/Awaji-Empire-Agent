@@ -2,9 +2,7 @@
 // Why: HTTP サーバーエントリエントリポイント (IPC用)。
 //      Phase 3-B では axum を使用してローカルのリクエストを受け付ける。
 
-use axum::{routing::get, Json, Router};
 use database_bridge::db::connection;
-use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tracing::{error, info};
 

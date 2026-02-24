@@ -36,6 +36,10 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
+          # .venv が root 所有の場合、devuser に所有権を移譲して uv sync を可能にする
+          if [ -d .venv ]; then
+            sudo chown -R "$(whoami):$(whoami)" .venv
+          fi
           /usr/local/bin/uv sync
 
       - name: Restart Services
@@ -79,6 +83,10 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
+          # .venv が root 所有の場合、devuser に所有権を移譲して uv sync を可能にする
+          if [ -d .venv ]; then
+            sudo chown -R "$(whoami):$(whoami)" .venv
+          fi
           /usr/local/bin/uv sync
 
       - name: Restart Services
