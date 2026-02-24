@@ -17,7 +17,6 @@ jobs:
         working-directory: ./database_bridge
         run: |
           source "$HOME/.cargo/env"
-          # discord_bot/.env から DATABASE_URL を読み込む（sqlx ビルド用）
           if [ -f /Awaji-Empire-Agent/discord_bot/.env ]; then
             set -a && source /Awaji-Empire-Agent/discord_bot/.env && set +a
           fi
@@ -36,18 +35,17 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          # 以前の root 所有などの権限エラーを回避
+          # 所有権修正を sudoers で許可されている前提で実行
           sudo chown -R $(whoami):$(whoami) .venv || true
           /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |
-          # systemd サービスファイルの登録・更新を自動化
-          sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          # スクリプト自体を sudo で実行。
+          # 内部コマンド（cp, systemctl）はスクリプトが root 権限を持つため sudo 不要。
           sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
-          sudo systemctl daemon-reload
-          # 全サービスを再起動
-          sudo systemctl restart database_bridge.service
+          
+          # ブリッジ以外のサービスも sudo で再起動
           sudo systemctl restart discord_bot.service
           sudo systemctl restart discord_webapp.service
 
@@ -63,7 +61,6 @@ jobs:
         working-directory: ./database_bridge
         run: |
           source "$HOME/.cargo/env"
-          # discord_bot/.env から DATABASE_URL を読み込む（sqlx ビルド用）
           if [ -f /Awaji-Empire-Agent/discord_bot/.env ]; then
             set -a && source /Awaji-Empire-Agent/discord_bot/.env && set +a
           fi
@@ -82,17 +79,11 @@ jobs:
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          # 権限エラー回避
           sudo chown -R $(whoami):$(whoami) .venv || true
           /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |
-          # 自動セットアップを実行
-          sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
           sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
-          sudo systemctl daemon-reload
-          # 全サービスを再起動
-          sudo systemctl restart database_bridge.service
           sudo systemctl restart discord_bot.service
           sudo systemctl restart discord_webapp.service
