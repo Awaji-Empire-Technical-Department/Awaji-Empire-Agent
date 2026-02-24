@@ -22,10 +22,10 @@ pub fn create_router(pool: MySqlPool) -> Router {
 fn survey_routes() -> Router<MySqlPool> {
     Router::new()
         .route("/", get(handlers::list_surveys).post(handlers::create_survey))
-        .route("/:id", get(handlers::get_survey).patch(handlers::update_survey).delete(handlers::delete_survey))
-        .route("/:id/toggle", post(handlers::toggle_survey_status))
-        .route("/:id/responses", get(handlers::list_responses))
-        .route("/:id/responses/:user_id", get(handlers::get_user_answers))
+        .route("/{id}", get(handlers::get_survey).patch(handlers::update_survey).delete(handlers::delete_survey))
+        .route("/{id}/toggle", post(handlers::toggle_survey_status))
+        .route("/{id}/responses", get(handlers::list_responses))
+        .route("/{id}/responses/{user_id}", get(handlers::get_user_answers))
         .route("/responses/upsert", post(handlers::upsert_response))
-        .route("/responses/:id/dm_sent", patch(handlers::mark_dm_sent))
+        .route("/responses/{id}/dm_sent", patch(handlers::mark_dm_sent))
 }
