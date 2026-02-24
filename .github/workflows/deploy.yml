@@ -29,30 +29,27 @@ jobs:
       - name: Install uv
         run: |
           if ! command -v /usr/local/bin/uv &> /dev/null; then
-             # sudoers に /usr/bin/env が必要な理由
-             curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
+            curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
           fi
 
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          # パスワードを求められても止まらないよう -n を付与して試行
-          sudo -n chown -R $(whoami):$(whoami) .venv || echo "Warning: sudo chown failed, skipping..."
+          sudo chown -R $(whoami):$(whoami) .venv || true
           /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |
-          echo "Current User: $(whoami)"
-          echo "Checking script path..."
-          ls -l /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          # 改行コード修正と権限付与を自動化
+          sudo sed -i 's/\r$//' /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
           
-          # -n (non-interactive) を付けて sudo 実行。失敗時にエラーログが出る。
           echo "Executing setup script..."
-          sudo -n /Awaji-Empire-Agent/scripts/setup-systemd.sh || echo "Error: Setup script execution failed (maybe sudoers issue)"
+          sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
           
           echo "Restarting additional services..."
-          sudo -n systemctl restart discord_bot.service || echo "Error: Restarting discord_bot failed"
-          sudo -n systemctl restart discord_webapp.service || echo "Error: Restarting discord_webapp failed"
+          sudo systemctl restart discord_bot.service
+          sudo systemctl restart discord_webapp.service
 
   deploy-test:
     name: Deploy to Test
@@ -78,17 +75,20 @@ jobs:
       - name: Install uv
         run: |
           if ! command -v /usr/local/bin/uv &> /dev/null; then
-             curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
+            curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
           fi
 
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          sudo -n chown -R $(whoami):$(whoami) .venv || echo "Warning: sudo chown failed"
+          sudo chown -R $(whoami):$(whoami) .venv || true
           /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |
-          sudo -n /Awaji-Empire-Agent/scripts/setup-systemd.sh || echo "Error: Setup script failed"
-          sudo -n systemctl restart discord_bot.service
-          sudo -n systemctl restart discord_webapp.service
+          sudo sed -i 's/\r$//' /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          
+          sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          sudo systemctl restart discord_bot.service
+          sudo systemctl restart discord_webapp.service
