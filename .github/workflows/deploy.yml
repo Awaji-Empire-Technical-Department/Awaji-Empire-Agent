@@ -40,8 +40,9 @@ jobs:
 
       - name: Restart Services
         run: |
-          # 改行コード修正と権限付与を自動化
-          sudo sed -i 's/\r$//' /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          # ローカル側（ワークスペース）で改行コードを修正してから、sudo cp で上書き
+          sed -i 's/\r$//' ./scripts/setup-systemd.sh
+          sudo cp ./scripts/setup-systemd.sh /Awaji-Empire-Agent/scripts/setup-systemd.sh
           sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
           
           echo "Executing setup script..."
@@ -86,7 +87,8 @@ jobs:
 
       - name: Restart Services
         run: |
-          sudo sed -i 's/\r$//' /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          sed -i 's/\r$//' ./scripts/setup-systemd.sh
+          sudo cp ./scripts/setup-systemd.sh /Awaji-Empire-Agent/scripts/setup-systemd.sh
           sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
           
           sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
