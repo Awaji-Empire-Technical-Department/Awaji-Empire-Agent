@@ -9,14 +9,6 @@ use sqlx::FromRow;
 use sqlx::types::time::OffsetDateTime;
 
 // ============================================================
-// Helper functions for BLOB to String conversion
-// ============================================================
-
-fn blob_to_string(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).into_owned()
-}
-
-// ============================================================
 // surveys テーブル
 // ============================================================
 
@@ -31,6 +23,8 @@ pub struct Survey {
     #[serde(with = "serde_bytes_to_string")]
     pub questions: Vec<u8>,
     pub is_active: bool,
+    /// 作成日時。デフォルトでは配列になるため、RFC3339 (ISO-8601) 文字列で出力する。
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 
@@ -78,6 +72,8 @@ pub struct SurveyResponse {
     /// JSON 文字列。DB側が BLOB のため Vec<u8> で受け取る。
     #[serde(with = "serde_bytes_to_string")]
     pub answers: Vec<u8>,
+    /// 提出日時。RFC3339 形式で出力。
+    #[serde(with = "time::serde::rfc3339")]
     pub submitted_at: OffsetDateTime,
     pub dm_sent: bool,
 }
@@ -109,6 +105,8 @@ pub struct OperationLog {
     pub user_name: String,
     pub command: String,
     pub detail: String,
+    /// 記録日時。RFC3339 形式で出力。
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 
