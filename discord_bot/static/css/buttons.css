@@ -1,0 +1,88 @@
+/* =========================================
+   BUTTONS: Unified Button System
+   ========================================= */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: center;
+    transition: all 0.2s;
+    color: white;
+    gap: 6px;
+    line-height: 1.2;
+}
+
+.btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.btn-sm {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+}
+
+.btn-block {
+    width: 100%;
+    display: flex;
+}
+
+.btn-primary {
+    background-color: var(--accent);
+}
+
+.btn-success {
+    background-color: var(--success);
+}
+
+.btn-warning {
+    background-color: var(--warning);
+    color: white;
+}
+
+.btn-danger {
+    background-color: var(--danger);
+}
+
+.btn-secondary {
+    background-color: var(--gray);
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--gray);
+}
+
+.btn-outline:hover {
+    background: var(--light);
+    color: var(--primary);
+}
+
+/* Icon Buttons (Square) */
+.btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+/* Button Group (Toolbar) */
+.btn-toolbar {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.btn-toolbar form {
+    margin: 0;
+    display: flex;
+}

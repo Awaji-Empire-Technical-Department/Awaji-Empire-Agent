@@ -1,0 +1,98 @@
+/* =========================================
+   COMPONENTS: Tables, Badges, Alerts, Charts
+   ========================================= */
+
+/* Tables */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+}
+
+.table th {
+    background: #f8f9fa;
+    color: var(--gray);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    padding: 12px;
+    border-bottom: 2px solid var(--border-color);
+    text-align: left;
+}
+
+.table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+/* Status Badges */
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: white;
+}
+
+.badge-success {
+    background: var(--success);
+}
+
+.badge-secondary {
+    background: var(--gray);
+}
+
+/* Alerts */
+.alert {
+    padding: 1rem;
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    display: flex;
+    align-items: center;
+}
+
+/* Charts (Results) */
+.chart-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.chart-label {
+    width: 30%;
+    padding-right: 15px;
+    word-break: break-all;
+}
+
+.chart-bar-bg {
+    flex: 1;
+    background: #ecf0f1;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.chart-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 6px;
+    transition: width 0.6s ease;
+}
+
+.chart-value {
+    width: 60px;
+    text-align: right;
+    font-weight: bold;
+    color: var(--gray);
+    font-size: 0.85rem;
+}

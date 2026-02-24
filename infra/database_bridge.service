@@ -1,0 +1,15 @@
+[Unit]
+Description=Awaji Empire Agent - Database Bridge (Rust IPC)
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/Awaji-Empire-Agent
+EnvironmentFile=/Awaji-Empire-Agent/discord_bot/.env
+ExecStart=/Awaji-Empire-Agent/database_bridge/target/release/database_bridge
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

@@ -5,8 +5,10 @@ on:
     branches: [master, test]
 
 jobs:
-  deploy:
-    runs-on: self-hosted
+  deploy-production:
+    name: Deploy to Production
+    if: github.ref == 'refs/heads/master'
+    runs-on: [self-hosted, 01sv-ubuntu]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,11 +24,56 @@ jobs:
         run: |
           sudo rsync -av --exclude='.git' ./ /Awaji-Empire-Agent/
 
+      - name: Install uv
+        run: |
+          if ! command -v /usr/local/bin/uv &> /dev/null; then
+            curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
+          fi
+
       - name: Install dependencies
         working-directory: /Awaji-Empire-Agent/discord_bot
         run: |
-          # /usr/local/bin にある uv をそのまま使用
-          uv sync
+          /usr/local/bin/uv sync
+
+      - name: Restart Services
+        run: |
+          # 権限設定（sudoers が適用されている前提）
+          sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
+
+          # 既存の Python サービス再起動
+          sudo systemctl restart discord_bot.service
+          sudo systemctl restart discord_webapp.service
+
+  deploy-test:
+    name: Deploy to Test
+    if: github.ref == 'refs/heads/test'
+    runs-on: [self-hosted, 02sv-testenv]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Rust bridge
+        working-directory: ./database_bridge
+        run: |
+          # Rust の環境変数を読み込んでビルド
+          source "$HOME/.cargo/env"
+          cargo build --release
+
+      - name: Sync to production directory
+        run: |
+          sudo rsync -av --exclude='.git' ./ /Awaji-Empire-Agent/
+
+      - name: Install uv
+        run: |
+          if ! command -v /usr/local/bin/uv &> /dev/null; then
+            curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
+          fi
+
+      - name: Install dependencies
+        working-directory: /Awaji-Empire-Agent/discord_bot
+        run: |
+          /usr/local/bin/uv sync
 
       - name: Restart Services
         run: |

@@ -1,0 +1,103 @@
+/* =========================================
+   MAINTENANCE: Bridge停止時メンテナンスページ
+   ========================================= */
+.maintenance-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    animation: spin-slow 4s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin-slow {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.status-badge {
+    display: inline-block;
+    background: rgba(243, 156, 18, 0.2);
+    border: 1px solid rgba(243, 156, 18, 0.5);
+    color: var(--warning);
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+    margin-bottom: 1.2rem;
+}
+
+.maintenance-info-box {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 1.2rem;
+    text-align: left;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.8;
+}
+
+.maintenance-info-box i {
+    margin-right: 6px;
+    color: var(--accent);
+}
+
+.maintenance-divider {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin: 1.5rem 0;
+}
+
+/* 管理者向け折りたたみ */
+details.admin-section {
+    text-align: left;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+details.admin-section summary {
+    cursor: pointer;
+    list-style: none;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.35);
+    user-select: none;
+}
+
+details.admin-section summary::after {
+    content: " ▸";
+}
+
+details.admin-section[open] summary::after {
+    content: " ▾";
+}
+
+details.admin-section code {
+    display: block;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 0.6rem 0.8rem;
+    margin-top: 0.8rem;
+    font-family: "Consolas", "Monaco", monospace;
+    font-size: 0.8rem;
+    color: #7ed321;
+    line-height: 1.6;
+    white-space: pre;
+}
+
+.btn-retry {
+    background: linear-gradient(135deg, var(--accent), #2980b9);
+    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+}
+
+.btn-retry:hover {
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.5);
+}

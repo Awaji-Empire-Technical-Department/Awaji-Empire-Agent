@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>システムメンテナンス中 | 淡路帝国</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+</head>
+
+<body class="auth-page">
+    <div class="auth-box" style="border-color: rgba(243, 156, 18, 0.4); max-width: 480px;">
+
+        <div class="maintenance-icon">🔧</div>
+
+        <div class="status-badge">
+            <i class="fas fa-circle"
+                style="font-size: 0.55rem; vertical-align: middle; color: var(--warning); margin-right: 4px;"></i>
+            SERVICE UNAVAILABLE
+        </div>
+
+        <h1 class="auth-title" style="font-size: 1.6rem;">システムメンテナンス中</h1>
+        <p class="auth-sub">
+            現在、データベースサービスが一時的に<br>利用できない状態です。
+        </p>
+
+        <div class="maintenance-info-box">
+            <div><i class="fas fa-clock"></i>しばらく時間をおいてから再試行してください。</div>
+            <div><i class="fas fa-shield-alt"></i>データは保護されており、失われていません。</div>
+            <div><i class="fas fa-headset"></i>問題が続く場合は管理者にお知らせください。</div>
+        </div>
+
+        <button class="btn btn-retry btn-block" onclick="location.reload()" style="margin-bottom: 0.8rem;">
+            <i class="fas fa-redo"></i> 再試行する
+        </button>
+
+        <a href="/" class="btn btn-outline btn-block"
+            style="color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.15);">
+            <i class="fas fa-home"></i> トップページへ
+        </a>
+
+        <hr class="maintenance-divider">
+
+        <details class="admin-section">
+            <summary><i class="fas fa-user-shield"></i> 管理者向け: Bridge 再起動手順</summary>
+            <code>sudo systemctl status database_bridge
+sudo systemctl restart database_bridge
+journalctl -u database_bridge -n 50</code>
+        </details>
+
+        <p style="font-size: 0.7rem; color: rgba(255,255,255,0.2); margin: 0;">
+            Awaji Empire Agent &mdash; Rust Bridge IPC
+        </p>
+
+    </div>
+</body>
+
+</html>
