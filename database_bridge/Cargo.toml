@@ -16,6 +16,9 @@ sqlx = { version = "0.8", features = [
     "time",     # OffsetDateTime サポート
 ] }
 
+# OffsetDateTime の serde 実装（sqlx の time feature だけでは serde が有効にならない）
+time = { version = "0.3", features = ["serde"] }
+
 # JSON シリアライズ・デシリアライズ
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
