@@ -81,5 +81,6 @@ jobs:
       - name: Restart Services
         run: |
           sudo systemctl daemon-reload
+          sudo systemctl restart database_bridge.service
           sudo systemctl restart discord_bot.service
           sudo systemctl restart discord_webapp.service
