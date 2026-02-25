@@ -55,4 +55,13 @@
 - [ ] テストサーバーへのデプロイ実行
 - [ ] `database_bridge` プロセスの稼働確認 (systemctl status)
 - [ ] Bot / Webapp のログ監視 (Error が出ていないか)
-- [ ] アンケート作成・回答のE2Eテスト
+
+## Phase 4: セキュア対戦ロビーシステム（🔨 進行中）
+
+- [ ] 仕様書 `docs/FEATURE_LOBBY.md` の更新
+  - [x] 自由対戦モード / 大会モードの選択機能を追記
+- [ ] データベースマイグレーションの作成 (`database_bridge/migrations/003_lobby_tables.sql`)
+- [ ] Rust Bridge: `LobbyRoom` モデルとリポジトリの実装
+- [ ] Rust Bridge: `POST /lobby/rooms` で `is_tournament` フラグをサポート
+- [ ] Webapp: ロビー作成フォームにモード選択 (Radioボタン) を追加
+- [ ] Bot: 大会終了時の優勝ロール自動付与ロジック実装

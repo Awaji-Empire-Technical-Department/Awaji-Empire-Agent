@@ -17,6 +17,8 @@
 |:---|:---|
 | 東方憑依華専用 | 12桁0埋めIP形式 + Cキー（Pad 3）入力に完全準拠 |
 | 物理IP非露出 | Cloudflare WARP 仮想IP を Rust 側でフォーマット後のみ提供 |
+| モード選択可能 | 自由対戦 / 大会モードを選択可能 |
+| プライバシーポリシー | プライバシーポリシー同意を必須。同意履歴を `user_networks` に記録 |
 | ダッシュボード無破壊 | 「📜 アンケート管理」カード直下に追加。既存CSS不変 |
 | 運営兼プレイヤーモデル | Staff は選手として参加しながら管理も行える |
 
@@ -73,7 +75,7 @@ CREATE TABLE user_networks (
 CREATE TABLE matchmaking_rooms (
     passcode            VARCHAR(32) PRIMARY KEY,
     host_id             BIGINT NOT NULL UNIQUE,         -- 1ユーザー1部屋制
-    is_tournament       BOOLEAN DEFAULT FALSE,          -- 大会モードフラグ
+    mode                ENUM('free', 'tournament') DEFAULT 'free', -- 部屋モード
     tournament_start_at TIMESTAMP NULL,
     expires_at          TIMESTAMP NOT NULL,             -- 動的TTL
     FOREIGN KEY (host_id) REFERENCES user_networks(discord_id) ON DELETE CASCADE
@@ -128,7 +130,7 @@ CREATE TABLE admin_logs (
 
 ```
 GET    /lobby/rooms            ロビー一覧（gamelink のみ返す、virtual_ip は除外）
-POST   /lobby/rooms            ロビー作成（合言葉を自動生成 or 指定可）
+POST   /lobby/rooms            ロビー作成（mode: 'free'|'tournament'）
 DELETE /lobby/rooms/{passcode} ロビー削除
 POST   /lobby/agree            プライバシーポリシー同意記録
 POST   /lobby/winner           勝者記録（Staff only）
@@ -146,7 +148,7 @@ GET    /admin/logs             admin_logs 一覧（Staff only）
 | フェーズ | 条件 | 動作 |
 |:---|:---|:---|
 | **ウォームアップ** | `tournament_start_at` の前 | 全参加者にコピーボタンを表示し、自由対戦を許可 |
-| **大会中** | `is_tournament = TRUE` かつ開始後 | 指定カードを最上位に固定。敗退者・待機者同士の並行自由対戦を許可 |
+| **大会中** | `mode = 'tournament'` かつ開始後 | 指定カードを最上位に固定。敗退者・待機者同士の並行自由対戦を許可 |
 | **大会後** | `winner_id` が確定した時 | Discord Bot が優勝ロールを自動付与 |
 
 ---
@@ -157,6 +159,11 @@ GET    /admin/logs             admin_logs 一覧（Staff only）
 
 - `discord_bot/templates/dashboard.html` の「📜 アンケート管理」カード直下に追加
 - 既存の `.card`, `.btn`, `.badge`, `.table` クラスを流用。新CSS定義なし
+- **作成フォーム内容**:
+  - **合言葉**: テキスト入力（任意・空欄時は自動生成）
+  - **対戦モード**: ラジオボタン選択
+    - `自由対戦`: 通常のP2P対戦用
+    - `大会モード`: 進行管理・結果集計が有効化
 
 ### 6.2 初回利用時：同意モーダル
 
