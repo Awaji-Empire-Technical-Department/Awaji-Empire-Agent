@@ -155,3 +155,26 @@ pub enum BridgeError {
 }
 
 pub type BridgeResult<T> = Result<T, BridgeError>;
+
+// ============================================================
+// 権限評価 API モデル
+// ============================================================
+
+/// `/permissions/evaluate` エンドポイントへのリクエスト。
+///
+/// Discord のチャンネル名と現在の権限フラグ (allow/deny bitmask) を受け取る。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PermissionEvaluateRequest {
+    pub channel_name: String,
+    pub current_allow: i64,
+    pub current_deny: i64,
+}
+
+/// `/permissions/evaluate` エンドポイントからのレスポンス。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PermissionEvaluateResponse {
+    pub needs_repair: bool,
+    pub target_allow: i64,
+    pub target_deny: i64,
+    pub reason: Option<String>,
+}
