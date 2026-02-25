@@ -6,6 +6,10 @@ use tracing::error;
 
 use super::models::{BridgeError, BridgeResult, Survey};
 
+/// SQL で DATETIME を文字列として取得するためのカラムリスト。
+/// Why: sqlx は DATETIME 型を直接 String にデコードできないため、DB 側で変換する。
+const SELECT_COLUMNS: &str = "id, owner_id, title, questions, is_active, CAST(created_at AS CHAR) as created_at";
+
 /// 新規アンケートを INSERT し、生成された ID を返す。
 pub async fn insert(pool: &MySqlPool, owner_id: &str) -> BridgeResult<i64> {
     let result = sqlx::query(
@@ -25,7 +29,8 @@ pub async fn insert(pool: &MySqlPool, owner_id: &str) -> BridgeResult<i64> {
 
 /// ID でアンケートを 1 件取得する。
 pub async fn find_by_id(pool: &MySqlPool, survey_id: i64) -> BridgeResult<Survey> {
-    sqlx::query_as::<_, Survey>("SELECT * FROM surveys WHERE id = ?")
+    let sql = format!("SELECT {} FROM surveys WHERE id = ?", SELECT_COLUMNS);
+    sqlx::query_as::<_, Survey>(&sql)
         .bind(survey_id)
         .fetch_optional(pool)
         .await?
@@ -38,48 +43,34 @@ pub async fn find_by_owner(
     owner_id: &str,
     active_only: Option<bool>,
 ) -> BridgeResult<Vec<Survey>> {
-    let surveys = if owner_id == "ALL" {
+    let sql = if owner_id == "ALL" {
         if active_only == Some(true) {
-            sqlx::query_as::<_, Survey>(
-                "SELECT * FROM surveys WHERE is_active = 1 ORDER BY created_at DESC",
-            )
-            .fetch_all(pool)
-            .await?
+            format!("SELECT {} FROM surveys WHERE is_active = 1 ORDER BY created_at DESC", SELECT_COLUMNS)
         } else {
-            sqlx::query_as::<_, Survey>(
-                "SELECT * FROM surveys ORDER BY created_at DESC",
-            )
-            .fetch_all(pool)
-            .await?
+            format!("SELECT {} FROM surveys ORDER BY created_at DESC", SELECT_COLUMNS)
         }
     } else {
         if active_only == Some(true) {
-            sqlx::query_as::<_, Survey>(
-                "SELECT * FROM surveys WHERE owner_id = ? AND is_active = 1 ORDER BY created_at DESC",
-            )
-            .bind(owner_id)
-            .fetch_all(pool)
-            .await?
+            format!("SELECT {} FROM surveys WHERE owner_id = ? AND is_active = 1 ORDER BY created_at DESC", SELECT_COLUMNS)
         } else {
-            sqlx::query_as::<_, Survey>(
-                "SELECT * FROM surveys WHERE owner_id = ? ORDER BY created_at DESC",
-            )
-            .bind(owner_id)
-            .fetch_all(pool)
-            .await?
+            format!("SELECT {} FROM surveys WHERE owner_id = ? ORDER BY created_at DESC", SELECT_COLUMNS)
         }
     };
 
-    Ok(surveys)
+    let mut query = sqlx::query_as::<_, Survey>(&sql);
+    if owner_id != "ALL" {
+        query = query.bind(owner_id);
+    }
+
+    Ok(query.fetch_all(pool).await?)
 }
 
 /// 稼働中（is_active = 1）の全アンケートを取得する。
 pub async fn find_active(pool: &MySqlPool) -> BridgeResult<Vec<Survey>> {
-    let surveys = sqlx::query_as::<_, Survey>(
-        "SELECT * FROM surveys WHERE is_active = 1 ORDER BY created_at DESC",
-    )
-    .fetch_all(pool)
-    .await?;
+    let sql = format!("SELECT {} FROM surveys WHERE is_active = 1 ORDER BY created_at DESC", SELECT_COLUMNS);
+    let surveys = sqlx::query_as::<_, Survey>(&sql)
+        .fetch_all(pool)
+        .await?;
 
     Ok(surveys)
 }
