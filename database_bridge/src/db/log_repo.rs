@@ -1,16 +1,14 @@
 // db/log_repo.rs
-// Why: operation_logs テーブルへの INSERT をここに集約する。
-//      Python の `LogService.log_operation()` に相当。
-//
-//      Note: sqlx::query!マクロの代わりに sqlx::query() ランタイム関数を使用。
+// Why: operation_logs テーブルへの操作を集約する。
 
 use sqlx::mysql::MySqlPool;
 
 use super::models::{BridgeResult, OperationLog};
 
+/// SQL で DATETIME を文字列として取得するためのカラムリスト。
+const SELECT_COLUMNS: &str = "id, user_id, user_name, command, detail, CAST(created_at AS CHAR) as created_at";
+
 /// 操作ログを operation_logs テーブルに INSERT する。
-///
-/// Python: `LogService.log_operation()`
 pub async fn insert(
     pool: &MySqlPool,
     user_id: &str,
@@ -32,15 +30,12 @@ pub async fn insert(
 }
 
 /// 最新の operation_logs を件数指定で取得する。
-///
-/// Why: webapp/dashboard_query.rs から呼ばれる集計クエリ。
 pub async fn find_recent(pool: &MySqlPool, limit: u32) -> BridgeResult<Vec<OperationLog>> {
-    let logs = sqlx::query_as::<_, OperationLog>(
-        "SELECT * FROM operation_logs ORDER BY created_at DESC LIMIT ?",
-    )
-    .bind(limit)
-    .fetch_all(pool)
-    .await?;
+    let sql = format!("SELECT {} FROM operation_logs ORDER BY created_at DESC LIMIT ?", SELECT_COLUMNS);
+    let logs = sqlx::query_as::<_, OperationLog>(&sql)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
 
     Ok(logs)
 }
