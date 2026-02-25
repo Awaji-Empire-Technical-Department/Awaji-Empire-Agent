@@ -35,12 +35,13 @@
 > [!IMPORTANT]
 > 以下の設定はコードで自動化できない。Cloudflare ダッシュボード上での手動作業が必要。
 
-| 作業 | 場所 | 詳細 |
-|:---|:---|:---|
-| WARP 有効化 | Zero Trust > Settings > Network | Split Tunnel から除外し全トラフィックをルーティング |
-| Access Application 作成 | Zero Trust > Access > Applications | `dashboard.awajiempire.net` を Discord OAuth2 で保護 |
-| Service Token 発行 | Zero Trust > Access > Service Auth | Rust Bridge がAPIを叩く際の認証トークン |
-| CF API Token 発行 | My Profile > API Tokens | Zero Trust Read スコープ。`.env` の `CLOUDFLARE_API_TOKEN` に設定 |
+| 作業 | 場所 | 詳細 | 該当環境変数 |
+| :--- | :--- | :--- | :--- |
+| WARP 有効化 | Zero Trust > Settings > Network | Split Tunnel から除外し全トラフィックをルーティング | - |
+| Access Application 作成 | Zero Trust > Access > Applications | `dashboard.awajiempire.net` を Discord OAuth2 で保護 | - |
+| Service Token 発行 | Zero Trust > Access > Service Auth | Rust Bridge がAPIを叩く際の認証トークン | `CF_ACCESS_CLIENT_ID`<br>`CF_ACCESS_CLIENT_SECRET` |
+| API Token 発行 | My Profile > API Tokens | Zero Trust Read スコープ | `CLOUDFLARE_API_TOKEN` |
+| アカウントID確認 | Dashboard 概要 | 32桁の英数字 | `CLOUDFLARE_ACCOUNT_ID` |
 
 ### 2.3 セキュリティ設計
 
