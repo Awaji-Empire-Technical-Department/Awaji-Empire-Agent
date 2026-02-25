@@ -4,10 +4,12 @@ import asyncio
 import os
 import mysql.connector
 from dotenv import load_dotenv
-from config import ADMIN_USER_ID, GUILD_ID
 
 # .envファイルを読み込む
 load_dotenv()
+
+ADMIN_USER_ID = os.getenv('ADMIN_USER_ID', '')
+GUILD_ID = os.getenv('GUILD_ID', '')
 
 # コグ（拡張機能）のリスト
 COGS = [

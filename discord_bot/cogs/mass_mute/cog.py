@@ -6,9 +6,22 @@ import discord
 from discord.ext import commands, tasks
 import datetime
 import logging
+import os
+from dotenv import load_dotenv
 
-from config import ADMIN_USER_ID, MUTE_ONLY_CHANNEL_NAMES, READ_ONLY_MUTE_CHANNEL_NAMES
 from .logic import MassMuteLogic
+
+load_dotenv()
+
+ADMIN_USER_ID = os.getenv('ADMIN_USER_ID', '')
+
+# .env にカンマ区切りで記載されたチャンネル名をリストに変換する。
+# 例) MUTE_ONLY_CHANNEL_NAMES=配信コメント,mute_only
+def _csv(key: str) -> list[str]:
+    return [s.strip() for s in os.getenv(key, '').split(',') if s.strip()]
+
+MUTE_ONLY_CHANNEL_NAMES      = _csv('MUTE_ONLY_CHANNEL_NAMES')
+READ_ONLY_MUTE_CHANNEL_NAMES = _csv('READ_ONLY_MUTE_CHANNEL_NAMES')
 
 logger = logging.getLogger(__name__)
 

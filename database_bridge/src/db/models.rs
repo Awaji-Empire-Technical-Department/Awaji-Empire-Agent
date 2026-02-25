@@ -69,8 +69,8 @@ pub enum QuestionType {
 pub struct SurveyResponse {
     pub id: i64,
     pub survey_id: i64,
-    /// DB が bigint(20) のため i64。NULL が紛れ込んでもデコードエラーにならないよう Option で受ける。
-    pub user_id: Option<i64>,
+    /// DB が bigint(20) のため i64。
+    pub user_id: i64,
     pub user_name: String,
     /// DB側が LONGTEXT (sqlx は BLOB 扱い) のため Vec<u8> で受け取る。
     #[serde(with = "serde_bytes_to_string")]
