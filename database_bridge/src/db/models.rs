@@ -69,8 +69,8 @@ pub enum QuestionType {
 pub struct SurveyResponse {
     pub id: i64,
     pub survey_id: i64,
-    /// DB が bigint(20) のため i64。NULL が紛れ込んでもデコードエラーにならないよう Option で受ける。
-    pub user_id: Option<i64>,
+    /// DB が bigint(20) のため i64。
+    pub user_id: i64,
     pub user_name: String,
     /// DB側が LONGTEXT (sqlx は BLOB 扱い) のため Vec<u8> で受け取る。
     #[serde(with = "serde_bytes_to_string")]
@@ -155,26 +155,3 @@ pub enum BridgeError {
 }
 
 pub type BridgeResult<T> = Result<T, BridgeError>;
-
-// ============================================================
-// 権限評価 API モデル
-// ============================================================
-
-/// `/permissions/evaluate` エンドポイントへのリクエスト。
-///
-/// Discord のチャンネル名と現在の権限フラグ (allow/deny bitmask) を受け取る。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PermissionEvaluateRequest {
-    pub channel_name: String,
-    pub current_allow: i64,
-    pub current_deny: i64,
-}
-
-/// `/permissions/evaluate` エンドポイントからのレスポンス。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PermissionEvaluateResponse {
-    pub needs_repair: bool,
-    pub target_allow: i64,
-    pub target_deny: i64,
-    pub reason: Option<String>,
-}
