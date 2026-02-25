@@ -3,9 +3,7 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
-## [1.3.0] - 2026-02-23
-
-本番投入バージョン。Phase 2 アーキテクチャ刷新・フォームバグ修正・Rust DB ブリッジ基盤の3本柱を含む大規模リリース。
+## [Unreleased] - 2026-02-23
 
 ### Phase 4 Preview (Upcoming)
 
