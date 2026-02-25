@@ -51,6 +51,29 @@
 | **ビジネスロジック (Logic)** | **Rust (database_bridge)** | 権限判定、計算処理、データ変換。複雑な条件分岐の集約。 |
 | **永続化層 (Persistence)** | **Rust (sqlx)** | DB(MariaDB)へのクエリ実行、コネクションプール管理。 |
 
+```mermaid
+graph TD
+    subgraph "Python (Interface Layer)"
+        discord[Discord Bot]
+        ps[PermissionService]
+        mm[MassMuteLogic]
+    end
+
+    subgraph "Rust (Logic/Data Layer)"
+        bridge[Database Bridge]
+        prepo[PermissionRepo]
+        lrepo[LogRepo]
+        db[(MariaDB)]
+    end
+
+    discord -- イベント検知 --> ps
+    ps -- "/permissions/evaluate" --> bridge
+    bridge -- 判定ロジック実行 --> prepo
+    mm -- "/logs" --> bridge
+    bridge -- 保存 --> lrepo
+    lrepo --> db
+```
+
 ### 5.2 設計の基本原則
 
 1. **Python プロセスの軽量化**: Python 側には DB 接続ドライバ（aiomysql等）を持たせず、すべての永続化操作を Rust 製の「データベースブリッジ (IPC)」へ委譲します。
