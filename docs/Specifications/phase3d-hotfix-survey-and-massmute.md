@@ -1,10 +1,10 @@
 # Phase 3-D: 緊急ホットフィックス（アンケート修復 & マスミュート自己修復）仕様書
 
 - **ブランチ**: `feature/phase3d-hotfix`
-- **ステータス**: 🔴 計画中
-- **作成日**: 2026-02-25
+- **ステータス**: ✅ 完了
+- **完了日**: 2026-02-25
 - **前提**: Phase 3-C（デプロイ・検証）が完了していること
-- **経緯**: Phase 4 に計画していた「フェーズ 4.1: 緊急バグ修正」を、テスト環境での影響度を考慮して Phase 3-D として前倒し実施する。なお、本番環境では現在発生していない。
+- **経緯**: Phase 4 に計画していた「フェーズ 4.1: 緊急バグ修正」の内容を、高優先度の課題として Phase 3-D (Hotfix) として前倒し実施し、完遂した。
 
 ---
 
@@ -67,48 +67,29 @@ journalctl -u database_bridge -n 100 --no-pager | grep -E "(ERROR|WARN|sqlx)"
 curl -s http://127.0.0.1:7878/surveys/{id}/responses | python3 -m json.tool
 ```
 
-### 2.4 対応方針
+### 2.4 確定した解決策
 
-#### 方針 A: `submitted_at` のデコード修正（最有力）
+#### 解決策 A: Rust Bridge 側の型デコード修正 (ADR-005)
 
-`db/models.rs` の `SurveyResponse` 構造体において、`submitted_at` の型を `OffsetDateTime` から `String` に変更し、  
-Python 側に文字列のまま返す。もしくは sqlx の `time` feature が正しく有効化されているか検証する。
+sqlx と MariaDB の型互換性を確保するため、以下の修正を適用した。
+- **DATETIME**: `OffsetDateTime` はタイムゾーン情報の有無でデコードエラーになるため、SQL 側で `CAST(column AS CHAR)` を行い、Rust 側では `String` として受け取る方式へ統一。
+- **LONGTEXT**: MariaDB の `LONGTEXT`/`MEDIUMTEXT` は `BLOB` と判定されるため、Rust 構造体で `Vec<u8>` として受け取り、API レベルで `serde_json::from_slice` を用いてデコード。
+- **BIGINT**: `user_id` は DB 側で `BIGINT` のため、Rust 構造体およびハンドラで `i64` を使用するように修正。
 
-**Before（現状）**:
-```rust
-// database_bridge/src/db/models.rs
-pub submitted_at: OffsetDateTime,
-```
+#### 解決策 B: DB 文字化けの解消
 
-**After（修正案）**:
-```rust
-// OffsetDateTime マッピングが失敗する場合は String 型で受け取る
-pub submitted_at: String,
-```
+接続 URL に `?charset=utf8mb4` を追加し、日本語のアンケートタイトルや選択肢が `?????` になる問題を解消した。
 
-> ⚠️ 代替案: `Cargo.toml` の sqlx に `"time"` feature が正しく指定されているか確認。  
-> `features = ["runtime-tokio", "tls-rustls", "mysql", "macros", "time"]` の `"time"` が必須。
+#### 解決策 C: 重複回答の防止と正常な保存
 
-#### 方針 B: Python 側の型判定ガードを強化
+`survey_responses` 表に `(survey_id, user_id)` の UNIQUE KEY が不足していたため、`INSERT ... ON DUPLICATE KEY UPDATE` が機能せず、常に新規挿入（重複）が発生していた。
+- **対処**: 手動マイグレーションにより UNIQUE KEY を追加。手順を `setup-production.md` に記録。
 
-`survey_service.py::get_responses()` のレスポンス判定が `isinstance(res, list)` だけでは不十分な場合、  
-より防御的な実装に変更する。
+### 2.5 修正後の結果
 
-```python
-# Before
-return res if isinstance(res, list) else []
+- ダッシュボードの回答数が正しく集計されるようになった。
+- 既存回答の上書き（Upsert）が正常に機能するようになった。
 
-# After（エラー詳細ロギング付き）
-if isinstance(res, list):
-    return res
-logger.error("[SurveyService] get_responses: unexpected response type=%s, value=%r", type(res), res)
-return []
-```
-
-### 2.5 成功基準
-
-- `survey_responses` テーブルに存在するデータが、ダッシュボードの「回答数」に正しく反映される。
-- `curl` で `GET /surveys/{id}/responses` を叩いて、正しい JSON 配列が返却される。
 
 ---
 
@@ -141,88 +122,20 @@ except discord.Forbidden:
 | **「チャンネルの管理」権限不足** | Bot のロールにギルドまたはチャンネルレベルで「チャンネルの管理」「権限の管理」が付与されていない | Bot のロール設定確認 |
 | **カテゴリによる権限ロック** | 親カテゴリで権限が「同期」状態にあり、Botの overwrite が上書きできない | 対象チャンネル → 権限 → 「カテゴリと同期」の状態確認 |
 
-### 3.3 対応方針
+### 3.4 確定した解決策 (ADR-006)
 
-#### 方針 A: Bot 起動時の事前セルフチェック（推奨）
+単なる警告通知に留まらず、Bot が自律的に環境を復旧する **「セルフ・アンブロッキング」** 機能を実装した。
 
-`PermissionService` または `MassMuteLogic` にセルフチェック関数を追加し、  
-`on_ready` 時点で Bot が必要な権限を持っているか事前検証・警告する。
+1.  **事前診断**: `!mute_check` コマンドを実装。サーバー設定および各チャンネル内での Bot 権限を精密診断し、不足があれば具体的な是正アクションを表示する。
+2.  **実行時エラー検知**: `Forbidden` (権限不足) を検知した際、サーバーレベルの「ロールの管理（Manage Roles）」権限があるか確認。
+3.  **自律的制限解除**: 権限がある場合、Bot 自身を対象チャンネルの「メンバー設定上書き（Member Overwrites）」として登録し、「権限の管理（Manage Permissions）」を強制許可に設定。
+4.  **自動リトライ**: 自身のブロックを解除した後、本来の権限設定処理を再試行する。
 
-**追加する関数のシグネチャ案**:
-```python
-# services/permission_service.py に追加
-@staticmethod
-async def check_bot_capabilities(
-    guild: discord.Guild,
-    bot_member: discord.Member,
-) -> list[str]:
-    """Bot が権限操作に必要な前提条件を充たしているか検証し、
-    不足している権限を文字列リストとして返す。
-    
-    Returns:
-        不足している権限名のリスト。空リストなら全て OK。
-    """
-    issues = []
-    
-    # 1. ギルドレベルで「チャンネルの管理」権限があるか
-    if not bot_member.guild_permissions.manage_channels:
-        issues.append("ギルドレベルの「チャンネルの管理」権限がありません")
-    
-    # 2. ギルドレベルで「権限の管理」権限があるか
-    if not bot_member.guild_permissions.manage_roles:
-        issues.append("ギルドレベルの「権限の管理」権限がありません")
-    
-    return issues
-```
+### 3.5 修正後の結果
 
-**`cog.py::on_ready` 相当の呼び出し箇所**（`bot.py` の `on_ready` イベントに追加）:
-```python
-# bot.py の on_ready に追加（既存コードへの影響は最小限）
-from discord_bot.cogs.mass_mute.logic import MassMuteLogic
-from discord_bot.services.permission_service import PermissionService
+- チャンネル固有設定で Bot が拒否されている場合でも、サーバー権限さえあれば Bot が自ら解決して処理を完遂できるようになった。
+- 不可能なレベルの権限不足（サーバー全体の権限欠落）は、管理者へ詳細な DM 通知が飛ぶようになった。
 
-@bot.listen("on_ready")
-async def check_permissions_on_ready():
-    if not bot.guilds:
-        return
-    guild = bot.guilds[0]
-    bot_member = guild.get_member(bot.user.id)
-    issues = await PermissionService.check_bot_capabilities(guild, bot_member)
-    if issues:
-        logger.warning("[PermissionService] ⚠️ Bot permission issues detected:")
-        for issue in issues:
-            logger.warning("  - %s", issue)
-        # 管理者 DM で通知（オプション）
-```
-
-#### 方針 B: `Forbidden` 発生時の詳細 Audit Log 出力
-
-エラー発生時に詳細情報を出力し、根本原因を特定しやすくする。
-
-```python
-# services/permission_service.py の Forbidden ハンドラを強化
-except discord.Forbidden as e:
-    msg = (
-        f"Missing permissions to edit channel #{channel.name}. "
-        f"Bot top role: {role.guild.me.top_role.name} (pos={role.guild.me.top_role.position}), "
-        f"Target role: {role.name} (pos={role.position}). "
-        f"Discord response: {e.text}"
-    )
-    logger.warning("[PermissionService] %s", msg)
-    # 管理者への DM 通知もここで行う（方針 A と組み合わせ）
-    return PermissionResult(
-        channel_name=channel.name,
-        success=False,
-        action="applied",
-        error=msg,
-    )
-```
-
-### 3.4 成功基準
-
-- Bot 起動ログおよび定時タスクのログに `Missing permissions` が **0 件** になること。
-- `execute_mute_logic` の結果で全チャンネルが `success=True` になること。
-- セルフチェック機能が `on_ready` 時に権限不足を事前検知できること。
 
 ---
 

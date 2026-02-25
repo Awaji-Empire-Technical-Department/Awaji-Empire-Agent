@@ -1,7 +1,7 @@
 # ADR-005: Phase 3-D — Rust Bridge 型不一致の修正と survey_responses UNIQUE KEY 追加
 
-- **日付**: 2026-02-25
-- **ステータス**: 承認済み (実装完了)
+- **日付**: 2026-02-25（更新: 2026-02-25）
+- **ステータス**: 承認済み (Phase 3-E 追加修正済み)
 - **ブランチ**: `feature/phase3d-hotfix`
 - **関連仕様書**: [phase3d-hotfix-survey-and-massmute.md](../Specifications/phase3d-hotfix-survey-and-massmute.md)
 
@@ -131,9 +131,29 @@ ALTER TABLE survey_responses
 
 ---
 
-## 5. 学んだ教訓
+## 5. Phase 3-E — 追加修正（2026-02-25）
+
+### 背景
+
+本番環境稼働中に `survey_responses.user_id` が `NULL` のレコードが混入し、
+`GET /surveys/{id}/responses` が 500 エラーを返す不具合が発生した。
+
+エラー: `error occurred while decoding column "user_id": unexpected null; try decoding as an 'Option'`
+
+### 対処
+
+1. **即時対応（本番 DB 手動）**: `DELETE FROM survey_responses WHERE user_id IS NULL;` を実行。
+2. **防御的コード修正**: `SurveyResponse.user_id` の型を `i64` → `Option<i64>` に変更。
+   - 今後 NULL が混入してもデコードエラーにならない。
+   - `response_repo.rs` / `survey_handler.rs` の bind は `i64` 直接渡しのため変更不要。
+   - JSON レスポンスでは `null` または数値として serde が自動変換。
+
+---
+
+## 6. 学んだ教訓
 
 1. **sqlx の型マッピングは直感と異なる場合がある**: `LONGTEXT` → `BLOB`、`DATETIME` → `OffsetDateTime` 非互換。実際の DB スキーマ (`DESCRIBE`) と sqlx のドキュメントを照合することが必須。
 2. **`SELECT *` はデバッグを困難にする**: カラムを明示することで型不一致の特定が容易になる。
 3. **UNIQUE KEY などの制約はスキーマ定義時に必ず確認する**: アプリのロジック（`ON DUPLICATE KEY UPDATE`）が制約を前提にしている場合、制約がないと silent に誤動作する。
 4. **テスト環境での徹底調査が本番保護になる**: 今回の全不具合がテスト環境で発見・修正されたことで、本番環境への影響ゼロを維持できた。
+5. **nullable カラムは常に `Option<T>` で受ける**: DB スキーマで `NOT NULL` が明示されていないカラムは、将来の NULL 混入に備えて `Option` にしておく。
