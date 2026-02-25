@@ -1,5 +1,12 @@
 // db/models.rs
 // Why: すべての DB テーブル対応 Struct をここに集約する。
+//
+// [重要] MariaDB の LONGTEXT / MEDIUMTEXT 型は sqlx が内部的に BLOB として扱うため、
+//        Rust 側は Vec<u8> で受け取る必要がある。String を指定すると実行時デコードエラーになる。
+//        シリアライズ時は serde_bytes_to_string モジュールで UTF-8 String に変換して出力する。
+//
+// [重要] MariaDB の DATETIME 型はタイムゾーン情報を持たないため、sqlx の OffsetDateTime は
+//        使用不可。CAST(... AS CHAR) で SQL 側で文字列化したものを String で受け取る。
 
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -14,17 +21,19 @@ pub struct Survey {
     pub id: i64,
     pub owner_id: String,
     pub title: String,
-    /// DB側が LONGTEXT のため String で受け取る。
-    pub questions: String,
+    /// DB側が LONGTEXT (sqlx는 BLOB 扱い) のため Vec<u8> で受け取る。
+    /// JSON Serialize 時は serde_bytes_to_string で String に変換。
+    #[serde(with = "serde_bytes_to_string")]
+    pub questions: Vec<u8>,
     pub is_active: bool,
-    /// 作成日時。MariaDB DATETIME 型は TZ なしのため String で受け取る。
+    /// CAST(created_at AS CHAR) で SQL 側で文字列化した値を String で受け取る。
     pub created_at: String,
 }
 
 impl Survey {
     /// `questions` JSON フィールドを型安全にパースする。
     pub fn parse_questions(&self) -> Result<Vec<Question>, serde_json::Error> {
-        serde_json::from_str(&self.questions)
+        serde_json::from_slice(&self.questions)
     }
 
     /// 質問数をゼロコスト（エラー時は 0）で返す。
@@ -63,9 +72,10 @@ pub struct SurveyResponse {
     /// DB が bigint(20) のため i64。
     pub user_id: i64,
     pub user_name: String,
-    /// DB が longtext のため String。
-    pub answers: String,
-    /// 提出日時。MariaDB DATETIME 型は TZ なしのため String で受け取る。
+    /// DB側が LONGTEXT (sqlx は BLOB 扱い) のため Vec<u8> で受け取る。
+    #[serde(with = "serde_bytes_to_string")]
+    pub answers: Vec<u8>,
+    /// CAST(submitted_at AS CHAR) で SQL 側で文字列化した値を String で受け取る。
     pub submitted_at: String,
     pub dm_sent: bool,
 }
@@ -75,7 +85,7 @@ impl SurveyResponse {
     pub fn parse_answers(
         &self,
     ) -> Result<std::collections::HashMap<String, AnswerValue>, serde_json::Error> {
-        serde_json::from_str(&self.answers)
+        serde_json::from_slice(&self.answers)
     }
 }
 
@@ -97,8 +107,32 @@ pub struct OperationLog {
     pub user_name: String,
     pub command: String,
     pub detail: String,
-    /// 記録日時。MariaDB DATETIME 型は TZ なしのため String で受け取る。
+    /// CAST(created_at AS CHAR) で SQL 側で文字列化した値を String で受け取る。
     pub created_at: String,
+}
+
+// ============================================================
+// Serde helpers for Vec<u8> (BLOB/LONGTEXT) <-> String
+// ============================================================
+
+mod serde_bytes_to_string {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = String::from_utf8_lossy(bytes);
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(s.into_bytes())
+    }
 }
 
 // ============================================================

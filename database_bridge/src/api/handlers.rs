@@ -173,7 +173,7 @@ pub async fn get_user_answers(
     match response_repo::find_answers_by_user(&pool, survey_id, &user_id).await {
         Ok(answers_opt) => {
             let answers: Value = match answers_opt {
-                Some(s) => serde_json::from_str(&s.answers).unwrap_or(json!({})),
+                Some(s) => serde_json::from_slice(&s.answers).unwrap_or(json!({})),
                 None => json!({}),
             };
             (StatusCode::OK, Json(answers))
