@@ -1,0 +1,12 @@
+# /etc/sudoers.d/database_bridge_deploy
+# Why: Allow non-interactive deployment for the Rust bridge.
+# Note: Replace <USER> with the actual username of the GitHub Actions runner (e.g., github-runner).
+
+# Allow execution of the setup script
+<USER> ALL=(ALL) NOPASSWD: /Awaji-Empire-Agent/scripts/setup-systemd.sh
+
+# Allow specific systemctl commands for the bridge service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl daemon-reload
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable database_bridge.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart database_bridge.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl status database_bridge.service

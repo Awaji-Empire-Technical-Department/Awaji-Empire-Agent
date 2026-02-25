@@ -23,12 +23,6 @@ class SurveyCog(commands.Cog):
             dashboard_url=os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net'),
         )
 
-    async def cog_load(self):
-        await self.logic.initialize_pool()
-
-    async def cog_unload(self):
-        await self.logic.close_pool()
-
     # --- グループコマンド /survey ---
     survey_group = app_commands.Group(name="survey", description="アンケート関連コマンド")
 

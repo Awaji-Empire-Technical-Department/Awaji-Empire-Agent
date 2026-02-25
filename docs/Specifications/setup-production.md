@@ -1,276 +1,162 @@
-# 本番環境（Master）移行・再構築ガイド
+# 本番環境（Master）移行・再構築ガイド (Phase 3 対応版)
 
-リポジトリのモノレポ化および `uv` / `Rust` 導入に伴い、本番サーバー側で必要となる初回セットアップ手順をまとめます。
+リポジトリの Rust Bridge (database_bridge) 導入に伴い、本番サーバー側で必要となる最新のセットアップ手順をまとめます。
 
 ## 1. 事前準備 (Antigravity 側での作業)
 
 本番マージ前に、以下のファイルが正しく設定されているか確認してください。
 
-- [ ] **GitHub Actions の更新**: `.github/workflows/` 内の YAML で `working-directory` が指定されていること。
-- [ ] **依存関係の確定**: `discord_bot/pyproject.toml` と `uv.lock` が最新であること。
-- [ ] **Rust 構成**: `database_bridge/Cargo.toml` に必要な依存関係が記述されていること。
+- [ ] **GitHub Actions の更新**: `.github/workflows/deploy.yml` で `database_bridge.service` の再起動が含まれていること。
+- [ ] **DBアクセス方式**: `sqlx::query!` マクロを廃止し、CI環境で `DATABASE_URL` が不要なランタイムAPIに移行済みであること。
+- [ ] **型互換性**: MariaDB の JSON (BLOB) カラムに対応した型定義（`Vec<u8>`）になっていること。
 
-## 2. 本番サーバー（01sv-production等）での初回作業
+## 2. 本番サーバーでの初回作業
 
-### A. インフラ環境の導入
+### A. ツールチェーンの導入
+Rust Bridge のビルドおよび Python 依存関係管理のため、以下をインストールします。
 
-本番サーバーに SSH で入り、新しいツールチェーンをインストールします。
-
-1. **uv のインストール**
-
+1. **uv (Python パッケージマネージャー)**
    ```bash
-   curl -LsSf [https://astral.sh/uv/install.sh](https://astral.sh/uv/install.sh) | sh
-   source $HOME/.local/bin/env
-
-2. **Rust (Cargo) のインストール**
-
+   curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin sh
+   ```
+2. **Rust (Cargo) ツールチェーン**
    ```bash
-   curl --proto '=https' --tlsv1.2 -sSf [https://sh.rustup.rs](https://sh.rustup.rs) | sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    source $HOME/.cargo/env
    ```
 
-### B. リポジトリのクローンと環境設定
+### B. 環境設定とビルド
 
-1. **リポジトリの取得**
-
-   ```bash
-   cd /home/awaji-bot
-   git clone <Your-Repo-URL> awaji-empire-agent
-   cd awaji-empire-agent
+1. **環境変数の配置**
+   `/Awaji-Empire-Agent/discord_bot/.env` に以下の項目が必須です。
+   ```env
+   DATABASE_URL=mysql://user:pass@localhost/dbname
+   # Bridge は 7878 ポートで待ち受ける
    ```
 
-2. **環境変数の配置**
-
+2. **Rust Bridge のビルド**
    ```bash
-   cp .env.example .env
-   # .env を開き、実際のトークンや設定値を入力する
-   ```
-
-3. **Python 仮想環境の作成と依存関係のインストール**
-
-   ```bash
-   # 仮想環境の作成
-   uv venv
-   source .venv/bin/activate
-
-   # 依存関係のインストール
-   uv sync
-   ```
-
-4. **Rust 依存関係のビルド**
-
-   ```bash
-   cd database_bridge
+   cd /Awaji-Empire-Agent/database_bridge
    cargo build --release
-   cd ..
    ```
 
-### C. サービスの再構築
-
-1. **既存サービスの停止**
-
+3. **Python 依存関係の同期**
    ```bash
-   sudo systemctl stop discord_bot.service
-   sudo systemctl stop discord_webapp.service
+   cd /Awaji-Empire-Agent/discord_bot
+   /usr/local/bin/uv sync
    ```
 
-2. **ファイルの配置**
+### C. systemd サービスの登録 (重要)
 
+Phase 3 以降、**サービスは3構成**になります。`scripts/setup-systemd.sh` を使用して一括登録します。
+
+1. **セットアップスクリプトの実行**
    ```bash
-   # 既存のファイルを削除またはバックアップ
-   sudo rm -rf /discord_bot/*
-   sudo rm -rf /discord_webapp/*
-
-   # 新しいコードを配置
-   sudo rsync -av --exclude='.git' ./ /discord_bot/
-   sudo rsync -av --exclude='.git' ./webapp/ /discord_webapp/
+   cd /Awaji-Empire-Agent
+   sudo chmod +x scripts/setup-systemd.sh
+   sudo ./scripts/setup-systemd.sh
    ```
 
-3. **権限の調整**
+2. **登録されるサービス一覧**
+   - `database_bridge.service`: Rust 製 DB 通信ブリッジ (Port 7878)
+   - `discord_bot.service`: Python 製 Discord Bot 本体
+   - `discord_webapp.service`: Python 製 管理画面 Web アプリ
 
+3. **起動確認**
    ```bash
-   sudo chown -R devuser:devuser /discord_bot
-   sudo chown -R devuser:devuser /discord_webapp
+   sudo systemctl status database_bridge.service
+   # 疎通確認
+   curl http://127.0.0.1:7878/health
    ```
 
-4. **サービスの反映**
+## 3. GitHub Actions による継続的デプロイ (CD)
 
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl start discord_bot.service
-   sudo systemctl start discord_webapp.service
-   ```
+デプロイ用ユーザーが `sudo` パスワードなしでサービスを制御できるよう、`/etc/sudoers.d/deploy` 等に設定を追加してください。
 
-### D. 一括セットアップスクリプト
-
-サーバーに SSH で入った後、以下のスクリプトを `setup_env.sh` として保存し実行することで、環境構築を自動化できます。
-> [!IMPORTANT]
-> 必ず `discord_bot` ディレクトリで実行するようにすること！
-
-```bash
-#!/bin/bash
-
-# =================================================================
-# 淡路帝国エージェント：モノレポ移行 & systemd 自動更新スクリプト
-# 役割: ディレクトリ整理、Rust/uv初期化、サービスパスの一括修正
-# =================================================================
-
-set -e # エラーが発生したら即座に停止
-
-# --- 設定項目 ---
-PARENT_DIR="/Awaji-Empire-Agent"
-PYTHON_DIR="$PARENT_DIR/discord_bot"
-RUST_DIR="$PARENT_DIR/database_bridge"
-SERVICES=("discord_bot.service" "discord_webapp.service")
-
-echo "🚀 モノレポ構成への移行を開始します..."
-
-# 1. 親ディレクトリの作成とファイル移動
-if [ ! -d "$PARENT_DIR" ]; then
-    echo "📂 親ディレクトリ $PARENT_DIR を作成中..."
-    sudo mkdir -p "$PYTHON_DIR"
-
-    echo "🚚 既存ファイルを $PYTHON_DIR へ移動中..."
-    # 隠しファイルを含め、このスクリプト自身以外の全ファイルを移動
-    sudo find . -maxdepth 1 ! -name "." ! -name "$(basename "$0")" -exec mv {} "$PYTHON_DIR/" \;
-
-    # 所有権を自分（現在のユーザー）に変更
-    sudo chown -R $USER:$USER "$PARENT_DIR"
-else
-    echo "⚠️ すでに $PARENT_DIR が存在します。移動をスキップします。"
-fi
-
-cd "$PARENT_DIR"
-
-# 2. Rust ブリッジの初期化 (Rust採用に向けた第一歩)
-if [ ! -d "$RUST_DIR" ]; then
-    echo "🦀 Rust プロジェクトを初期化中..."
-    mkdir -p "$RUST_DIR"
-    cd "$RUST_DIR"
-    cargo init --bin
-    cd ..
-fi
-
-# 3. uv (Rust製パッケージマネージャー) の導入
-echo "⚡ uv をセットアップ中..."
-if ! command -v uv &> /dev/null; then
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-
-    # パスを即時反映（インストーラーの指示に従う）
-    if [ -f "$HOME/.local/bin/env" ]; then
-        source "$HOME/.local/bin/env"
-    fi
-    #念のため、PATHにも直接追加しておく
-    export PATH="$HOME/.local/bin:$PATH"
-fi
-
-# Python環境の初期化
-cd "$PYTHON_DIR"
-uv init
-# 既存の依存関係を pyproject.toml ベースへ
-if [ -f "requirements.txt" ]; then
-    echo "📦 requirements.txt から依存関係をインポート中..."
-    uv pip compile requirements.txt -o requirements.txt
-fi
-cd ..
-
-# 4. systemd サービスのパス自動書き換え
-echo "⚙️ systemd サービスを更新中..."
-for SERVICE in "${SERVICES[@]}"; do
-    SYSTEMD_PATH="/etc/systemd/system/$SERVICE"
-
-    if [ -f "$SYSTEMD_PATH" ]; then
-        echo "🔄 $SERVICE のパスを置換中..."
-        # バックアップ作成
-        sudo cp "$SYSTEMD_PATH" "${SYSTEMD_PATH}.bak"
-
-        # WorkingDirectory と ExecStart 内のディレクトリパスを置換
-        sudo sed -i "s|WorkingDirectory=.*|WorkingDirectory=$PYTHON_DIR|g" "$SYSTEMD_PATH"
-        sudo sed -i "s|/discord_bot/|/Awaji-Empire-Agent/discord_bot/|g" "$SYSTEMD_PATH"
-
-        echo "✅ $SERVICE の更新完了（バックアップ: ${SERVICE}.bak）"
-    else
-        echo "❌ エラー: $SYSTEMD_PATH が見つかりません。"
-    fi
-done
-
-# 5. systemd 設定の反映と再起動
-echo "🔄 サービスを再起動中..."
-sudo systemctl daemon-reload
-for SERVICE in "${SERVICES[@]}"; do
-    sudo systemctl restart "$SERVICE"
-    echo "🚀 $SERVICE が再起動しました。"
-done
-
-# 6. .gitignore の config.py 除外設定を確実に反映
-echo "🔒 .gitignore への config.py 除外設定を確認中..."
-cd "$PARENT_DIR"
-
-# .gitignore にエントリがなければ追記
-# パターンが存在しない場合のみ追加
-if ! grep -qF 'config.py' .gitignore 2>/dev/null; then
-    echo 'discord_bot/config.py' >> .gitignore
-    echo '**/config.py'          >> .gitignore
-    echo "✅ .gitignore に config.py の除外ルールを追加しました。"
-else
-    echo "⚠️  config.py の除外ルールはすでに .gitignore に存在します。"
-fi
-
-# 追跡済みの config.py がある場合はキャッシュから削除
-CACHED_CONFIGS=$(git ls-files --error-unmatch 'discord_bot/config.py' '**/config.py' 2>/dev/null || true)
-if [ -n "$CACHED_CONFIGS" ]; then
-    echo "🗑️  git インデックスから config.py を除去中..."
-    git ls-files --error-unmatch 'discord_bot/config.py' '**/config.py' 2>/dev/null \
-        | xargs -r git rm --cached --
-    echo "✅ git rm --cached 完了。実体ファイルはサーバー上にそのまま残ります。"
-else
-    echo "✅ config.py は git に追跡されていません。"
-fi
-
-# 7. Git ブランチ設定
-echo "🌿 Git ブランチを 'test' に切り替え中..." # <- これはtest環境の話,本番環境であればいらない
-if [ ! -d ".git" ]; then
-    git init
-fi
-# masterに影響を与えないよう test ブランチを作成 <- これはtest環境の話
-# 本番環境はmaster
-git checkout test
-
-echo "✨ 全ての工程が完了しました！"
-echo "現在のディレクトリ構造:"
-ls -R | grep ":$" | sed -e 's/:$//' -e 's/[^-][^\/]*\//--/g' -e 's/^/   /
+```text
+# 例: /etc/sudoers.d/deploy
+devuser ALL=(ALL) NOPASSWD: /usr/bin/rsync, /usr/bin/systemctl, /Awaji-Empire-Agent/scripts/setup-systemd.sh
 ```
 
-## 3. GitHub Actions による自動デプロイ設定
+## 4. トラブルシューティング
 
-モノレポ化に伴い、GitHub Actions の設定を更新する必要があります。
-
-- **`working-directory` の設定**: 各ジョブ（`deploy` など）内で `working-directory: discord_bot` を指定し、正しいディレクトリでコマンドが実行されるようにします。
-- **`uv` の利用**: `pip` の代わりに `uv` コマンド（`uv sync`, `uv run`）を使用するように変更します。
-
-`rsync` コマンドと `systemctl` コマンドをパスワード無しで使えるようにします。
-これをしなければ、GitHub Actions からデプロイする際にパスワードを入力する必要があります。
-
-1. 設定ファイルを開く
-
+### 1. `uv sync` で `Permission denied` が出る
+過去に root で `.venv` を作成した可能性があります。
 ```bash
-sudo visudo -f /etc/sudoers.d/github-actions
+sudo chown -R devuser:devuser /Awaji-Empire-Agent/discord_bot/.venv
 ```
 
-※ `/etc/sudoers.d/` 配下に新しいファイルを作るのが、システムを汚さない最も安全な方法です。
+### 2. Bridge が `mismatched types (BLOB)` で落ちる
+DBのカラム型と Rust の構造体が不一致です。`models.rs` で `questions/answers` が `Vec<u8>` で定義されているか確認してください。
 
-1. 以下を追加
+### 3. 日時が配列形式 `[2026, ...]` で表示される（旧情報・対応済み）
+~~`#[serde(with = "time::serde::rfc3339")]` が付与されている必要があります。~~
 
-```bash
-your_github_actions_user ALL=(ALL) NOPASSWD: /usr/bin/rsync, /bin/systemctl
+> **Phase 3-D 修正済み**: MariaDB の `DATETIME` 型は `OffsetDateTime` に非互換。
+> `CAST(created_at AS CHAR)` で SQL 側で文字列化し、Rust 側で `String` で受け取る方式に変更済み。
+> `OffsetDateTime` および `time::serde::rfc3339` は **使用禁止**。
+
+### 4. Bridge が `mismatched types ... BLOB` で落ちる
+`LONGTEXT` / `MEDIUMTEXT` カラムは `sqlx` が内部的に `BLOB` として扱うため、
+Rust の構造体フィールドには `String` ではなく **`Vec<u8>`** を使用すること。
+シリアライズ時は `serde_bytes_to_string` モジュールで UTF-8 String に変換する。
+
+---
+
+## 5. 最終確認リスト
+
+- [ ] `curl http://127.0.0.1:7878/health` が `{"status":"ok"}` を返す。
+- [ ] 管理画面の「作成日時」が正しく読み取れる形式で表示されている。
+- [ ] アンケートを新規作成し、DBに保存される。
+- [ ] ログ（`operation_logs`）が Bridge 経由で記録されている。
+- [ ] アンケートに回答→再回答した際、レコードが追加されず更新されること。
+
+---
+
+## 6. 本番 DB マイグレーション手順（Phase 3-D 対応）
+
+> **⚠ 重要**: 以下の手順は本番環境への初回デプロイ時または Phase 3-D ブランチのマージ後、
+> **必ず手動で実行**してください。コードのデプロイだけでは完結しません。
+
+### 背景
+
+Phase 3-D ホットフィックス（`feature/phase3d-hotfix`）の調査で、
+`survey_responses` テーブルに `(survey_id, user_id)` の UNIQUE KEY が存在しないことが判明しました。
+UNIQUE KEY がないと `ON DUPLICATE KEY UPDATE` による更新が機能せず、
+同一ユーザーが再回答するたびに新しいレコードが追加されてしまいます。
+
+### 実行手順
+
+```sql
+-- 【Step 1】UNIQUE KEY が既に存在するか確認（存在する場合はStep 3は不要）
+SHOW INDEX FROM survey_responses WHERE Key_name = 'unique_survey_user';
+
+-- 【Step 2】既存の重複行を確認
+SELECT survey_id, user_id, COUNT(*) as cnt
+FROM survey_responses
+GROUP BY survey_id, user_id
+HAVING cnt > 1;
+
+-- 【Step 3】重複があれば古いレコードを削除（最新の id を残す）
+--   ※ 重複がない場合はスキップ
+DELETE sr1 FROM survey_responses sr1
+INNER JOIN survey_responses sr2
+  ON sr1.survey_id = sr2.survey_id
+  AND sr1.user_id = sr2.user_id
+  AND sr1.id < sr2.id;
+
+-- 【Step 4】UNIQUE KEY を追加
+ALTER TABLE survey_responses
+  ADD UNIQUE KEY unique_survey_user (survey_id, user_id);
+
+-- 【Step 5】追加確認
+SHOW INDEX FROM survey_responses;
 ```
 
-※ YAML で `sudo` を使っているのは `rsync` と `systemctl` だけなので、これらだけを指定するのがセキュリティ上望ましいです。
+### 動作確認
 
-## 4. 確認事項
+```bash
+# 同一アンケートに2回回答し、survey_responses のレコード数が増えないことを確認
+SELECT COUNT(*) FROM survey_responses WHERE survey_id = <テスト用ID>;
+```
 
-デプロイ後、以下の点を確認してください。
-
-- [ ] Bot が起動し、チャンネルに接続しているか。
-- [ ] Web アプリケーションが正常に動作しているか。
-- [ ] `database_bridge` が正常にコンパイルされ、Bot から呼び出されているか。

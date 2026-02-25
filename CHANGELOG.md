@@ -7,6 +7,45 @@
 
 本番投入バージョン。Phase 2 アーキテクチャ刷新・フォームバグ修正・Rust DB ブリッジ基盤の3本柱を含む大規模リリース。
 
+### Phase 4 Preview (Upcoming)
+
+- **Python ロジックの Rust 移譲**: 残りの Python ロジック（Discord Cog 等）を順次 Rust Bridge へ移行し、Python 側を疎結合なゲートウェイへと進化させる。
+- **モニタリング強化**: Rust 側での詳細なメトリクス収集とロギングの改良。
+
+## [1.3.1] - 2026-02-25
+
+Phase 3-C および 3-D (Hotfix) 完了。Rust Bridge の型不一致修正と、マスミュート機能の「真の自己修復」ロジックを導入。
+
+### Added
+
+- **Phase 3-C: Rust Bridge 完全統合とデプロイ自動化**
+  - **HTTP IPC による分散構成**: Python Bot/Webapp が Rust Bridge 経由でデータベースを操作するアーキテクチャへの完全移行。
+  - **CI/CD パイプライン強化**: GitHub Actions による自動ビルド・デプロイフローを構築。
+- **Phase 3-D: Survey Recovery およびマスミュート自己修復の強化**
+  - **セルフ・アンブロッキング (Self-unblocking)**: サーバーレベルの「ロールの管理」がある場合、Botが自律的にチャンネル制限を解除するロジックを実装。
+  - **診断コマンド `!mute_check`**: 本番導入前にBotの権限と対象チャンネルの状態を一括診断するコマンドを追加。
+  - **設計記録の拡充**: `docs/adr/005-phase3d-survey-response-fix.md`（Survey 根本原因・対策）、`docs/adr/006-phase3d-mass-mute-self-unblocking.md`（自己修復設計）を追加。
+
+### Changed
+
+- **Rust Bridge の堅牢化**
+  - **型不一致の根本解決**: `DATETIME` 型非互換を SQL `CAST` で、`LONGTEXT` を `Vec<u8>` で処理する堅牢なデコード設計へ移行。
+- **CSS 分割リファクタリング**: デザインの拡張性向上のため、スタイルシートを機能別に分割。
+- **依存関係管理**: `uv` 使用時のパーミッションエラーを防ぐため、CI 時に `.venv` の所有権を自動修復するステップを追加。
+
+### Fixed
+
+- **Phase 3-D: ホットフィックス (Rust Bridge/Survey/Mass Mute)**
+  - **DB文字化け解消**: 接続 URL への `charset=utf8mb4` 追加により日本語化けを修正。
+  - **重複回答の防止**: `survey_responses` への UNIQUE KEY 手動追加手順を確立し、上書き保存を正常化。
+  - **権限エラー通知**: `Forbidden` 発生時に不足権限と対処法を管理者へ詳細通知するよう改善。
+- **Phase 3-C 修正**: 自動デプロイ時の sudo 権限問題や日付フォーマットの不一致を解除。
+- **未使用コード削除**: Rust 側のビルドウオーニングを解消し、バイナリをクリーン化。
+
+## [1.3.0] - 2026-02-23
+
+本番投入バージョン。Phase 2 アーキテクチャ刷新・フォームバグ修正・Rust DB ブリッジ基盤の3本柱を含む大規模リリース。
+
 ### Added
 
 - **Phase 2 — アーキテクチャ刷新** (`feature/phase2-architecture-refactoring`)

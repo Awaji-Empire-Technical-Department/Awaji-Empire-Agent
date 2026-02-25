@@ -1,12 +1,13 @@
 import os
-import aiomysql
 import httpx
 from quart import Quart, render_template, request, redirect, url_for, session, current_app
 from quart_cors import cors
 from dotenv import load_dotenv
 
-# Blueprintの読み込み（routes/survey.py 内でも非同期処理が徹底されているか確認してください）
 from routes.survey import survey_bp
+from services.bridge_client import BridgeUnavailableError
+from services.survey_service import SurveyService
+from services.log_service import LogService
 
 load_dotenv()
 
@@ -16,24 +17,10 @@ class Config:
     CLIENT_SECRET = os.getenv('DISCORD_CLIENT_SECRET')
     REDIRECT_URI = os.getenv('DISCORD_REDIRECT_URI')
     TARGET_GUILD_ID = os.getenv('DISCORD_GUILD_ID')
-    
-    # DB設定にタイムアウトを追加（重要）
-    DB_CONFIG = {
-        'host': os.getenv('DB_HOST', '127.0.0.1'),
-        'user': os.getenv('DB_USER', 'root'),
-        'password': os.getenv('DB_PASS', ''),
-        'db': os.getenv('DB_NAME', 'bot_db'),
-        'charset': 'utf8mb4',
-        'autocommit': True,
-        'connect_timeout': 10  # 10秒で接続できなければエラーにする（無限待機防止）
-    }
 
 app = Quart(__name__, static_folder='static', static_url_path='/static')
 app = cors(app, allow_origin="*")
 app.secret_key = Config.SECRET_KEY
-
-# アプリ全体で使えるように変数を初期化
-app.db_pool = None
 
 # Blueprintの登録
 app.register_blueprint(survey_bp)
@@ -41,25 +28,13 @@ app.register_blueprint(survey_bp)
 # --- ライフサイクル ---
 @app.before_serving
 async def startup():
-    """サーバー起動時にDBプールを作成"""
-    try:
-        app.logger.info("Attempting to connect to database...")
-        # タイムアウト付きでプール作成
-        app.db_pool = await aiomysql.create_pool(**Config.DB_CONFIG)
-        app.logger.info("✅ Database connection pool created successfully.")
-    except Exception as e:
-        # DBに繋がらなくてもサーバー自体は起動させる（リトライやエラーページのため）
-        # ただしログには致命的エラーとして残す
-        app.logger.critical(f"❌ Failed to connect to database: {e}")
-        app.db_pool = None
+    """サーバー起動時の処理 (現在は Rust Bridge があるため何もしない)"""
+    app.logger.info("Webapp starting (Bridge IPC enabled)")
 
 @app.after_serving
 async def shutdown():
-    """サーバー終了時にDBプールを閉じる"""
-    if app.db_pool:
-        app.db_pool.close()
-        await app.db_pool.wait_closed()
-        app.logger.info("Database connection pool closed.")
+    """サーバー終了時の処理"""
+    app.logger.info("Webapp shutting down")
 
 # --- コンテキストプロセッサ ---
 @app.context_processor
@@ -70,6 +45,11 @@ def inject_css_version():
     except:
         version = 1
     return dict(css_ver=version)
+
+# --- 認証ルート (Auth) ---
+# ... (login, callback, logout は変更なしのため省略。実際はそのまま残す)
+# 省略記法が使えないため、全量を書くか、diff を工夫する。
+# ここでは一旦 index のみを書き換える。
 
 # --- 認証ルート (Auth) ---
 @app.route('/login')
@@ -160,25 +140,21 @@ async def index():
     if not user:
         return redirect(url_for('login'))
     
-    # DB接続が失敗している場合のハンドリング
-    if not app.db_pool:
-        return "Database connection is not available. Please contact administrator.", 503
-    
     try:
-        async with app.db_pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                # クエリ実行
-                await cur.execute("SELECT * FROM surveys WHERE owner_id = %s ORDER BY created_at DESC", (user['id'],))
-                surveys = await cur.fetchall()
-                
-                await cur.execute("SELECT * FROM operation_logs ORDER BY created_at DESC LIMIT 30")
-                logs = await cur.fetchall()
+        # SurveyService 経由で取得 (Rust Bridge を利用)
+        surveys = await SurveyService.get_surveys_by_owner(None, user['id'])
+        
+        # LogService 経由で取得 (Rust Bridge を利用)
+        logs = await LogService.get_recent_logs(None, limit=30)
 
         return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs)
         
+    except BridgeUnavailableError:
+        current_app.logger.warning("Bridge unavailable on index: rendering maintenance page")
+        return await render_template('maintenance.html'), 503
     except Exception as e:
-        current_app.logger.error(f"Database Error in Index: {e}")
-        return f"Database Error: {e}", 500
+        current_app.logger.error(f"Error in Index Dashboard: {e}")
+        return f"System Error: {e}", 500
 
 if __name__ == '__main__':
     # ローカル開発用設定

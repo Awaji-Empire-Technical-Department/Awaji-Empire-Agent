@@ -8,7 +8,7 @@ dependencies = [
     "aiofiles==25.1.0",
     "aiohappyeyeballs==2.6.1",
     "aiohttp==3.13.2",
-    "aiomysql==0.3.2",
+    "httpx",
     "aiosignal==1.4.0",
     "anyio==4.12.1",
     "attrs==25.4.0",
