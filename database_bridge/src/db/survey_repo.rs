@@ -1,10 +1,5 @@
 // db/survey_repo.rs
 // Why: surveys テーブルへの純粋な CRUD をここに集約する。
-//      本ファイルは Bot / Webapp 両方から呼ばれるため、
-//      Discord にも Quart にも依存しない純粋な Rust コードのみを記述する。
-//
-//      Note: sqlx::query!マクロ（コンパイル時DB検証）の代わりに
-//      sqlx::query()ランタイム関数を使用。CI環境のDATABASE_URL依存を排除する。
 
 use sqlx::{mysql::MySqlPool, Row};
 use tracing::error;
@@ -12,8 +7,6 @@ use tracing::error;
 use super::models::{BridgeError, BridgeResult, Survey};
 
 /// 新規アンケートを INSERT し、生成された ID を返す。
-///
-/// Python: `SurveyService.create_survey()`
 pub async fn insert(pool: &MySqlPool, owner_id: &str) -> BridgeResult<i64> {
     let result = sqlx::query(
         "INSERT INTO surveys (owner_id, title, questions, is_active, created_at) \
@@ -31,8 +24,6 @@ pub async fn insert(pool: &MySqlPool, owner_id: &str) -> BridgeResult<i64> {
 }
 
 /// ID でアンケートを 1 件取得する。
-///
-/// Python: `SurveyService.get_survey()`
 pub async fn find_by_id(pool: &MySqlPool, survey_id: i64) -> BridgeResult<Survey> {
     sqlx::query_as::<_, Survey>("SELECT * FROM surveys WHERE id = ?")
         .bind(survey_id)
@@ -42,36 +33,47 @@ pub async fn find_by_id(pool: &MySqlPool, survey_id: i64) -> BridgeResult<Survey
 }
 
 /// オーナー ID でアンケート一覧を取得する。
-///
-/// Python: `SurveyService.get_surveys_by_owner()`
-/// - `active_only = Some(true)` で is_active = 1 のみに絞り込む。
 pub async fn find_by_owner(
     pool: &MySqlPool,
     owner_id: &str,
     active_only: Option<bool>,
 ) -> BridgeResult<Vec<Survey>> {
-    let surveys = if active_only == Some(true) {
-        sqlx::query_as::<_, Survey>(
-            "SELECT * FROM surveys WHERE owner_id = ? AND is_active = 1 ORDER BY created_at DESC",
-        )
-        .bind(owner_id)
-        .fetch_all(pool)
-        .await?
+    let surveys = if owner_id == "ALL" {
+        if active_only == Some(true) {
+            sqlx::query_as::<_, Survey>(
+                "SELECT * FROM surveys WHERE is_active = 1 ORDER BY created_at DESC",
+            )
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, Survey>(
+                "SELECT * FROM surveys ORDER BY created_at DESC",
+            )
+            .fetch_all(pool)
+            .await?
+        }
     } else {
-        sqlx::query_as::<_, Survey>(
-            "SELECT * FROM surveys WHERE owner_id = ? ORDER BY created_at DESC",
-        )
-        .bind(owner_id)
-        .fetch_all(pool)
-        .await?
+        if active_only == Some(true) {
+            sqlx::query_as::<_, Survey>(
+                "SELECT * FROM surveys WHERE owner_id = ? AND is_active = 1 ORDER BY created_at DESC",
+            )
+            .bind(owner_id)
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, Survey>(
+                "SELECT * FROM surveys WHERE owner_id = ? ORDER BY created_at DESC",
+            )
+            .bind(owner_id)
+            .fetch_all(pool)
+            .await?
+        }
     };
 
     Ok(surveys)
 }
 
 /// 稼働中（is_active = 1）の全アンケートを取得する。
-///
-/// Python: `SurveyService.get_active_surveys()`
 pub async fn find_active(pool: &MySqlPool) -> BridgeResult<Vec<Survey>> {
     let surveys = sqlx::query_as::<_, Survey>(
         "SELECT * FROM surveys WHERE is_active = 1 ORDER BY created_at DESC",
@@ -83,8 +85,6 @@ pub async fn find_active(pool: &MySqlPool) -> BridgeResult<Vec<Survey>> {
 }
 
 /// タイトルと質問 JSON を更新する。
-///
-/// Python: `SurveyService.update_survey()`
 pub async fn update(
     pool: &MySqlPool,
     survey_id: i64,
@@ -102,8 +102,6 @@ pub async fn update(
 }
 
 /// アンケートを削除する（owner_id 照合付き）。
-///
-/// Python: `SurveyService.delete_survey()`
 pub async fn delete(pool: &MySqlPool, survey_id: i64, owner_id: &str) -> BridgeResult<()> {
     let survey = find_by_id(pool, survey_id).await?;
 
@@ -120,8 +118,6 @@ pub async fn delete(pool: &MySqlPool, survey_id: i64, owner_id: &str) -> BridgeR
 }
 
 /// アンケートのオーナー ID を取得する。
-///
-/// Python: `SurveyService.get_owner_id()`
 pub async fn get_owner_id(pool: &MySqlPool, survey_id: i64) -> BridgeResult<String> {
     let row = sqlx::query("SELECT owner_id FROM surveys WHERE id = ?")
         .bind(survey_id)
