@@ -32,23 +32,21 @@ class PermissionService:
     """
 
     @staticmethod
-    def preflight_check(guild: discord.Guild) -> list[str]:
+    def preflight_check(guild: discord.Guild, channel: Optional[discord.TextChannel] = None) -> list[str]:
         """Bot が権限操作を行うのに必要な権限を確認し、不足リストを返す。
 
-        Why: channel.set_permissions(role, ...) でロールへの上書きを変更するには
-             Discord API の仕様として guild レベルの manage_roles が必須。
-             事前チェックをすることで、操作失敗前に管理者に通知できる。
-
-        Returns:
-            不足している権限の名前リスト。空リストなら OK。
+        Args:
+            guild: 確認対象のギルド
+            channel: 指定された場合は、そのチャンネル内での具体的な権限もチェックする。
         """
         me = guild.me
+        # channel があればその中での権限、なければサーバー全体の権限
+        perms = channel.permissions_for(me) if channel else me.guild_permissions
+        
         missing = []
-        # ロールへの権限上書きに必要な権限
-        if not me.guild_permissions.manage_roles:
-            missing.append("Manage Roles (ロールの管理)")
-        # チャンネル上書き全般に必要な権限
-        if not me.guild_permissions.manage_channels:
+        if not perms.manage_roles:
+            missing.append("Manage Roles / Manage Permissions (ロールの管理 / 権限の管理)")
+        if not perms.manage_channels:
             missing.append("Manage Channels (チャンネルの管理)")
         return missing
 
@@ -73,14 +71,13 @@ class PermissionService:
                 action="applied",
             )
         except discord.Forbidden:
-            # Why: Discord API の仕様で、ロールへの上書きには guild レベルの
-            #      manage_roles が必要。不足権限を明示してデバッグを助ける。
-            missing = PermissionService.preflight_check(channel.guild)
-            missing_str = ", ".join(missing) if missing else "不明 (チャンネルの上書き設定でBotが拒否されている可能性)"
+            # Why: そのチャンネル内での権限を詳しく調べる
+            missing = PermissionService.preflight_check(channel.guild, channel)
+            missing_str = ", ".join(missing) if missing else "不明 (ロール順位が低い、若しくは 2FA 設定の問題の可能性)"
             msg = (
                 f"Missing permissions to edit channel #{channel.name}. "
-                f"不足権限: [{missing_str}]. "
-                f"Botのロールに 'Manage Roles' と 'Manage Channels' を付与してください。"
+                f"不足権限(チャンネル内): [{missing_str}]. "
+                f"チャンネル設定の「権限」タブで Bot のロールに '権限の管理' を許可してください。"
             )
             logger.warning("[PermissionService] %s", msg)
             return PermissionResult(
@@ -163,11 +160,11 @@ class PermissionService:
                 action="repaired",
             )
         except discord.Forbidden:
-            missing = PermissionService.preflight_check(channel.guild)
-            missing_str = ", ".join(missing) if missing else "不明 (チャンネルの上書き設定でBotが拒否されている可能性)"
+            missing = PermissionService.preflight_check(channel.guild, channel)
+            missing_str = ", ".join(missing) if missing else "不明 (ロール順位が低い、若しくは 2FA 設定の問題の可能性)"
             msg = (
                 f"Missing permissions to repair #{channel.name}. "
-                f"不足権限: [{missing_str}]"
+                f"不足権限(チャンネル内): [{missing_str}]"
             )
             logger.warning("[PermissionService] %s", msg)
             return PermissionResult(
