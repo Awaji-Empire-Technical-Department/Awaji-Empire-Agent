@@ -32,6 +32,27 @@ class PermissionService:
     """
 
     @staticmethod
+    def preflight_check(guild: discord.Guild) -> list[str]:
+        """Bot が権限操作を行うのに必要な権限を確認し、不足リストを返す。
+
+        Why: channel.set_permissions(role, ...) でロールへの上書きを変更するには
+             Discord API の仕様として guild レベルの manage_roles が必須。
+             事前チェックをすることで、操作失敗前に管理者に通知できる。
+
+        Returns:
+            不足している権限の名前リスト。空リストなら OK。
+        """
+        me = guild.me
+        missing = []
+        # ロールへの権限上書きに必要な権限
+        if not me.guild_permissions.manage_roles:
+            missing.append("Manage Roles (ロールの管理)")
+        # チャンネル上書き全般に必要な権限
+        if not me.guild_permissions.manage_channels:
+            missing.append("Manage Channels (チャンネルの管理)")
+        return missing
+
+    @staticmethod
     async def apply_permission(
         channel: discord.TextChannel,
         role: discord.Role,
@@ -52,7 +73,15 @@ class PermissionService:
                 action="applied",
             )
         except discord.Forbidden:
-            msg = f"Missing permissions to edit channel #{channel.name}"
+            # Why: Discord API の仕様で、ロールへの上書きには guild レベルの
+            #      manage_roles が必要。不足権限を明示してデバッグを助ける。
+            missing = PermissionService.preflight_check(channel.guild)
+            missing_str = ", ".join(missing) if missing else "不明 (チャンネルの上書き設定でBotが拒否されている可能性)"
+            msg = (
+                f"Missing permissions to edit channel #{channel.name}. "
+                f"不足権限: [{missing_str}]. "
+                f"Botのロールに 'Manage Roles' と 'Manage Channels' を付与してください。"
+            )
             logger.warning("[PermissionService] %s", msg)
             return PermissionResult(
                 channel_name=channel.name,
@@ -134,7 +163,12 @@ class PermissionService:
                 action="repaired",
             )
         except discord.Forbidden:
-            msg = f"Missing permissions to repair #{channel.name}"
+            missing = PermissionService.preflight_check(channel.guild)
+            missing_str = ", ".join(missing) if missing else "不明 (チャンネルの上書き設定でBotが拒否されている可能性)"
+            msg = (
+                f"Missing permissions to repair #{channel.name}. "
+                f"不足権限: [{missing_str}]"
+            )
             logger.warning("[PermissionService] %s", msg)
             return PermissionResult(
                 channel_name=channel.name,

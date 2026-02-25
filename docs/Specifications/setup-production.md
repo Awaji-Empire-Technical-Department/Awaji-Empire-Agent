@@ -89,8 +89,17 @@ sudo chown -R devuser:devuser /Awaji-Empire-Agent/discord_bot/.venv
 ### 2. Bridge が `mismatched types (BLOB)` で落ちる
 DBのカラム型と Rust の構造体が不一致です。`models.rs` で `questions/answers` が `Vec<u8>` で定義されているか確認してください。
 
-### 3. 日時が配列形式 `[2026, ...]` で表示される
-Rust 側のシリアライズ設定を確認してください。`#[serde(with = "time::serde::rfc3339")]` が付与されている必要があります。
+### 3. 日時が配列形式 `[2026, ...]` で表示される（旧情報・対応済み）
+~~`#[serde(with = "time::serde::rfc3339")]` が付与されている必要があります。~~
+
+> **Phase 3-D 修正済み**: MariaDB の `DATETIME` 型は `OffsetDateTime` に非互換。
+> `CAST(created_at AS CHAR)` で SQL 側で文字列化し、Rust 側で `String` で受け取る方式に変更済み。
+> `OffsetDateTime` および `time::serde::rfc3339` は **使用禁止**。
+
+### 4. Bridge が `mismatched types ... BLOB` で落ちる
+`LONGTEXT` / `MEDIUMTEXT` カラムは `sqlx` が内部的に `BLOB` として扱うため、
+Rust の構造体フィールドには `String` ではなく **`Vec<u8>`** を使用すること。
+シリアライズ時は `serde_bytes_to_string` モジュールで UTF-8 String に変換する。
 
 ---
 
@@ -100,3 +109,54 @@ Rust 側のシリアライズ設定を確認してください。`#[serde(with =
 - [ ] 管理画面の「作成日時」が正しく読み取れる形式で表示されている。
 - [ ] アンケートを新規作成し、DBに保存される。
 - [ ] ログ（`operation_logs`）が Bridge 経由で記録されている。
+- [ ] アンケートに回答→再回答した際、レコードが追加されず更新されること。
+
+---
+
+## 6. 本番 DB マイグレーション手順（Phase 3-D 対応）
+
+> **⚠ 重要**: 以下の手順は本番環境への初回デプロイ時または Phase 3-D ブランチのマージ後、
+> **必ず手動で実行**してください。コードのデプロイだけでは完結しません。
+
+### 背景
+
+Phase 3-D ホットフィックス（`feature/phase3d-hotfix`）の調査で、
+`survey_responses` テーブルに `(survey_id, user_id)` の UNIQUE KEY が存在しないことが判明しました。
+UNIQUE KEY がないと `ON DUPLICATE KEY UPDATE` による更新が機能せず、
+同一ユーザーが再回答するたびに新しいレコードが追加されてしまいます。
+
+### 実行手順
+
+```sql
+-- 【Step 1】UNIQUE KEY が既に存在するか確認（存在する場合はStep 3は不要）
+SHOW INDEX FROM survey_responses WHERE Key_name = 'unique_survey_user';
+
+-- 【Step 2】既存の重複行を確認
+SELECT survey_id, user_id, COUNT(*) as cnt
+FROM survey_responses
+GROUP BY survey_id, user_id
+HAVING cnt > 1;
+
+-- 【Step 3】重複があれば古いレコードを削除（最新の id を残す）
+--   ※ 重複がない場合はスキップ
+DELETE sr1 FROM survey_responses sr1
+INNER JOIN survey_responses sr2
+  ON sr1.survey_id = sr2.survey_id
+  AND sr1.user_id = sr2.user_id
+  AND sr1.id < sr2.id;
+
+-- 【Step 4】UNIQUE KEY を追加
+ALTER TABLE survey_responses
+  ADD UNIQUE KEY unique_survey_user (survey_id, user_id);
+
+-- 【Step 5】追加確認
+SHOW INDEX FROM survey_responses;
+```
+
+### 動作確認
+
+```bash
+# 同一アンケートに2回回答し、survey_responses のレコード数が増えないことを確認
+SELECT COUNT(*) FROM survey_responses WHERE survey_id = <テスト用ID>;
+```
+
