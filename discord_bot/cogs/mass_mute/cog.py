@@ -246,11 +246,21 @@ class MassMuteCog(commands.Cog):
                 inline=False,
             )
 
-        # 対象チャンネルの存在確認
+        # 対象チャンネルの存在と権限の精密確認
         all_target = list(MUTE_ONLY_CHANNEL_NAMES) + list(READ_ONLY_MUTE_CHANNEL_NAMES)
-        found = [f"✅ #{n}" for n in all_target if discord.utils.get(guild.text_channels, name=n)]
-        not_found = [f"❌ #{n} (チャンネルが見つかりません)" for n in all_target if not discord.utils.get(guild.text_channels, name=n)]
-        channel_status = "\n".join(found + not_found) or "(対象チャンネルなし)"
-        embed.add_field(name="対象チャンネル確認", value=channel_status, inline=False)
+        found_lines = []
+        for n in all_target:
+            ch = discord.utils.get(guild.text_channels, name=n)
+            if not ch:
+                found_lines.append(f"❌ #{n} (チャンネルが見つかりません)")
+            else:
+                ch_missing = PermissionService.preflight_check(guild, ch)
+                if not ch_missing:
+                    found_lines.append(f"✅ #{n}")
+                else:
+                    found_lines.append(f"⚠️ #{n} (権限不足: {', '.join(ch_missing)})")
+        
+        channel_status = "\n".join(found_lines) or "(対象チャンネルなし)"
+        embed.add_field(name="対象チャンネル診断", value=channel_status, inline=False)
 
         await ctx.send(embed=embed)
