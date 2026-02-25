@@ -3,40 +3,63 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
-## [Unreleased]
+## [1.3.2] - 2026-02-26
 
-### Phase 4 Preview (Upcoming)
+Phase 4: 権限エンジンの Rust 移行、SQLAlchemy 完全撤去、設定の `.env` 統一。設計記録: `docs/adr/007-phase4-rust-permission-engine-and-config-unification.md`
 
-- **Python ロジックの Rust 移譲**: 残りの Python ロジック（Discord Cog 等）を順次 Rust Bridge へ移行し、Python 側を疎結合なゲートウェイへと進化させる。
-- **モニタリング強化**: Rust 側での詳細なメトリクス収集とロギングの改良。
+### Added
 
-## [1.4.0] - 2026-02-26 (予定)
+- **Rust 権限評価エンジン** (`database_bridge/src/db/permission_repo.rs`)
+  - Discord 権限フラグのビット演算による `needs_repair` 判定ロジックを Rust に実装
+  - `POST /permissions/evaluate` エンドポイントを追加
+  - チャンネル名ポリシーは `.env` の `MUTE_ONLY_CHANNEL_NAMES` / `READ_ONLY_CHANNEL_NAMES` から動的に読み込む
+- **`.env.example`**: 全環境変数（Discord Bot / DB / Rust Bridge / 権限設定）のサンプルテンプレートを新規作成
 
-Phase 3-C 完了。Rust Bridge を DB 操作の中核として正式採用し、CI/CD による自動デプロイ体制を確立。
+### Changed
+
+- **Python 権限判定の Rust 委譲**: `permission_service.py` の `needs_repair()` を async 化し、Rust Bridge `POST /permissions/evaluate` へ委譲
+- **mass_mute ログ記録の Rust 統合**: `MassMuteLogic.save_log_to_db()` を async 化し、`LogService`（Rust Bridge 経由）への委譲に変更
+- **設定の `.env` 統一**:
+  - `bot.py` の `ADMIN_USER_ID`・`GUILD_ID` を `os.getenv()` に変更
+  - `mass_mute/cog.py` の `ADMIN_USER_ID`・`MUTE_ONLY_CHANNEL_NAMES`・`READ_ONLY_MUTE_CHANNEL_NAMES` を `os.getenv()` に変更
+
+### Removed
+
+- **`services/database.py`**: SQLAlchemy エンジン設定ファイルを削除
+- **`bot.py::get_db_connection()`**: mysql-connector-python による接続メソッドを削除
+- **`MassMuteLogic.create_table_if_not_exists()`**: 起動時 DDL 実行メソッドを削除
+- **`MassMuteLogic.save_log_to_db()`（旧実装）**: 直接 DB 書き込みロジックを削除
+- **依存ライブラリ**: `SQLAlchemy`、`mysql-connector-python`、`PyMySQL`、`greenlet` を `requirements.txt` / `pyproject.toml` から削除
+
+## [1.3.1] - 2026-02-25
+
+Phase 3-C および 3-D (Hotfix) 完了。Rust Bridge の型不一致修正と、マスミュート機能の「真の自己修復」ロジックを導入。
 
 ### Added
 
 - **Phase 3-C: Rust Bridge 完全統合とデプロイ自動化**
-  - **HTTP IPC による分散構成**: Python Bot/Webapp が Rust Bridge 経由でデータベースを操作する疎結合アーキテクチャへの完全移行。
-  - **CI/CD パイプライン強化**: GitHub Actions (`deploy.yml`) による自動ビルド・デプロイ・サービス登録（systemd）フローを構築。
-  - **自動セットアップスクリプト**: `scripts/setup-systemd.sh` を新設し、サービス登録と再起動手順をコード化。
-  - **メンテナンスモード**: Rust Bridge 停止時、Webapp に統一デザインのメンテナンスページ (`templates/maintenance.html`) を表示する機能を実装。
-  - **デプロイメントドキュメント**: 本番環境セットアップおよび自動デプロイ用の `sudoers` 設定手順を `docs/Specifications/setup-production.md` に集約。
+  - **HTTP IPC による分散構成**: Python Bot/Webapp が Rust Bridge 経由でデータベースを操作するアーキテクチャへの完全移行。
+  - **CI/CD パイプライン強化**: GitHub Actions による自動ビルド・デプロイフローを構築。
+- **Phase 3-D: Survey Recovery およびマスミュート自己修復の強化**
+  - **セルフ・アンブロッキング (Self-unblocking)**: サーバーレベルの「ロールの管理」がある場合、Botが自律的にチャンネル制限を解除するロジックを実装。
+  - **診断コマンド `!mute_check`**: 本番導入前にBotの権限と対象チャンネルの状態を一括診断するコマンドを追加。
+  - **設計記録の拡充**: `docs/adr/005-phase3d-survey-response-fix.md`（Survey 根本原因・対策）、`docs/adr/006-phase3d-mass-mute-self-unblocking.md`（自己修復設計）を追加。
 
 ### Changed
 
 - **Rust Bridge の堅牢化**
-  - **シリアライズ修正**: `OffsetDateTime` を JSON 時に RFC3339 形式の文字列として出力するよう修正（日付表示バグの解消）。
-  - **MariaDB JSON 互換性**: MariaDB から BLOB として返される JSON カラムを `Vec<u8>` で受け、適切にデコードするよう修正。
-  - **Axum 0.8 対応**: ルーティング構文の変更 (`/{id}`) に対応し、ランタイムパニックを防止。
-- **CSS 分割リファクタリング**: `static/style.css` を 7 つの単一責任ファイル（base, layout, components 等）に分割し、デザインの拡張性を向上。
+  - **型不一致の根本解決**: `DATETIME` 型非互換を SQL `CAST` で、`LONGTEXT` を `Vec<u8>` で処理する堅牢なデコード設計へ移行。
+- **CSS 分割リファクタリング**: デザインの拡張性向上のため、スタイルシートを機能別に分割。
 - **依存関係管理**: `uv` 使用時のパーミッションエラーを防ぐため、CI 時に `.venv` の所有権を自動修復するステップを追加。
 
 ### Fixed
 
-- **デプロイ・ブロッキング修正**: 自動デプロイ中に `sudo` パスワードを要求され CI が停止する問題を、`sudoers` 設定と `deploy.yml` の `--non-interactive` 化により解消。
-- **日付フォーマット不一致**: 以前のビルドで日付が数値配列になっていた問題を RFC3339 形式に統一。
-- **未使用コード削除**: Rust 側のビルドウオーニング（`blob_to_string`）を解消し、バイナリをクリーン化。
+- **Phase 3-D: ホットフィックス (Rust Bridge/Survey/Mass Mute)**
+  - **DB文字化け解消**: 接続 URL への `charset=utf8mb4` 追加により日本語化けを修正。
+  - **重複回答の防止**: `survey_responses` への UNIQUE KEY 手動追加手順を確立し、上書き保存を正常化。
+  - **権限エラー通知**: `Forbidden` 発生時に不足権限と対処法を管理者へ詳細通知するよう改善。
+- **Phase 3-C 修正**: 自動デプロイ時の sudo 権限問題や日付フォーマットの不一致を解除。
+- **未使用コード削除**: Rust 側のビルドウオーニングを解消し、バイナリをクリーン化。
 
 ## [1.3.0] - 2026-02-23
 
