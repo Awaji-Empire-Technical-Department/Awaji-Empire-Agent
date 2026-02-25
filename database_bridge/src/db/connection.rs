@@ -17,7 +17,9 @@ fn build_url() -> String {
     let password = std::env::var("DB_PASS").unwrap_or_default();
     let host = std::env::var("DB_HOST").unwrap_or_else(|_| "127.0.0.1".into());
     let database = std::env::var("DB_NAME").unwrap_or_else(|_| "bot_db".into());
-    format!("mysql://{user}:{password}@{host}/{database}")
+    // Why: charset=utf8mb4 を明示しないと日本語等の文字列カラムを
+    //      sqlx がデコードできず、FromRow が行全体を破棄するケースがある。
+    format!("mysql://{user}:{password}@{host}/{database}?charset=utf8mb4")
 }
 
 /// MariaDB コネクションプールを生成して返す。
