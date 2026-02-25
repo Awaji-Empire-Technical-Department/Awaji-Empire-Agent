@@ -33,14 +33,8 @@ class PermissionService:
 
     @staticmethod
     def preflight_check(guild: discord.Guild, channel: Optional[discord.TextChannel] = None) -> list[str]:
-        """Bot が権限操作を行うのに必要な権限を確認し、不足リストを返す。
-
-        Args:
-            guild: 確認対象のギルド
-            channel: 指定された場合は、そのチャンネル内での具体的な権限もチェックする。
-        """
+        """Bot が権限操作を行うのに必要な権限を確認し、不足リストを返す。"""
         me = guild.me
-        # channel があればその中での権限、なければサーバー全体の権限
         perms = channel.permissions_for(me) if channel else me.guild_permissions
         
         missing = []
@@ -49,6 +43,34 @@ class PermissionService:
         if not perms.manage_channels:
             missing.append("Manage Channels (チャンネルの管理)")
         return missing
+
+    @staticmethod
+    async def repair_self_if_blocked(channel: discord.TextChannel) -> bool:
+        """Bot 自身がチャンネル内の「権限の管理」を拒否されている場合、
+        サーバーレベルの「ロールの管理」権限を使って自身の制限を解除する。
+
+        Why: 本機能の真の「自己修復」。サーバー権限さえあれば、チャンネルごとの
+             手動設定ミスを Bot が自分で直して進むことができる。
+        """
+        me = channel.guild.me
+        
+        # 1. サーバーレベルの権限があるか確認
+        if not me.guild_permissions.manage_roles:
+            return False # サーバーレベルで権限がない場合はどうしようもない
+        
+        # 2. 現在のチャンネル内での実効権限を確認
+        perms = channel.permissions_for(me)
+        if perms.manage_roles:
+            return True # 既に権限があるので修復不要
+            
+        logger.info("[PermissionService] Bot is blocked in #%s. Attempting to unblock itself using server-wide Manage Roles.", channel.name)
+        try:
+            # 3. 自身のメンバー上書き設定で「権限の管理」を強制許可に設定
+            await channel.set_permissions(me, manage_roles=True, reason="Self-healing: Unblocking bot's own permission to manage channel.")
+            return True
+        except Exception as e:
+            logger.error("[PermissionService] Failed to unblock itself in #%s: %s", channel.name, e)
+            return False
 
     @staticmethod
     async def apply_permission(
@@ -71,7 +93,15 @@ class PermissionService:
                 action="applied",
             )
         except discord.Forbidden:
-            # Why: そのチャンネル内での権限を詳しく調べる
+            # --- 自己修復試行 ---
+            if await PermissionService.repair_self_if_blocked(channel):
+                try:
+                    await channel.set_permissions(role, overwrite=overwrite)
+                    return PermissionResult(channel_name=channel.name, success=True, action="applied")
+                except discord.Forbidden:
+                    pass # 修復したが依然として失敗
+
+            # ここに到達した場合は本当に権限不足
             missing = PermissionService.preflight_check(channel.guild, channel)
             missing_str = ", ".join(missing) if missing else "不明 (ロール順位が低い、若しくは 2FA 設定の問題の可能性)"
             msg = (
@@ -160,6 +190,14 @@ class PermissionService:
                 action="repaired",
             )
         except discord.Forbidden:
+            # --- 自己修復試行 ---
+            if await PermissionService.repair_self_if_blocked(channel):
+                try:
+                    await channel.set_permissions(role, overwrite=expected)
+                    return PermissionResult(channel_name=channel.name, success=True, action="repaired")
+                except discord.Forbidden:
+                    pass
+
             missing = PermissionService.preflight_check(channel.guild, channel)
             missing_str = ", ".join(missing) if missing else "不明 (ロール順位が低い、若しくは 2FA 設定の問題の可能性)"
             msg = (
