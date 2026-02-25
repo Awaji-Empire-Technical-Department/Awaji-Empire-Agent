@@ -2,12 +2,13 @@ import discord
 from discord.ext import commands
 import asyncio
 import os
-import mysql.connector
 from dotenv import load_dotenv
-from config import ADMIN_USER_ID, GUILD_ID
 
 # .envファイルを読み込む
 load_dotenv()
+
+ADMIN_USER_ID = os.getenv('ADMIN_USER_ID', '')
+GUILD_ID = os.getenv('GUILD_ID', '')
 
 # コグ（拡張機能）のリスト
 COGS = [
@@ -56,15 +57,7 @@ class MyBot(commands.Bot):
             except Exception as e:
                 print(f"Failed to global sync: {e}")
 
-    # --- 追加: DB接続用メソッド ---
-    def get_db_connection(self):
-        """MySQLへの接続オブジェクトを返す"""
-        return mysql.connector.connect(
-            host=os.getenv('DB_HOST'),
-            database=os.getenv('DB_NAME'),
-            user=os.getenv('DB_USER'),
-            password=os.getenv('DB_PASS')
-        )
+
 
 # Botインスタンスの作成
 bot = MyBot()

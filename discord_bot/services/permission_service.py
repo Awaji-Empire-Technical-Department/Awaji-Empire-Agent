@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 import discord
+from .bridge_client import bridge_client
 
 logger = logging.getLogger(__name__)
 
@@ -127,50 +128,78 @@ class PermissionService:
             )
 
     @staticmethod
-    def needs_repair(
+    async def needs_repair(
         channel: discord.TextChannel,
         role: discord.Role,
-        expected: discord.PermissionOverwrite,
-    ) -> bool:
-        """チャンネルの現在の権限上書きが期待値と一致するか判定する。
+        expected: Optional[discord.PermissionOverwrite] = None,
+    ) -> tuple[bool, Optional[discord.PermissionOverwrite]]:
+        """チャンネルの現在の権限状態を Rust Bridge で評価する。
 
-        Why: 自己修復機能の核。on_guild_channel_update 等で呼ばれ、
-             current と expected を比較して差異があれば True を返す。
-             判定は純粋な比較だがチャンネルの状態参照を伴うため services に配置。
+        Why: 自己修復機能の核。判定ロジックを Rust に委譲することで、
+             Python 側での複雑な条件分岐を排除する。
 
         Args:
             channel: チェック対象チャンネル
             role: 比較対象のロール
-            expected: 期待される権限上書き
+            expected: (オプショナル) Python 側で指定する期待値。Rust 側にポリシーがない場合のフォールバック。
         Returns:
-            修復が必要なら True
+            (修復が必要か, 期待される上書きオブジェクト)
         """
-        current = channel.overwrites_for(role)
+        allow, deny = channel.overwrites_for(role).pair()
+        
+        try:
+            res = await bridge_client.request(
+                "POST",
+                "/permissions/evaluate",
+                json={
+                    "channel_name": channel.name,
+                    "current_allow": allow.value,
+                    "current_deny": deny.value
+                }
+            )
+            
+            if res and res.get("reason") != "Not a target channel for automated permission management":
+                # Rust 側にポリシーが存在する場合
+                needs_repair = res.get("needs_repair", False)
+                target_allow = res.get("target_allow", 0)
+                target_deny = res.get("target_deny", 0)
+                
+                target_overwrite = discord.PermissionOverwrite.from_pair(
+                    discord.Permissions(target_allow),
+                    discord.Permissions(target_deny)
+                )
+                return needs_repair, target_overwrite
+                
+        except Exception as e:
+            logger.error("[PermissionService] Failed to evaluate via bridge: %s", e)
 
-        # PermissionOverwrite の各権限値を比較
-        # Why: discord.py の PermissionOverwrite.__eq__ はインスタンス比較のため、
-        #      個々の権限フィールドを比較する必要がある。
+        # Rust 側にポリシーがない、またはエラー時のフォールバック処理
+        if expected is None:
+            return False, None
+            
+        current = channel.overwrites_for(role)
         for perm, value in expected:
             if value is not None and getattr(current, perm) != value:
-                return True
-        return False
+                return True, expected
+        return False, expected
 
     @staticmethod
     async def check_and_repair(
         channel: discord.TextChannel,
         role: discord.Role,
-        expected: discord.PermissionOverwrite,
+        expected: Optional[discord.PermissionOverwrite] = None,
     ) -> PermissionResult:
         """権限の差異を検知し、必要があれば修復する。
 
         Args:
             channel: チェック対象チャンネル
             role: 比較対象のロール
-            expected: 期待される権限上書き
+            expected: (オプショナル) 期待される権限上書き
         Returns:
             修復が実行されたか、またはスキップされたかを示す結果
         """
-        if not PermissionService.needs_repair(channel, role, expected):
+        needs_repair, target_overwrite = await PermissionService.needs_repair(channel, role, expected)
+        if not needs_repair or target_overwrite is None:
             return PermissionResult(
                 channel_name=channel.name,
                 success=True,
@@ -183,7 +212,7 @@ class PermissionService:
             role.name,
         )
         try:
-            await channel.set_permissions(role, overwrite=expected)
+            await channel.set_permissions(role, overwrite=target_overwrite)
             return PermissionResult(
                 channel_name=channel.name,
                 success=True,
@@ -193,7 +222,7 @@ class PermissionService:
             # --- 自己修復試行 ---
             if await PermissionService.repair_self_if_blocked(channel):
                 try:
-                    await channel.set_permissions(role, overwrite=expected)
+                    await channel.set_permissions(role, overwrite=target_overwrite)
                     return PermissionResult(channel_name=channel.name, success=True, action="repaired")
                 except discord.Forbidden:
                     pass

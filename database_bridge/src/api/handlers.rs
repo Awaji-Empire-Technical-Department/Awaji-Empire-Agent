@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use sqlx::MySqlPool;
 use tracing::error;
 
-use crate::db::{models::BridgeError, survey_repo, response_repo, log_repo};
+use crate::db::{models::BridgeError, models::PermissionEvaluateRequest, survey_repo, response_repo, log_repo, permission_repo};
 use crate::bot::survey_handler;
 
 // ============================================================
@@ -252,4 +252,13 @@ pub async fn log_operation(
         Ok(_) => (StatusCode::CREATED, Json(json!({"status": "ok"}))),
         Err(e) => map_bridge_error(e),
     }
+}
+
+/// POST /permissions/evaluate
+/// チャンネルの権限状態を評価し、期待値との差異を返す。
+pub async fn evaluate_permissions(
+    Json(payload): Json<PermissionEvaluateRequest>,
+) -> (StatusCode, Json<Value>) {
+    let response = permission_repo::PermissionRepo::evaluate(payload);
+    (StatusCode::OK, Json(json!(response)))
 }

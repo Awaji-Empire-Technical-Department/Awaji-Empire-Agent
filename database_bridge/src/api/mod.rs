@@ -15,6 +15,7 @@ pub fn create_router(pool: MySqlPool) -> Router {
         .route("/health", get(handlers::health_check))
         .nest("/surveys", survey_routes())
         .route("/logs", get(handlers::list_recent_logs).post(handlers::log_operation))
+        .route("/permissions/evaluate", post(handlers::evaluate_permissions))
         .with_state(pool)
 }
 

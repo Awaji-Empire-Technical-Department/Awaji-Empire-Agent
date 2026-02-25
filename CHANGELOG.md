@@ -3,14 +3,33 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
-## [1.3.0] - 2026-02-23
+## [1.3.2] - 2026-02-26
 
-本番投入バージョン。Phase 2 アーキテクチャ刷新・フォームバグ修正・Rust DB ブリッジ基盤の3本柱を含む大規模リリース。
+Phase 4: 権限エンジンの Rust 移行、SQLAlchemy 完全撤去、設定の `.env` 統一。設計記録: `docs/adr/007-phase4-rust-permission-engine-and-config-unification.md`
 
-### Phase 4 Preview (Upcoming)
+### Added
 
-- **Python ロジックの Rust 移譲**: 残りの Python ロジック（Discord Cog 等）を順次 Rust Bridge へ移行し、Python 側を疎結合なゲートウェイへと進化させる。
-- **モニタリング強化**: Rust 側での詳細なメトリクス収集とロギングの改良。
+- **Rust 権限評価エンジン** (`database_bridge/src/db/permission_repo.rs`)
+  - Discord 権限フラグのビット演算による `needs_repair` 判定ロジックを Rust に実装
+  - `POST /permissions/evaluate` エンドポイントを追加
+  - チャンネル名ポリシーは `.env` の `MUTE_ONLY_CHANNEL_NAMES` / `READ_ONLY_CHANNEL_NAMES` から動的に読み込む
+- **`.env.example`**: 全環境変数（Discord Bot / DB / Rust Bridge / 権限設定）のサンプルテンプレートを新規作成
+
+### Changed
+
+- **Python 権限判定の Rust 委譲**: `permission_service.py` の `needs_repair()` を async 化し、Rust Bridge `POST /permissions/evaluate` へ委譲
+- **mass_mute ログ記録の Rust 統合**: `MassMuteLogic.save_log_to_db()` を async 化し、`LogService`（Rust Bridge 経由）への委譲に変更
+- **設定の `.env` 統一**:
+  - `bot.py` の `ADMIN_USER_ID`・`GUILD_ID` を `os.getenv()` に変更
+  - `mass_mute/cog.py` の `ADMIN_USER_ID`・`MUTE_ONLY_CHANNEL_NAMES`・`READ_ONLY_MUTE_CHANNEL_NAMES` を `os.getenv()` に変更
+
+### Removed
+
+- **`services/database.py`**: SQLAlchemy エンジン設定ファイルを削除
+- **`bot.py::get_db_connection()`**: mysql-connector-python による接続メソッドを削除
+- **`MassMuteLogic.create_table_if_not_exists()`**: 起動時 DDL 実行メソッドを削除
+- **`MassMuteLogic.save_log_to_db()`（旧実装）**: 直接 DB 書き込みロジックを削除
+- **依存ライブラリ**: `SQLAlchemy`、`mysql-connector-python`、`PyMySQL`、`greenlet` を `requirements.txt` / `pyproject.toml` から削除
 
 ## [1.3.1] - 2026-02-25
 
