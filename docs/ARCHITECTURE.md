@@ -37,6 +37,7 @@
 - [通知マスミュート機能](./FEATURE_MASS_MUTE.md)
 - [内製アンケートシステム](./FEATURE_SURVEY.md)
 - [寝落ち検知機能](./FEATURE_VOICE_KEEPER.md)
+- [セキュア対戦ロビーシステム（東方憑依華専用）](./FEATURE_LOBBY.md)
 
 ## 5. 今後の展望：Rustによるデータアクセス層の再構築 (検討中)
 
