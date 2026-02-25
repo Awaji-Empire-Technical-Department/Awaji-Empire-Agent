@@ -5,30 +5,38 @@
 
 ## [Unreleased]
 
+### Phase 4 Preview (Upcoming)
+
+- **Python ロジックの Rust 移譲**: 残りの Python ロジック（Discord Cog 等）を順次 Rust Bridge へ移行し、Python 側を疎結合なゲートウェイへと進化させる。
+- **モニタリング強化**: Rust 側での詳細なメトリクス収集とロギングの改良。
+
+## [1.4.0] - 2026-02-26 (予定)
+
+Phase 3-C 完了。Rust Bridge を DB 操作の中核として正式採用し、CI/CD による自動デプロイ体制を確立。
+
 ### Added
 
-- **Phase 3-C: Bridge停止時メンテナンスページ** (`templates/maintenance.html` 新規作成)
-  - Rust Bridge (`database_bridge`) が停止している際、プレーンテキスト503の代わりに
-    統一デザインのメンテナンスページをユーザーに表示するよう実装。
-  - `services/bridge_client.py` に `BridgeUnavailableError` 例外クラスを追加し、
-    `httpx.RequestError`（ConnectError / TimeoutException）との区別を明確化。
-  - `routes/survey.py` および `webapp.py` の全ルートでメンテナンスページへの
-    フォールバックを実装（HTTP 503）。
-  - `tests/test_bridge_client.py` にて pytest 7件全パスを確認。
+- **Phase 3-C: Rust Bridge 完全統合とデプロイ自動化**
+  - **HTTP IPC による分散構成**: Python Bot/Webapp が Rust Bridge 経由でデータベースを操作する疎結合アーキテクチャへの完全移行。
+  - **CI/CD パイプライン強化**: GitHub Actions (`deploy.yml`) による自動ビルド・デプロイ・サービス登録（systemd）フローを構築。
+  - **自動セットアップスクリプト**: `scripts/setup-systemd.sh` を新設し、サービス登録と再起動手順をコード化。
+  - **メンテナンスモード**: Rust Bridge 停止時、Webapp に統一デザインのメンテナンスページ (`templates/maintenance.html`) を表示する機能を実装。
+  - **デプロイメントドキュメント**: 本番環境セットアップおよび自動デプロイ用の `sudoers` 設定手順を `docs/Specifications/setup-production.md` に集約。
 
 ### Changed
 
-- **CSS分割リファクタリング** (`static/style.css` → `static/css/` ディレクトリ)
-  - `static/style.css` を `@import` ファサードに変更し、各部品を単一責任ファイルへ分割。
-    - `css/base.css` — CSS変数・リセット
-    - `css/layout.css` — ナビバー・コンテナ・カード
-    - `css/buttons.css` — ボタン系全般
-    - `css/forms.css` — フォームコントロール
-    - `css/components.css` — テーブル・バッジ・アラート・チャート
-    - `css/pages.css` — 認証ページ・送信完了・ユーティリティ
-    - `css/maintenance.css` — メンテナンスページ専用スタイル
-  - テンプレート側の `<link>` タグ変更は不要（`style.css` が @import で集約）。
-  - 設計記録: `docs/adr/004-phase3c-bridge-error-and-css-split.md` (ADR-004)
+- **Rust Bridge の堅牢化**
+  - **シリアライズ修正**: `OffsetDateTime` を JSON 時に RFC3339 形式の文字列として出力するよう修正（日付表示バグの解消）。
+  - **MariaDB JSON 互換性**: MariaDB から BLOB として返される JSON カラムを `Vec<u8>` で受け、適切にデコードするよう修正。
+  - **Axum 0.8 対応**: ルーティング構文の変更 (`/{id}`) に対応し、ランタイムパニックを防止。
+- **CSS 分割リファクタリング**: `static/style.css` を 7 つの単一責任ファイル（base, layout, components 等）に分割し、デザインの拡張性を向上。
+- **依存関係管理**: `uv` 使用時のパーミッションエラーを防ぐため、CI 時に `.venv` の所有権を自動修復するステップを追加。
+
+### Fixed
+
+- **デプロイ・ブロッキング修正**: 自動デプロイ中に `sudo` パスワードを要求され CI が停止する問題を、`sudoers` 設定と `deploy.yml` の `--non-interactive` 化により解消。
+- **日付フォーマット不一致**: 以前のビルドで日付が数値配列になっていた問題を RFC3339 形式に統一。
+- **未使用コード削除**: Rust 側のビルドウオーニング（`blob_to_string`）を解消し、バイナリをクリーン化。
 
 ## [1.3.0] - 2026-02-23
 

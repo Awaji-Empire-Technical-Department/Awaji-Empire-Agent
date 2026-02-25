@@ -35,3 +35,18 @@ MariaDB の `JSON` 型は内部的に `LONGTEXT` のエイリアスですが、R
 `sqlx` の `time` フィーチャーを有効にするだけでは、`OffsetDateTime` の `Serialize`/`Deserialize` は実装されません。
 
 - **対策**: `Cargo.toml` に直接 `time = { version = "0.3", features = ["serde"] }` を追加する必要がある。
+
+## 6. sudoers のパス・引数指定の罠
+`visudo` でコマンドを許可する際、引数を細かく指定しすぎると（例: `systemctl restart service_name`）、フラグが一つ増えただけで弾かれます。
+
+- **教訓**: CI のように頻繁にコマンド構成が変わる場合は、コマンドパス（`/usr/bin/systemctl` 等）のみを許可し、ユーザー名が `whoami` と一致しているか、および実行コマンドの絶対パスが `sudoers` の記述と 1 文字も違わないかを厳格に確認する。
+
+## 7. Windows/Linux 改行コード (CRLF/LF) の罠
+Windows で作成したシェルスクリプトを `rsync` 等で Linux に転送して実行すると、末尾の `\r` (CR) が原因で `#!/bin/bash\r` となり、Linux が「そんなシェル（コマンド）はない」というエラー (`command not found`) を出します。
+
+- **対策**: デプロイフローの中で `sed -i 's/\r$//' script.sh` を実行してから `chmod +x` し実行する。ファイルが存在するのに「見つからない」と言われる場合は、ほぼこれが原因。
+
+## 8. OffsetDateTime のシリアライズ形式 (RFC3339)
+`time::serde::rfc3339` を明示的に指定しないと、`OffsetDateTime` は数値の配列（`[2026, 55, ...]`）としてシリアライズされることがあります。
+
+- **対策**: 構造体フィールドに `#[serde(with = "time::serde::rfc3339")]` を付与し、API レスポンスが標準的な ISO-8601 文字列になるよう強制する。

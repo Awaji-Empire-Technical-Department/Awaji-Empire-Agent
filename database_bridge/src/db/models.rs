@@ -3,10 +3,14 @@
 //      MariaDB の JSON 型が BLOB として返される場合があるため、
 //      questions/answers カラムを Vec<u8> で受け取り、
 //      アプリケーション層で String に変換する設計に変更。
+//
+//      datetime フィールド(created_at / submitted_at) について:
+//      MariaDB の DATETIME 型はタイムゾーン情報を持たないため、
+//      sqlx の OffsetDateTime へのマッピングは実行時デコードエラーになる。
+//      String で受け取り、Python 側に文字列のまま渡す設計に統一する。
 
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use sqlx::types::time::OffsetDateTime;
 
 // ============================================================
 // surveys テーブル
@@ -23,9 +27,8 @@ pub struct Survey {
     #[serde(with = "serde_bytes_to_string")]
     pub questions: Vec<u8>,
     pub is_active: bool,
-    /// 作成日時。デフォルトでは配列になるため、RFC3339 (ISO-8601) 文字列で出力する。
-    #[serde(with = "time::serde::rfc3339")]
-    pub created_at: OffsetDateTime,
+    /// 作成日時。MariaDB DATETIME 型は TZ なしのため String で受け取る。
+    pub created_at: String,
 }
 
 impl Survey {
@@ -72,9 +75,8 @@ pub struct SurveyResponse {
     /// JSON 文字列。DB側が BLOB のため Vec<u8> で受け取る。
     #[serde(with = "serde_bytes_to_string")]
     pub answers: Vec<u8>,
-    /// 提出日時。RFC3339 形式で出力。
-    #[serde(with = "time::serde::rfc3339")]
-    pub submitted_at: OffsetDateTime,
+    /// 提出日時。MariaDB DATETIME 型は TZ なしのため String で受け取る。
+    pub submitted_at: String,
     pub dm_sent: bool,
 }
 
@@ -105,9 +107,8 @@ pub struct OperationLog {
     pub user_name: String,
     pub command: String,
     pub detail: String,
-    /// 記録日時。RFC3339 形式で出力。
-    #[serde(with = "time::serde::rfc3339")]
-    pub created_at: OffsetDateTime,
+    /// 記録日時。MariaDB DATETIME 型は TZ なしのため String で受け取る。
+    pub created_at: String,
 }
 
 // ============================================================
