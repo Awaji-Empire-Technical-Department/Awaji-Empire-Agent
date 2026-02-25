@@ -10,7 +10,6 @@ from typing import List, Optional
 import discord
 
 from services.permission_service import PermissionResult, PermissionService
-from services.log_service import LogService
 
 logger = logging.getLogger(__name__)
 
@@ -202,31 +201,58 @@ class MassMuteLogic:
         return embed
 
     @staticmethod
-    async def save_log_to_db(
+    def create_table_if_not_exists(bot) -> None:
+        """ログ保存用のテーブルがなければ作成する。
+
+        Why: Bot起動時に1度だけ呼ばれる。bot.get_db_connection() を使うため
+             完全にステートレスにはできないが、bot オブジェクトを引数として
+             受け取ることで ctx 非依存を維持。
+        """
+        try:
+            conn = bot.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS mute_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    trigger_name VARCHAR(50),
+                    executed_at DATETIME,
+                    status VARCHAR(20),
+                    details TEXT
+                )
+            """)
+            conn.commit()
+            cursor.close()
+            conn.close()
+            logger.info("[MassMute] DB Table check OK.")
+        except Exception as e:
+            logger.error("[MassMute] DB Init Error: %s", e)
+
+    @staticmethod
+    def save_log_to_db(
         bot,
         trigger: str,
         results: List[PermissionResult],
     ) -> None:
-        """操作ログを DB に保存する (Rust Bridge 経由)。
+        """操作結果をDBに保存する。
 
-        Why: 独自の DB 接続を廃止し、LogService 経由で Rust Bridge にログ記録を委譲する。
-             これにより Python 側から MySQL ドライバを完全に排除できる。
+        Why: DB書き込みは副作用だが、mysql.connector（同期ドライバ）を使用するため
+             services/log_service.py（aiomysql ベース）とは別系統。
+             将来的にはDB統合時に一本化する。
         """
         try:
+            conn = bot.get_db_connection()
+            cursor = conn.cursor()
             error_count = sum(1 for r in results if not r.success)
             success_count = sum(1 for r in results if r.success)
             status = "SUCCESS" if error_count == 0 else "WARNING"
-            details = f"Trigger: {trigger}, Success: {success_count}, Errors: {error_count}"
+            details = f"Success: {success_count}, Errors: {error_count}"
 
-            # LogService を利用して Rust Bridge に送信
-            # user_id / user_name は Bot 自体のアカウント情報を匿名的に利用するか、
-            # システムログとしての固定値を使用する。
-            await LogService.log_operation(
-                pool=None,
-                user_id="system",
-                user_name="MassMuteSystem",
-                command=f"MassMute:{trigger}",
-                detail=details
+            cursor.execute(
+                "INSERT INTO mute_logs (trigger_name, executed_at, status, details) VALUES (%s, %s, %s, %s)",
+                (trigger, datetime.datetime.now(), status, details),
             )
+            conn.commit()
+            cursor.close()
+            conn.close()
         except Exception as e:
-            logger.error("[MassMute] Error saving log via bridge: %s", e)
+            logger.error("[MassMute] DB Error saving log: %s", e)

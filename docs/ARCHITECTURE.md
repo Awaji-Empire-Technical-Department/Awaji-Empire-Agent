@@ -38,50 +38,17 @@
 - [内製アンケートシステム](./FEATURE_SURVEY.md)
 - [寝落ち検知機能](./FEATURE_VOICE_KEEPER.md)
 
-## 5. 開発方針と技術選定の原則 (Development Policy)
+## 5. 今後の展望：Rustによるデータアクセス層の再構築 (検討中)
 
-システムの堅牢性とメンテナンス性を維持するため、以下の役割分担を厳格に適用します。
+システムの堅牢性と安全性をさらに高めるため、現在 Python (Quart) で行っている MariaDB との通信部を、Rust による独立したエージェントへ移行する構成を検討しています。
 
-### 5.1 言語別の役割分担 (Separation of Concerns)
+### 5.1 背景と目的
 
-| 役割 | 使用言語/技術 | 担当範囲 |
-| :--- | :--- | :--- |
-| **ユーザーインターフェース (UI)** | **Python (Quart / Jinja2)** | HTMLレンダリング、CSS、クライアントサイドJSの配信。 |
-| **外部API連携 (Discord)** | **Python (discord.py)** | Discord APIとの直接通信、イベントリスナー、コマンド受付。 |
-| **ビジネスロジック (Logic)** | **Rust (database_bridge)** | 権限判定、計算処理、データ変換。複雑な条件分岐の集約。 |
-| **永続化層 (Persistence)** | **Rust (sqlx)** | DB(MariaDB)へのクエリ実行、コネクションプール管理。 |
+- **OSトレンドへの適応**: Ubuntu 26.04 LTS のコアシステムにおける Rust 採用の流れを汲み、システム全体のメモリ安全性を向上させます。
+  - 参照: [Ubuntu、26.04 LTSのコアシステムにRustを導入へ - ZDNET Japan](https://japan.zdnet.com/article/35243565/)
+- **型安全性の確保**: `sqlx` 等のライブラリを活用し、コンパイル時にクエリの妥当性を検証することで、実行時のランタイムエラーを最小化します。
+- **リソース管理の最適化**: Discord Bot や Web アプリからの DB 接続を集約し、コネクションプールを最適化することで、物理サーバー (Proxmox 実行環境) への負荷を軽減します。
 
-```mermaid
-graph TD
-    subgraph "Python (Interface Layer)"
-        discord[Discord Bot]
-        ps[PermissionService]
-        mm[MassMuteLogic]
-    end
+### 5.2 構成案
 
-    subgraph "Rust (Logic/Data Layer)"
-        bridge[Database Bridge]
-        prepo[PermissionRepo]
-        lrepo[LogRepo]
-        db[(MariaDB)]
-    end
-
-    discord -- イベント検知 --> ps
-    ps -- "/permissions/evaluate" --> bridge
-    bridge -- 判定ロジック実行 --> prepo
-    mm -- "/logs" --> bridge
-    bridge -- 保存 --> lrepo
-    lrepo --> db
-```
-
-### 5.2 設計の基本原則
-
-1. **Python プロセスの軽量化**: Python 側には DB 接続ドライバ（aiomysql等）を持たせず、すべての永続化操作を Rust 製の「データベースブリッジ (IPC)」へ委譲します。
-2. **型安全性の追求**: Rust 側の `sqlx` を活用し、コンパイル時にスキーマ整合性を検証します。これにより本番環境でのデコードエラーや型不一致を最小化します。
-3. **OSトレンドへの適応**: Ubuntu 26.04 LTS のコアシステムにおける Rust 採用の流れを汲み、長期的な安定運用を見据えた技術スタックを選択します。
-4. **責務の分離**: Python 側は「どう見せるか / どう受け付けるか」に集中し、Rust 側は「何が正しい状態か / どう保存するか」を決定します。
-
-### 5.3 ネットワークとセキュリティ
-
-- **プロセス間通信 (IPC)**: Python と Rust はローカルスタック（127.0.0.1）上の HTTP を介して通信します。将来的なマイクロサービス化を見据え、API は RESTful に設計します。
-- **データ不揮発性**: すべての重要な状態操作は Rust 側でバリデーションされた後に DB へ書き込まれます。
+現在の `/discord_bot` 内の DB ロジックを切り出し、Rust 製の「DBブリッジ」を介して MariaDB にアクセスするハイブリッド構成を目指します。

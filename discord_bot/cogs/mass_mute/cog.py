@@ -15,12 +15,13 @@ load_dotenv()
 
 ADMIN_USER_ID = os.getenv('ADMIN_USER_ID', '')
 
-# .env にカンマ区切りで記載されたチャンネル名をリストに変換するヘルパー。
-_csv = lambda key: [
-    s.strip() for s in os.getenv(key, '').split(',') if s.strip()
-]
-MUTE_ONLY_CHANNEL_NAMES = _csv('MUTE_ONLY_CHANNEL_NAMES')
-READ_ONLY_MUTE_CHANNEL_NAMES = _csv('READ_ONLY_CHANNEL_NAMES')
+# .env にカンマ区切りで記載されたチャンネル名をリストに変換する。
+# 例) MUTE_ONLY_CHANNEL_NAMES=配信コメント,mute_only
+def _csv(key: str) -> list[str]:
+    return [s.strip() for s in os.getenv(key, '').split(',') if s.strip()]
+
+MUTE_ONLY_CHANNEL_NAMES      = _csv('MUTE_ONLY_CHANNEL_NAMES')
+READ_ONLY_MUTE_CHANNEL_NAMES = _csv('READ_ONLY_MUTE_CHANNEL_NAMES')
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,10 @@ class MassMuteCog(commands.Cog):
         self.bot = bot
         self.owner_id = int(ADMIN_USER_ID)
         self.daily_mute_check.start()
+
+        # Why: DB テーブル作成は副作用だが、Cog初期化時に1度だけ実行する特殊ケース。
+        #      logic.py に委譲しつつ bot.get_db_connection を渡す。
+        MassMuteLogic.create_table_if_not_exists(bot)
 
     def cog_unload(self):
         self.daily_mute_check.cancel()
@@ -189,8 +194,8 @@ class MassMuteCog(commands.Cog):
             readonly_channel_names=READ_ONLY_MUTE_CHANNEL_NAMES,
         )
 
-        # DBへのログ保存 (Rust Bridge 経由)
-        await MassMuteLogic.save_log_to_db(self.bot, trigger, results)
+        # DBへのログ保存
+        MassMuteLogic.save_log_to_db(self.bot, trigger, results)
 
         # 管理者への完了通知DM
         embed = MassMuteLogic.build_result_embed(trigger=trigger, results=results)
