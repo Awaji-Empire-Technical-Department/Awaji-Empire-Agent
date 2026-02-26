@@ -6,7 +6,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::MySqlPool;
 
-use crate::db::{lobby_repo, models::{BridgeError, LobbyRoom, LobbyMember}};
+use crate::db::{lobby_repo, models::BridgeError};
 use crate::lobby::game_link::GameLinkFormatter;
 
 // Error mapping (copied from handlers.rs for brevity, though ideally extracted to a shared module)
