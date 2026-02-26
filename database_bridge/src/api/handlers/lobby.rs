@@ -54,7 +54,7 @@ pub async fn list_rooms(State(pool): State<MySqlPool>) -> (StatusCode, Json<Valu
         Ok(mut rooms) => {
             for room in &mut rooms {
                 if let Some(ref ip) = room.virtual_ip {
-                    room.gamelink = Some(GameLinkFormatter::format(ip));
+                    room.gamelink = GameLinkFormatter::format(ip);
                 }
             }
             (StatusCode::OK, Json(json!(rooms)))
@@ -101,7 +101,7 @@ pub async fn get_room(
     match lobby_repo::find_room_by_passcode(&pool, &passcode).await {
         Ok(mut room) => {
             if let Some(ref ip) = room.virtual_ip {
-                room.gamelink = Some(GameLinkFormatter::format(ip));
+                room.gamelink = GameLinkFormatter::format(ip);
             }
             (StatusCode::OK, Json(json!(room)))
         }
