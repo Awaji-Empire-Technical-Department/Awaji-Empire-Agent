@@ -121,4 +121,137 @@ pub async fn update_survey(
         Err(e) => return (StatusCode::BAD_REQUEST, Json(json!({"status": "error", "message": e.to_string()}))),
     };
 
-    match survey_repo::update(&pool,
+    match survey_repo::update(&pool, id, &payload.title, &questions_str).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ToggleStatusRequest {
+    owner_id: String,
+}
+
+/// POST /surveys/:id/toggle
+pub async fn toggle_survey_status(
+    State(pool): State<MySqlPool>,
+    Path(id): Path<i64>,
+    Json(payload): Json<ToggleStatusRequest>,
+) -> (StatusCode, Json<Value>) {
+    match survey_handler::toggle_status(&pool, id, &payload.owner_id).await {
+        Ok(new_status) => (StatusCode::OK, Json(json!({"status": "ok", "is_active": new_status}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+/// DELETE /surveys/:id
+pub async fn delete_survey(
+    State(pool): State<MySqlPool>,
+    Path(id): Path<i64>,
+    Query(query): Query<ToggleStatusRequest>, // owner_id をクエリで受け取る
+) -> (StatusCode, Json<Value>) {
+    match survey_repo::delete(&pool, id, &query.owner_id).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+/// GET /surveys/:id/responses
+pub async fn list_responses(
+    State(pool): State<MySqlPool>,
+    Path(id): Path<i64>,
+) -> (StatusCode, Json<Value>) {
+    match response_repo::find_by_survey(&pool, id).await {
+        Ok(responses) => (StatusCode::OK, Json(json!(responses))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+/// GET /surveys/:id/responses/:user_id
+pub async fn get_user_answers(
+    State(pool): State<MySqlPool>,
+    Path((survey_id, user_id)): Path<(i64, String)>,
+) -> (StatusCode, Json<Value>) {
+    match response_repo::find_answers_by_user(&pool, survey_id, &user_id).await {
+        Ok(answers_opt) => {
+            let answers: Value = match answers_opt {
+                Some(s) => serde_json::from_slice(&s.answers).unwrap_or(json!({})),
+                None => json!({}),
+            };
+            (StatusCode::OK, Json(answers))
+        },
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UpsertResponseRequest {
+    survey_id: i64,
+    user_id: String,
+    user_name: String,
+    answers: Value,
+}
+
+/// POST /surveys/responses/upsert
+pub async fn upsert_response(
+    State(pool): State<MySqlPool>,
+    Json(payload): Json<UpsertResponseRequest>,
+) -> (StatusCode, Json<Value>) {
+    match survey_handler::upsert_response(
+        &pool,
+        payload.survey_id,
+        &payload.user_id,
+        &payload.user_name,
+        &payload.answers,
+    ).await {
+        Ok(id) => (StatusCode::OK, Json(json!({"id": id}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+/// PATCH /surveys/responses/:id/dm_sent
+pub async fn mark_dm_sent(
+    State(pool): State<MySqlPool>,
+    Path(id): Path<i64>,
+) -> (StatusCode, Json<Value>) {
+    match response_repo::mark_dm_sent(&pool, id).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ListLogsQuery {
+    limit: Option<u32>,
+}
+
+/// GET /logs
+pub async fn list_recent_logs(
+    State(pool): State<MySqlPool>,
+    Query(query): Query<ListLogsQuery>,
+) -> (StatusCode, Json<Value>) {
+    let limit = query.limit.unwrap_or(30);
+    match log_repo::find_recent(&pool, limit).await {
+        Ok(logs) => (StatusCode::OK, Json(json!(logs))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct LogOperationRequest {
+    user_id: String,
+    user_name: String,
+    command: String,
+    detail: String,
+}
+
+/// POST /logs
+pub async fn log_operation(
+    State(pool): State<MySqlPool>,
+    Json(payload): Json<LogOperationRequest>,
+) -> (StatusCode, Json<Value>) {
+    match log_repo::insert(&pool, &payload.user_id, &payload.user_name, &payload.command, &payload.detail).await {
+        Ok(_) => (StatusCode::CREATED, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
