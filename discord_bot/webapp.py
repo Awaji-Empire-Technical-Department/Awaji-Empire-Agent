@@ -163,13 +163,9 @@ async def callback():
             else:
                 debug_log.append("Skipping CF fetch due to missing email or config.")
 
-            # Write debug log to file
-            try:
-                import os
-                with open(os.path.join(os.getcwd(), "cf_debug.log"), "w", encoding="utf-8") as f:
-                    f.write("\n".join(debug_log))
-            except Exception as e:
-                pass
+            # Write debug log to logger instead of file
+            for line in debug_log:
+                current_app.logger.info(f"[CF_DEBUG] {line}")
 
             # Rust Bridge へユーザー情報を同期
             discord_id = int(user_data['id'])
