@@ -37,6 +37,7 @@ fn map_bridge_error(err: BridgeError) -> (StatusCode, Json<Value>) {
 // ---------------------------------------------------------
 // GET /lobby/rooms
 // ---------------------------------------------------------
+pub async fn list_rooms(State(pool): State<MySqlPool>) -> (StatusCode, Json<Value>) {
     /* 
     let query = r#"
         SELECT m.passcode, m.host_id, m.mode, m.title, m.description, 
