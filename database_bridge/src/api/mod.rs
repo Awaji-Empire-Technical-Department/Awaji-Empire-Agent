@@ -4,7 +4,7 @@
 pub mod handlers;
 
 use axum::{
-    routing::{get, post, patch},
+    routing::{get, post, patch, delete},
     Router,
 };
 use sqlx::MySqlPool;
@@ -23,7 +23,7 @@ pub fn create_router(pool: MySqlPool) -> Router {
 fn lobby_routes() -> Router<MySqlPool> {
     Router::new()
         .route("/rooms", get(crate::api::handlers::lobby::list_rooms).post(crate::api::handlers::lobby::create_room))
-        .route("/rooms/{passcode}", get(crate::api::handlers::lobby::get_room).patch(crate::api::handlers::lobby::update_room))
+        .route("/rooms/{passcode}", get(crate::api::handlers::lobby::get_room).patch(crate::api::handlers::lobby::update_room).delete(crate::api::handlers::lobby::delete_room))
         .route("/join", post(crate::api::handlers::lobby::join_lobby))
         .route("/join/{passcode}", get(crate::api::handlers::lobby::list_members))
 }

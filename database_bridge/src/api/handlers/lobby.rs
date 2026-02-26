@@ -37,8 +37,7 @@ fn map_bridge_error(err: BridgeError) -> (StatusCode, Json<Value>) {
 // ---------------------------------------------------------
 // GET /lobby/rooms
 // ---------------------------------------------------------
-pub async fn list_rooms(State(pool): State<MySqlPool>) -> (StatusCode, Json<Value>) {
-    // Requires joining with user_networks to get the virtual_ip
+    /* 
     let query = r#"
         SELECT m.passcode, m.host_id, m.mode, m.title, m.description, 
                CAST(m.tournament_start_at AS CHAR) as tournament_start_at, 
@@ -48,48 +47,18 @@ pub async fn list_rooms(State(pool): State<MySqlPool>) -> (StatusCode, Json<Valu
         LEFT JOIN user_networks u ON m.host_id = u.discord_id
         WHERE m.expires_at > NOW()
     "#;
+    */
 
-    #[derive(serde::Serialize)]
-    struct RoomResponse {
-        passcode: String,
-        host_id: i64,
-        mode: Option<String>,
-        title: Option<String>,
-        description: Option<String>,
-        tournament_start_at: Option<String>,
-        is_approved: Option<bool>,
-        expires_at: String,
-        gamelink: Option<String>, // virtual_ip is intentionally EXCLUDED
-    }
-
-    match sqlx::query_as::<_, (String, i64, Option<String>, Option<String>, Option<String>, Option<String>, Option<bool>, String, Option<String>)>(query)
-        .fetch_all(&pool)
-        .await
-    {
-        Ok(rows) => {
-            let mut rooms = Vec::new();
-            for (passcode, host_id, mode, title, description, start_at, is_approved, expires_at, virtual_ip) in rows {
-                let gamelink = if let Some(ip) = virtual_ip {
-                    GameLinkFormatter::format(&ip)
-                } else {
-                    None
-                };
-
-                rooms.push(RoomResponse {
-                    passcode,
-                    host_id,
-                    mode,
-                    title,
-                    description,
-                    tournament_start_at: start_at,
-                    is_approved,
-                    expires_at,
-                    gamelink,
-                });
+    match lobby_repo::find_active_rooms(&pool).await {
+        Ok(mut rooms) => {
+            for room in &mut rooms {
+                if let Some(ref ip) = room.virtual_ip {
+                    room.gamelink = Some(GameLinkFormatter::format(ip));
+                }
             }
             (StatusCode::OK, Json(json!(rooms)))
         }
-        Err(e) => map_bridge_error(BridgeError::Sqlx(e)),
+        Err(e) => map_bridge_error(e),
     }
 }
 
@@ -129,7 +98,12 @@ pub async fn get_room(
     Path(passcode): Path<String>,
 ) -> (StatusCode, Json<Value>) {
     match lobby_repo::find_room_by_passcode(&pool, &passcode).await {
-        Ok(room) => (StatusCode::OK, Json(json!(room))),
+        Ok(mut room) => {
+            if let Some(ref ip) = room.virtual_ip {
+                room.gamelink = Some(GameLinkFormatter::format(ip));
+            }
+            (StatusCode::OK, Json(json!(room)))
+        }
         Err(e) => map_bridge_error(e),
     }
 }
@@ -193,6 +167,19 @@ pub async fn join_lobby(
     Json(payload): Json<JoinLobbyRequest>,
 ) -> (StatusCode, Json<Value>) {
     match lobby_repo::upsert_member(&pool, &payload.passcode, payload.user_id, &payload.role).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+// ---------------------------------------------------------
+// DELETE /lobby/rooms/{passcode}
+// ---------------------------------------------------------
+pub async fn delete_room(
+    State(pool): State<MySqlPool>,
+    Path(passcode): Path<String>,
+) -> (StatusCode, Json<Value>) {
+    match lobby_repo::delete_room(&pool, &passcode).await {
         Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
         Err(e) => map_bridge_error(e),
     }

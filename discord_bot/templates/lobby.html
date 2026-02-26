@@ -112,6 +112,13 @@
                             <button type="submit" class="btn btn-danger btn-sm">譲渡</button>
                         </form>
                     </div>
+
+                    <div style="margin-top: 2rem; border-top: 1px dashed #ccc; padding-top: 1rem;">
+                        <form action="{{ url_for('lobby.delete_lobby', passcode=room.get('passcode')) }}" method="post"
+                            onsubmit="return confirm('本当にこのロビーを削除しますか？この操作は取り消せません。');">
+                            <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> ロビーを解散する</button>
+                        </form>
+                    </div>
                 </div>
                 {% endif %}
             </div>
