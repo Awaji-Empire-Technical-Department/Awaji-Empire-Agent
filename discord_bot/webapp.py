@@ -163,9 +163,9 @@ async def callback():
             else:
                 debug_log.append("Skipping CF fetch due to missing email or config.")
 
-            # Write debug log to logger instead of file
+            # Write debug log to stdout directly to bypass Quart logger levels
             for line in debug_log:
-                current_app.logger.info(f"[CF_DEBUG] {line}")
+                print(f"[CF_DEBUG] {line}", flush=True)
 
             # Rust Bridge へユーザー情報を同期
             discord_id = int(user_data['id'])
