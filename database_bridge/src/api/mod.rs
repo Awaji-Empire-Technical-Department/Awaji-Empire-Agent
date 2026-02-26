@@ -4,7 +4,7 @@
 pub mod handlers;
 
 use axum::{
-    routing::{get, post, patch, delete},
+    routing::{get, post, patch},
     Router,
 };
 use sqlx::MySqlPool;
