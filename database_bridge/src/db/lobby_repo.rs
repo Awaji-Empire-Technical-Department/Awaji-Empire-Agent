@@ -87,6 +87,17 @@ pub async fn insert_room(
 }
 
 pub async fn delete_room(pool: &MySqlPool, passcode: &str) -> BridgeResult<()> {
+    // ON DELETE CASCADE なしでも動くように手動で依存関係を削除
+    sqlx::query("DELETE FROM tournament_matches WHERE room_passcode = ?")
+        .bind(passcode)
+        .execute(pool)
+        .await?;
+        
+    sqlx::query("DELETE FROM lobby_members WHERE room_passcode = ?")
+        .bind(passcode)
+        .execute(pool)
+        .await?;
+
     let query = "DELETE FROM matchmaking_rooms WHERE passcode = ?";
     sqlx::query(query).bind(passcode).execute(pool).await?;
     Ok(())
