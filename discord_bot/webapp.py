@@ -131,7 +131,7 @@ async def callback():
             debug_log.append(f"Has API Token: {bool(Config.CLOUDFLARE_API_TOKEN)}")
 
             if user_email and Config.CLOUDFLARE_ACCOUNT_ID and Config.CLOUDFLARE_API_TOKEN:
-                cf_url = f"https://api.cloudflare.com/client/v4/accounts/{Config.CLOUDFLARE_ACCOUNT_ID}/devices?per_page=1000"
+                cf_url = f"https://api.cloudflare.com/client/v4/accounts/{Config.CLOUDFLARE_ACCOUNT_ID}/devices?per_page=100"
                 cf_headers = {
                     "Authorization": f"Bearer {Config.CLOUDFLARE_API_TOKEN}",
                     "Content-Type": "application/json"
