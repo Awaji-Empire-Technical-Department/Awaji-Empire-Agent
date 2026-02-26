@@ -35,6 +35,26 @@ fn map_bridge_error(err: BridgeError) -> (StatusCode, Json<Value>) {
 }
 
 // ---------------------------------------------------------
+// POST /lobby/sync_user
+// ---------------------------------------------------------
+#[derive(Deserialize)]
+pub struct SyncUserRequest {
+    discord_id: i64,
+    email: String,
+    virtual_ip: Option<String>,
+}
+
+pub async fn sync_user(
+    State(pool): State<MySqlPool>,
+    Json(payload): Json<SyncUserRequest>,
+) -> (StatusCode, Json<Value>) {
+    match lobby_repo::sync_user_network(&pool, payload.discord_id, &payload.email, payload.virtual_ip.as_deref()).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+// ---------------------------------------------------------
 // GET /lobby/rooms
 // ---------------------------------------------------------
 pub async fn list_rooms(State(pool): State<MySqlPool>) -> (StatusCode, Json<Value>) {

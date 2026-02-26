@@ -22,6 +22,7 @@ pub fn create_router(pool: MySqlPool) -> Router {
 /// ロビー関連のルーティング。
 fn lobby_routes() -> Router<MySqlPool> {
     Router::new()
+        .route("/sync_user", post(crate::api::handlers::lobby::sync_user))
         .route("/rooms", get(crate::api::handlers::lobby::list_rooms).post(crate::api::handlers::lobby::create_room))
         .route("/rooms/{passcode}", get(crate::api::handlers::lobby::get_room).patch(crate::api::handlers::lobby::update_room).delete(crate::api::handlers::lobby::delete_room))
         .route("/join", post(crate::api::handlers::lobby::join_lobby))

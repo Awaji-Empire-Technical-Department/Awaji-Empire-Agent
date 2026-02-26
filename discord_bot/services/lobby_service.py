@@ -16,6 +16,17 @@ class LobbyService:
         return res
 
     @staticmethod
+    async def sync_user(discord_id: int, email: str, virtual_ip: Optional[str] = None) -> bool:
+        """ユーザー情報(WARP IP含む)をデータベースと同期する"""
+        payload = {
+            "discord_id": discord_id,
+            "email": email,
+            "virtual_ip": virtual_ip
+        }
+        res = await bridge_client.request("POST", "/lobby/sync_user", json=payload)
+        return res is not None and res.get("status") == "ok"
+
+    @staticmethod
     async def create_room(passcode: str, host_id: int, mode: str, title: str, description: Optional[str] = None, expires_in_hours: int = 24) -> bool:
         """新規ロビーを作成する"""
         payload = {

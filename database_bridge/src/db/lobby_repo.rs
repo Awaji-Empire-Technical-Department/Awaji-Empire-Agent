@@ -15,6 +15,24 @@ pub async fn ensure_user_exists(pool: &MySqlPool, discord_id: i64) -> BridgeResu
     Ok(())
 }
 
+pub async fn sync_user_network(pool: &MySqlPool, discord_id: i64, email: &str, virtual_ip: Option<&str>) -> BridgeResult<()> {
+    let query = r#"
+        INSERT INTO user_networks (discord_id, email, virtual_ip)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+        email = VALUES(email),
+        virtual_ip = VALUES(virtual_ip),
+        updated_at = CURRENT_TIMESTAMP
+    "#;
+    sqlx::query(query)
+        .bind(discord_id)
+        .bind(email)
+        .bind(virtual_ip)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn find_active_rooms(pool: &MySqlPool) -> BridgeResult<Vec<LobbyRoom>> {
     let query = r#"
         SELECT m.passcode, m.host_id, m.mode, m.title, m.description, CAST(m.tournament_start_at AS CHAR) as tournament_start_at, m.is_approved, CAST(m.expires_at AS CHAR) as expires_at, u.virtual_ip
