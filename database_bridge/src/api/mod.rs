@@ -2,7 +2,6 @@
 // Why: API エンドポイントのルーティングを集約する。
 
 pub mod handlers;
-pub mod lobby;
 
 use axum::{
     routing::{get, post, patch},
