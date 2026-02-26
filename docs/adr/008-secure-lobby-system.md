@@ -113,3 +113,25 @@
 | `discord_bot/services/lobby_service.py` | Rust Bridge API ラッパー |
 | `discord_bot/templates/lobby.html` | ロビーUI（同意モーダル・大会表示） |
 | `discord_bot/cogs/lobby/tournament.py` | 優勝ロール自動付与 |
+
+---
+
+## 5. 実装時のフィードバックと教訓 (Feedback & Lessons Learned)
+
+システムの実装・テスト段階で以下のフィードバックを受け、設計の修正と追加実装が行われた。
+
+1. **外部キー制約(FK Constraint)とデータ同期の不一致**
+   - **事象**: 新規Discordユーザが初回アクセス時にロビーを作成しようとすると、`matchmaking_rooms(host_id)` から `user_networks(discord_id)` への外部キー制約違反（Error 1452）で失敗した。
+   - **対応**: Rust バックエンドの `lobby_repo.rs`内 にて、各種ロビー操作（作成・参加・譲渡）を行う直前に未登録ユーザを暗黙的に登録する `ensure_user_exists` 関数 （`INSERT IGNORE INTO user_networks`） を実装し、呼び出すことで解決した。
+
+2. **Jinja2 テンプレートエンジンの制約（Python関数の使用不可）**
+   - **事象**: HTML内で Python の `str()` 組み込み関数を使用してユーザID比較を行っていたため、Jinja2のレンダリング時に `500 Server Error` (`UndefinedError: 'str' is undefined`) が発生した。
+   - **対応**: Jinja2マニュアルに準拠し、組み込みパイプラインフィルタ `|string` を使用するよう修正した（例: `m.get('user_id')|string == user['id']|string`）。
+
+3. **GameLink 出力のための JOIN クエリ調整**
+   - **事象**: ロビー詳細と一覧 API (`/lobby/rooms`) において、ホストの `virtual_ip` が取得できず、フロントエンド上に緑色の「ゲームリンク」が表示されなかった。
+   - **対応**: Rust側の SQL SELECT 文で `user_networks` テーブルを `LEFT JOIN` し、`virtual_ip` の値を取得して `GameLinkFormatter` に渡すようモデル・クエリを修正した。
+
+4. **ロビー解散（削除）機能の追加**
+   - **事象**: 初期要件から漏れていたが、実際に本番運用を想定すると、作成したロビーの「削除（解散）ボタン」が必要であることが判明した。
+   - **対応**: Rust バックエンドに `DELETE /lobby/rooms/{passcode}` API を追加公開し、それに合わせて Python サービス (`lobby_service.py`) とフロントエンドのUI (`lobby.html`) に削除機能への導線を追加した。
