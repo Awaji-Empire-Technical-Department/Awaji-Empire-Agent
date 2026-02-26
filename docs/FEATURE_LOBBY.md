@@ -14,13 +14,14 @@
 ### 核心設計原則
 
 | 原則 | 実現方法 |
-|:---|:---|
+| :--- | :--- |
 | 東方憑依華専用 | 12桁0埋めIP形式 + Cキー（Pad 3）入力に完全準拠 |
 | 物理IP非露出 | Cloudflare WARP 仮想IP を Rust 側でフォーマット後のみ提供 |
 | モード選択可能 | 自由対戦 / 大会モードを選択可能 |
 | プライバシーポリシー | プライバシーポリシー同意を必須。同意履歴を `user_networks` に記録 |
 | ダッシュボード無破壊 | 「📜 アンケート管理」カード直下に追加。既存CSS不変 |
-| 運営兼プレイヤーモデル | Staff は選手として参加しながら管理も行える |
+| 運営兼プレイヤーモデル | Staff/Moderator は選手または運営補助として参加可能 |
+| ホスト権限委譲 | 部屋作成者（Host）は他ユーザーに権限を譲渡可能 |
 
 ---
 
@@ -41,7 +42,7 @@
 | :--- | :--- | :--- | :--- |
 | WARP 有効化 | Zero Trust > Settings > Network | Split Tunnel から除外し全トラフィックをルーティング | - |
 | Access Application 作成 | Zero Trust > Access > Applications | `dashboard.awajiempire.net` を Discord OAuth2 で保護 | - |
-| Service Token 発行 | Zero Trust > Access > Service Auth | Rust Bridge がAPIを叩く際の認証トークン | `CF_ACCESS_CLIENT_ID`<br>`CF_ACCESS_CLIENT_SECRET` |
+| Service Token 発行 | Zero Trust > Access > Service Auth | Rust Bridge がAPIを叩く際の認証トークン | `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` |
 | API Token 発行 | My Profile > API Tokens | Zero Trust Read スコープ | `CLOUDFLARE_API_TOKEN` |
 | アカウントID確認 | Dashboard 概要 | 32桁の英数字 | `CLOUDFLARE_ACCOUNT_ID` |
 
@@ -74,11 +75,23 @@ CREATE TABLE user_networks (
 ```sql
 CREATE TABLE matchmaking_rooms (
     passcode            VARCHAR(32) PRIMARY KEY,
-    host_id             BIGINT NOT NULL UNIQUE,         -- 1ユーザー1部屋制
-    mode                ENUM('free', 'tournament') DEFAULT 'free', -- 部屋モード
+    host_id             BIGINT NOT NULL,
+    mode                ENUM('free', 'tournament') DEFAULT 'free',
+    title               VARCHAR(255) DEFAULT '新対戦ロビー', -- ロール名に使用
     tournament_start_at TIMESTAMP NULL,
-    expires_at          TIMESTAMP NOT NULL,             -- 動的TTL
-    FOREIGN KEY (host_id) REFERENCES user_networks(discord_id) ON DELETE CASCADE
+    is_approved         BOOLEAN DEFAULT FALSE,          -- ホストによる最終承認
+    expires_at          TIMESTAMP NOT NULL,
+    FOREIGN KEY (host_id) REFERENCES user_networks(discord_id)
+);
+
+-- ロビー参加者・役割管理
+CREATE TABLE lobby_members (
+    room_passcode VARCHAR(32),
+    user_id       BIGINT,
+    role          ENUM('player', 'staff') DEFAULT 'player',
+    PRIMARY KEY (room_passcode, user_id),
+    FOREIGN KEY (room_passcode) REFERENCES matchmaking_rooms(passcode) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES user_networks(discord_id) ON DELETE CASCADE
 );
 ```
 
@@ -128,13 +141,16 @@ CREATE TABLE admin_logs (
 
 ### 4.2 Rust Bridge API エンドポイント
 
-```
-GET    /lobby/rooms            ロビー一覧（gamelink のみ返す、virtual_ip は除外）
-POST   /lobby/rooms            ロビー作成（mode: 'free'|'tournament'）
+```text
+GET    /lobby/rooms            ロビー一覧（gamelink のみ返す）
+POST   /lobby/rooms            ロビー作成（mode, title）
 DELETE /lobby/rooms/{passcode} ロビー削除
-POST   /lobby/agree            プライバシーポリシー同意記録
-POST   /lobby/winner           勝者記録（Staff only）
-GET    /admin/logs             admin_logs 一覧（Staff only）
+PATCH  /lobby/rooms/{passcode} ロビー更新（host_id 譲渡、is_approved 承認）
+POST   /lobby/join             ロビー参加（role 指定）
+GET    /lobby/members          参加者一覧
+POST   /lobby/winner           勝者記録（Staff/Host only）
+GET    /lobby/export           大会結果CSV出力（Staff/Host only）
+GET    /admin/logs             監査ログ（Staff only）
 ```
 
 > [!WARNING]
@@ -146,10 +162,10 @@ GET    /admin/logs             admin_logs 一覧（Staff only）
 ## 5. スケジュール連動型マッチング
 
 | フェーズ | 条件 | 動作 |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | **ウォームアップ** | `tournament_start_at` の前 | 全参加者にコピーボタンを表示し、自由対戦を許可 |
 | **大会中** | `mode = 'tournament'` かつ開始後 | 指定カードを最上位に固定。敗退者・待機者同士の並行自由対戦を許可 |
-| **大会後** | `winner_id` が確定した時 | Discord Bot が優勝ロールを自動付与 |
+| **大会後** | `is_approved = TRUE` になった時 | Discord Bot が優勝ロール（`{title} 優勝`）を自動付与 |
 
 ---
 
@@ -164,10 +180,16 @@ GET    /admin/logs             admin_logs 一覧（Staff only）
   - **アクティブロビー一覧**: 現在進行中のロビーをカード形式またはテーブル形式で表示
   - **画面遷移**: 一覧からロビーを選択（クリック）すると、詳細操作を行うための **「ロビー専用画面（lobby.html）」** へ遷移する
 - **作成フォーム内容**:
+  - **ロビー名**: テキスト入力（デフォルト: {ユーザー名}のロビー）
   - **合言葉**: テキスト入力（任意・空欄時は自動生成）
   - **対戦モード**: ラジオボタン選択
     - `自由対戦`: 通常のP2P対戦用
-    - `大会モード`: 進行管理・結果集計が有効化
+    - `大会モード`: 進行管理・結果集計・承認フローが有効化
+- **参加時オプション（大会モードのみ）**:
+  - チェックボックスで役割を選択
+    - `[ ] 選手として参加` (デフォルトON)
+    - `[ ] スタッフとして参加` (モデレーター権限)
+    - ※ 選手OFF/スタッフON で運営専念が可能
 
 ### 6.2 初回利用時：同意モーダル
 
@@ -178,13 +200,17 @@ GET    /admin/logs             admin_logs 一覧（Staff only）
 - メールアドレスの利用目的（Cloudflare APIとの照合のみ）
 - 同意しない場合はロビー機能を利用できない旨
 
-### 6.3 Staff 専用オーバーレイ
+### 6.3 特権操作オーバーレイ（Staff / Host 用）
 
-`is_staff = TRUE` のユーザーには、通常のプレイヤー画面に以下を統合表示する。
+`is_staff = TRUE` モジュールまたはロビー内の `Staff` 権限保持者には、以下を統合表示する。
 
-- 勝敗の手動修正（`POST /lobby/winner`）
-- 参加者の追放（`DELETE /lobby/rooms/{passcode}`）
-- `admin_logs` の閲覧
+- **勝敗操作**: 参加者の自己申告を修正・上書き
+- **参加者管理**: 迷惑ユーザーの追放
+- **大会結果のCSV出力**: 全試合の組み合わせと勝敗をCSV形式で取得可能
+- **ホスト権限の譲渡**: 別の参加者にHost（承認者）の座を譲る
+- **最終承認実行（Hostのみ）**:
+  - 全ての決勝戦終了後、内容を確認して承認。実行時に優勝者にロールを付与し、結果を確定させる。
+  - 優勝ロール名はデフォルトで `{ロビー名} 優勝` とするが、承認時に任意の名前に変更可能。
 
 ---
 
@@ -199,15 +225,15 @@ GET    /admin/logs             admin_logs 一覧（Staff only）
 ## 8. ファイル追加・変更一覧
 
 | 操作 | ファイル | 説明 |
-|:---|:---|:---|
-| **新規** | `database_bridge/migrations/003_lobby_tables.sql` | 4テーブル追加 |
+| :--- | :--- | :--- |
+| **新規** | `database_bridge/migrations/003_lobby_tables.sql` | 5テーブル追加（members追加） |
 | **新規** | `database_bridge/src/lobby/game_link.rs` | GameLinkFormatter |
-| **新規** | `database_bridge/src/db/lobby_repo.rs` | ロビーCRUD・IP照合 |
+| **新規** | `database_bridge/src/db/lobby_repo.rs` | ロビーCRUD・権限操作 |
 | **変更** | `database_bridge/src/db/models.rs` | 新struct追加 |
 | **変更** | `database_bridge/src/main.rs` | ロビーエンドポイント追加 |
-| **新規** | `discord_bot/routes/lobby.py` | Quart Blueprint |
+| **新規** | `discord_bot/routes/lobby.py` | Quart Blueprint（CSV出力対応） |
 | **新規** | `discord_bot/services/lobby_service.py` | Rust Bridge APIラッパー |
-| **新規** | `discord_bot/templates/lobby.html` | ロビーUI |
-| **新規** | `discord_bot/cogs/lobby/tournament.py` | 優勝ロール自動付与 |
+| **新規** | `discord_bot/templates/lobby.html` | ロビーUI（役割選択・承認ボタン） |
+| **新規** | `discord_bot/cogs/lobby/tournament.py` | 優勝ロール動的付与 |
 | **変更** | `discord_bot/webapp.py` | `lobby_bp` 登録追加 |
 | **変更** | `discord_bot/templates/dashboard.html` | ロビーカード挿入 |
