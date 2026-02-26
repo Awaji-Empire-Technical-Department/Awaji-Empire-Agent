@@ -167,6 +167,7 @@ pub struct LobbyRoom {
     pub is_approved: Option<bool>,
     /// CAST(expires_at AS CHAR) で取得
     pub expires_at: String,
+    pub virtual_ip: Option<String>,
 }
 
 /// lobby_members テーブルの 1 行に対応する Struct。

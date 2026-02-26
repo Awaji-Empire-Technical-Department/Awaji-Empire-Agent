@@ -17,9 +17,10 @@ pub async fn ensure_user_exists(pool: &MySqlPool, discord_id: i64) -> BridgeResu
 
 pub async fn find_active_rooms(pool: &MySqlPool) -> BridgeResult<Vec<LobbyRoom>> {
     let query = r#"
-        SELECT passcode, host_id, mode, title, description, CAST(tournament_start_at AS CHAR) as tournament_start_at, is_approved, CAST(expires_at AS CHAR) as expires_at
-        FROM matchmaking_rooms 
-        WHERE expires_at > NOW()
+        SELECT m.passcode, m.host_id, m.mode, m.title, m.description, CAST(m.tournament_start_at AS CHAR) as tournament_start_at, m.is_approved, CAST(m.expires_at AS CHAR) as expires_at, u.virtual_ip
+        FROM matchmaking_rooms m
+        LEFT JOIN user_networks u ON m.host_id = u.discord_id
+        WHERE m.expires_at > NOW()
     "#;
     let rooms = sqlx::query_as::<_, LobbyRoom>(query).fetch_all(pool).await?;
     Ok(rooms)
@@ -27,9 +28,10 @@ pub async fn find_active_rooms(pool: &MySqlPool) -> BridgeResult<Vec<LobbyRoom>>
 
 pub async fn find_room_by_passcode(pool: &MySqlPool, passcode: &str) -> BridgeResult<LobbyRoom> {
      let query = r#"
-        SELECT passcode, host_id, mode, title, description, CAST(tournament_start_at AS CHAR) as tournament_start_at, is_approved, CAST(expires_at AS CHAR) as expires_at
-        FROM matchmaking_rooms 
-        WHERE passcode = ?
+        SELECT m.passcode, m.host_id, m.mode, m.title, m.description, CAST(m.tournament_start_at AS CHAR) as tournament_start_at, m.is_approved, CAST(m.expires_at AS CHAR) as expires_at, u.virtual_ip
+        FROM matchmaking_rooms m
+        LEFT JOIN user_networks u ON m.host_id = u.discord_id
+        WHERE m.passcode = ?
     "#;
     let room = sqlx::query_as::<_, LobbyRoom>(query)
         .bind(passcode)

@@ -192,3 +192,25 @@ async def export_csv(passcode):
         return output
     except BridgeUnavailableError:
         return await render_template('maintenance.html'), 503
+
+@lobby_bp.route('/<passcode>/delete', methods=['POST'])
+async def delete_lobby(passcode):
+    user = session.get('discord_user')
+    if not user:
+        return redirect(url_for('login'))
+
+    try:
+        room = await LobbyService.get_room(passcode)
+        if not room or str(room.get('host_id')) != str(user['id']):
+            await flash("ロビー削除の権限がありません", "error")
+            return redirect(url_for('lobby.view_lobby', passcode=passcode))
+
+        success = await LobbyService.delete_room(passcode)
+        if success:
+            await flash("ロビーを削除しました", "success")
+        else:
+            await flash("ロビーの削除に失敗しました", "error")
+    except BridgeUnavailableError:
+        return await render_template('maintenance.html'), 503
+
+    return redirect(url_for('index'))

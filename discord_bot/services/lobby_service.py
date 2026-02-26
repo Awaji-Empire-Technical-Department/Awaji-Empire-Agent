@@ -45,6 +45,12 @@ class LobbyService:
         return res is not None and res.get("status") == "ok"
 
     @staticmethod
+    async def delete_room(passcode: str) -> bool:
+        """ロビーを削除する"""
+        res = await bridge_client.request("DELETE", f"/lobby/rooms/{passcode}")
+        return res is not None and res.get("status") == "ok"
+
+    @staticmethod
     async def get_members(passcode: str) -> List[Dict[str, Any]]:
         """ロビーの参加者一覧を取得する"""
         res = await bridge_client.request("GET", f"/lobby/join/{passcode}")
