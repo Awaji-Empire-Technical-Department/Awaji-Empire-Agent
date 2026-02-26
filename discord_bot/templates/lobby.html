@@ -103,7 +103,7 @@
                             <select name="new_host_id" class="form-control lobby-transfer-select" required>
                                 <option value="">メンバーを選択...</option>
                                 {% for m in members %}
-                                {% if str(m.get('user_id')) != str(user['id']) %}
+                                {% if m.get('user_id')|string != user['id']|string %}
                                 <option value="{{ m.get('user_id') }}">{{ m.get('user_id') }} ({{ m.get('role') }})
                                 </option>
                                 {% endif %}
@@ -153,10 +153,10 @@
                     <tr>
                         <td>
                             {{ m.get('user_id') }}
-                            {% if str(m.get('user_id')) == str(room.get('host_id')) %}
+                            {% if m.get('user_id')|string == room.get('host_id')|string %}
                             <i class="fas fa-crown" style="color: #ffc107; margin-left: 5px;" title="ホスト"></i>
                             {% endif %}
-                            {% if str(m.get('user_id')) == str(user['id']) %}
+                            {% if m.get('user_id')|string == user['id']|string %}
                             <span class="badge badge-secondary" style="font-size:0.7em;">あなた</span>
                             {% endif %}
                         </td>
