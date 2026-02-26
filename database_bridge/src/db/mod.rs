@@ -7,3 +7,4 @@ pub mod models;
 pub mod survey_repo;
 pub mod response_repo;
 pub mod log_repo;
+pub mod lobby_repo;
