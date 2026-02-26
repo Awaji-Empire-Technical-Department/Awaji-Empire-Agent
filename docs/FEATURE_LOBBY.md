@@ -78,6 +78,7 @@ CREATE TABLE matchmaking_rooms (
     host_id             BIGINT NOT NULL,
     mode                ENUM('free', 'tournament') DEFAULT 'free',
     title               VARCHAR(255) DEFAULT '新対戦ロビー', -- ロール名に使用
+    description         TEXT NULL,                      -- 大会やロビーの任意の説明
     tournament_start_at TIMESTAMP NULL,
     is_approved         BOOLEAN DEFAULT FALSE,          -- ホストによる最終承認
     expires_at          TIMESTAMP NOT NULL,
@@ -143,7 +144,7 @@ CREATE TABLE admin_logs (
 
 ```text
 GET    /lobby/rooms            ロビー一覧（gamelink のみ返す）
-POST   /lobby/rooms            ロビー作成（mode, title）
+POST   /lobby/rooms            ロビー作成（mode, title, passcode, description）
 DELETE /lobby/rooms/{passcode} ロビー削除
 PATCH  /lobby/rooms/{passcode} ロビー更新（host_id 譲渡、is_approved 承認）
 POST   /lobby/join             ロビー参加（role 指定）
@@ -181,7 +182,8 @@ GET    /admin/logs             監査ログ（Staff only）
   - **画面遷移**: 一覧からロビーを選択（クリック）すると、詳細操作を行うための **「ロビー専用画面（lobby.html）」** へ遷移する
 - **作成フォーム内容**:
   - **ロビー名**: テキスト入力（デフォルト: {ユーザー名}のロビー）
-  - **合言葉**: テキスト入力（任意・空欄時は自動生成）
+  - **合言葉**: テキスト入力（必須・半角英数字）
+  - **説明書き (任意)**: テキストエリア（大会のルールや概要などを自由に記述可能）
   - **対戦モード**: ラジオボタン選択
     - `自由対戦`: 通常のP2P対戦用
     - `大会モード`: 進行管理・結果集計・承認フローが有効化

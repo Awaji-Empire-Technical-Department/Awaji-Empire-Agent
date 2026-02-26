@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ロビー詳細 - Awaji Agent</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><i class="fas fa-robot"></i> Awaji Empire Agent</div>
+        <div class="user-menu">
+            <img src="{{ user['avatar_url'] }}" class="user-avatar" alt="Avatar">
+            <span>{{ user['name'] }}</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline"
+                style="border-color:rgba(255,255,255,0.3); color:white;">ログアウト</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="lobby-nav">
+            <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i>
+                ダッシュボードへ戻る</a>
+        </div>
+
+        {% for cat, msg in get_flashed_messages(with_categories=true) %}
+        <div class="alert {% if cat == 'error' %}alert-danger{% endif %}">
+            <i class="fas fa-info-circle" style="margin-right:10px;"></i> {{ msg }}
+        </div>
+        {% endfor %}
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    {{ room.get('title', '無題ロビー') }}
+                    <span
+                        class="badge {{ 'badge-primary' if room.get('mode') == 'tournament' else 'badge-success' }}">{{
+                        '大会モード' if room.get('mode') == 'tournament' else '自由対戦モード' }}</span>
+                </h2>
+                {% if room.get('description') %}
+                <p style="margin-top: 0.5rem; color: var(--gray); white-space: pre-wrap;">{{ room.get('description') }}
+                </p>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="lobby-info-container">
+                    <div class="lobby-info-column">
+                        <h3>ロビー情報</h3>
+                        <table class="table">
+                            <tr>
+                                <th>合言葉</th>
+                                <td class="lobby-passcode">{{ room.get('passcode') }}</td>
+                            </tr>
+                            <tr>
+                                <th>ホストID</th>
+                                <td>{{ room.get('host_id') }}</td>
+                            </tr>
+                            <tr>
+                                <th>ステータス</th>
+                                <td>{{ '終了 (承認済)' if room.get('is_approved') else '受付中' }}</td>
+                            </tr>
+                            <tr>
+                                <th>有効期限</th>
+                                <td>{{ room.get('expires_at') }}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div class="lobby-info-column">
+                        <h3>ゲームリンク (Cloudflare WARP)</h3>
+                        {% if room.get('gamelink') %}
+                        <div class="lobby-gamelink-box">
+                            <code class="lobby-gamelink-text">{{ room.get('gamelink') }}</code>
+                            <p class="lobby-gamelink-note">※ このIPを東方憑依華に入力して接続してください</p>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning">ゲームリンク（仮想IP）が取得できませんでした。ホストの接続を確認してください。</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if is_host %}
+                <div class="lobby-host-menu">
+                    <h3 class="lobby-host-title"><i class="fas fa-crown"></i> ホスト管理メニュー</h3>
+                    <div class="lobby-action-buttons">
+                        <form action="{{ url_for('lobby.approve_winner', passcode=room.get('passcode')) }}"
+                            method="post"
+                            onsubmit="return confirm('※ 最終承認を実行します。承認をすると優勝者が確定します。以降変更できなくなりますがよろしいですか？');">
+                            <button type="submit" class="btn btn-warning" {% if room.get('is_approved') %}disabled{%
+                                endif %}><i class="fas fa-trophy"></i> 最終結果の承認 (優勝者確定)</button>
+                        </form>
+                        <a href="{{ url_for('lobby.export_csv', passcode=room.get('passcode')) }}"
+                            class="btn btn-secondary"><i class="fas fa-file-csv"></i> 結果のCSVエクスポート</a>
+                    </div>
+
+                    <div class="lobby-transfer-section">
+                        <h4 class="lobby-transfer-title">ホスト権限の譲渡</h4>
+                        <form action="{{ url_for('lobby.transfer_host', passcode=room.get('passcode')) }}" method="post"
+                            class="lobby-transfer-form" onsubmit="return confirm('本当にホスト権限を譲渡しますか？あなたはこの操作を元に戻せません。');">
+                            <select name="new_host_id" class="form-control lobby-transfer-select" required>
+                                <option value="">メンバーを選択...</option>
+                                {% for m in members %}
+                                {% if str(m.get('user_id')) != str(user['id']) %}
+                                <option value="{{ m.get('user_id') }}">{{ m.get('user_id') }} ({{ m.get('role') }})
+                                </option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-danger btn-sm">譲渡</button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card lobby-card">
+            <div class="card-header lobby-members-header">
+                <h2 class="card-title"><i class="fas fa-users"></i> 参加メンバー ({{ members|length }}名)</h2>
+                {% if not my_role %}
+                <form action="{{ url_for('lobby.join_lobby', passcode=room.get('passcode')) }}" method="post"
+                    class="lobby-join-form">
+                    {% if room.get('mode') == 'tournament' %}
+                    <label class="lobby-role-label"><input type="checkbox" name="role_player" checked> 選手として参加</label>
+                    <label class="lobby-role-label"><input type="checkbox" name="role_staff"> スタッフとして参加</label>
+                    {% else %}
+                    <input type="hidden" name="role_player" value="on">
+                    <span class="lobby-role-note">自由対戦モードでは選手として参加します</span>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-sign-in-alt"></i>
+                        ロビーに参加する</button>
+                </form>
+                {% else %}
+                <div>
+                    <span class="badge badge-success">あなたの参加ロール: {{ my_role }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ユーザーID</th>
+                        <th>ロール</th>
+                        <th>ステータス</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in members %}
+                    <tr>
+                        <td>
+                            {{ m.get('user_id') }}
+                            {% if str(m.get('user_id')) == str(room.get('host_id')) %}
+                            <i class="fas fa-crown" style="color: #ffc107; margin-left: 5px;" title="ホスト"></i>
+                            {% endif %}
+                            {% if str(m.get('user_id')) == str(user['id']) %}
+                            <span class="badge badge-secondary" style="font-size:0.7em;">あなた</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge {{ 'badge-primary' if m.get('role') == 'staff' else 'badge-success' }}">
+                                {{ m.get('role')|upper }}
+                            </span>
+                        </td>
+                        <td>
+                            <!-- 仮 -->入室済
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center; color: var(--gray);">まだ参加者はいません</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+
+</html>

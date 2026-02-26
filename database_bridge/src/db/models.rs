@@ -136,6 +136,71 @@ mod serde_bytes_to_string {
 }
 
 // ============================================================
+// セキュア対戦ロビーシステム (user_networks, matchmaking_rooms, lobby_members, etc)
+// ============================================================
+
+/// user_networks テーブルの 1 行に対応する Struct。
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct UserNetwork {
+    pub discord_id: i64,
+    pub email: String,
+    pub virtual_ip: Option<String>,
+    pub is_active: Option<bool>,
+    pub is_staff: Option<bool>,
+    /// CAST(agreed_at AS CHAR) で取得
+    pub agreed_at: Option<String>,
+    /// CAST(updated_at AS CHAR) で取得
+    pub updated_at: Option<String>,
+}
+
+/// matchmaking_rooms テーブルの 1 行に対応する Struct。
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LobbyRoom {
+    pub passcode: String,
+    pub host_id: i64,
+    /// 'free' または 'tournament'
+    pub mode: Option<String>, 
+    pub title: Option<String>,
+    pub description: Option<String>,
+    /// CAST(tournament_start_at AS CHAR) で取得
+    pub tournament_start_at: Option<String>,
+    pub is_approved: Option<bool>,
+    /// CAST(expires_at AS CHAR) で取得
+    pub expires_at: String,
+}
+
+/// lobby_members テーブルの 1 行に対応する Struct。
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LobbyMember {
+    pub room_passcode: String,
+    pub user_id: i64,
+    pub role: Option<String>,
+}
+
+/// tournament_matches テーブルの 1 行に対応する Struct。
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct TournamentMatch {
+    pub match_id: i32,
+    pub room_passcode: Option<String>,
+    pub player1_id: Option<i64>,
+    pub player2_id: Option<i64>,
+    pub winner_id: Option<i64>,
+    pub status: Option<String>,
+}
+
+/// admin_logs テーブルの 1 行に対応する Struct。
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AdminLog {
+    pub id: i64,
+    pub staff_id: i64,
+    pub action: String,
+    pub target_id: Option<i64>,
+    pub detail: Option<String>,
+    /// CAST(created_at AS CHAR) で取得
+    pub created_at: Option<String>,
+}
+
+// ============================================================
 // 共通エラー型
 // ============================================================
 

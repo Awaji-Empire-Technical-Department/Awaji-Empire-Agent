@@ -17,6 +17,7 @@ COGS = [
     "cogs.mass_mute",     # ディレクトリ化（__init__.py 経由）
     "cogs.survey",        # ディレクトリ化（__init__.py 経由）
     "cogs.voice_keeper",  # 変更なし
+    "cogs.lobby.tournament", # セキュアロビーシステム (大会役職付与)
 ]
 
 class MyBot(commands.Bot):
