@@ -1,4 +1,6 @@
-// api/handlers.rs
+﻿pub mod lobby;
+
+// api/handlers.rs (now as mod.rs inside handlers/)
 // Why: 各エンドポイントの実装をここに集約する。
 
 use axum::extract::{Path, Query, State};

@@ -5,6 +5,8 @@ from quart_cors import cors
 from dotenv import load_dotenv
 
 from routes.survey import survey_bp
+from routes.lobby import lobby_bp
+from services.lobby_service import LobbyService
 from services.bridge_client import BridgeUnavailableError
 from services.survey_service import SurveyService
 from services.log_service import LogService
@@ -24,6 +26,7 @@ app.secret_key = Config.SECRET_KEY
 
 # Blueprintの登録
 app.register_blueprint(survey_bp)
+app.register_blueprint(lobby_bp)
 
 # --- ライフサイクル ---
 @app.before_serving
@@ -146,8 +149,11 @@ async def index():
         
         # LogService 経由で取得 (Rust Bridge を利用)
         logs = await LogService.get_recent_logs(None, limit=30)
+        
+        # LobbyService 経由でアクティブなロビーを取得
+        lobbies = await LobbyService.get_active_rooms()
 
-        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs)
+        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies)
         
     except BridgeUnavailableError:
         current_app.logger.warning("Bridge unavailable on index: rendering maintenance page")
