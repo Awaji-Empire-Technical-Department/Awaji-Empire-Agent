@@ -125,47 +125,24 @@ async def callback():
             user_email = user_data.get('email')
             virtual_ip = None
             
-            # DEBUG LOGGING
-            debug_log = [f"User Email from Discord: {user_email}"]
-            debug_log.append(f"Has Account ID: {bool(Config.CLOUDFLARE_ACCOUNT_ID)}")
-            debug_log.append(f"Has API Token: {bool(Config.CLOUDFLARE_API_TOKEN)}")
-
             if user_email and Config.CLOUDFLARE_ACCOUNT_ID and Config.CLOUDFLARE_API_TOKEN:
                 cf_url = f"https://api.cloudflare.com/client/v4/accounts/{Config.CLOUDFLARE_ACCOUNT_ID}/devices?per_page=100"
                 cf_headers = {
                     "Authorization": f"Bearer {Config.CLOUDFLARE_API_TOKEN}",
                     "Content-Type": "application/json"
                 }
-                debug_log.append(f"Requesting CF API: {cf_url}")
                 try:
                     r_cf = await client.get(cf_url, headers=cf_headers, timeout=10.0)
-                    debug_log.append(f"CF API Status: {r_cf.status_code}")
                     if r_cf.status_code == 200:
                         cf_data = r_cf.json()
                         if cf_data.get("success"):
                             devices = cf_data.get("result", [])
-                            debug_log.append(f"Found {len(devices)} devices in CF")
                             for device in devices:
-                                d_email = device.get("user", {}).get("email")
-                                if d_email == user_email:
+                                if device.get("user", {}).get("email") == user_email:
                                     virtual_ip = device.get("ip")
-                                    debug_log.append(f"Matched device! IP: {virtual_ip}")
                                     break
-                            if not virtual_ip:
-                                debug_log.append("No matching email found in CF devices.")
-                        else:
-                            debug_log.append(f"CF API returned success=false: {cf_data.get('errors')}")
-                    else:
-                        debug_log.append(f"CF API failed response: {r_cf.text}")
                 except Exception as e:
-                    debug_log.append(f"CF API Exception: {e}")
                     current_app.logger.error(f"Failed to fetch CF devices: {e}")
-            else:
-                debug_log.append("Skipping CF fetch due to missing email or config.")
-
-            # Write debug log to stdout directly to bypass Quart logger levels
-            for line in debug_log:
-                print(f"[CF_DEBUG] {line}", flush=True)
 
             # Rust Bridge へユーザー情報を同期
             discord_id = int(user_data['id'])
