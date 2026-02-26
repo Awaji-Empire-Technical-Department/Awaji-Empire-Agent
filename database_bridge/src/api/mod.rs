@@ -2,6 +2,7 @@
 // Why: API エンドポイントのルーティングを集約する。
 
 pub mod handlers;
+pub mod lobby;
 
 use axum::{
     routing::{get, post, patch},
@@ -14,8 +15,18 @@ pub fn create_router(pool: MySqlPool) -> Router {
     Router::new()
         .route("/health", get(handlers::health_check))
         .nest("/surveys", survey_routes())
+        .nest("/lobby", lobby_routes())
         .route("/logs", get(handlers::list_recent_logs).post(handlers::log_operation))
         .with_state(pool)
+}
+
+/// ロビー関連のルーティング。
+fn lobby_routes() -> Router<MySqlPool> {
+    Router::new()
+        .route("/rooms", get(crate::api::handlers::lobby::list_rooms).post(crate::api::handlers::lobby::create_room))
+        .route("/rooms/{passcode}", get(crate::api::handlers::lobby::get_room).patch(crate::api::handlers::lobby::update_room))
+        .route("/join", post(crate::api::handlers::lobby::join_lobby))
+        .route("/join/{passcode}", get(crate::api::handlers::lobby::list_members))
 }
 
 /// アンケート関連のルーティング。

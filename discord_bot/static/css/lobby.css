@@ -1,0 +1,144 @@
+/* =========================================
+   LOBBY SYSTEM STYLES
+   ========================================= */
+
+/* Common */
+.lobby-card {
+    margin-top: 2rem;
+}
+
+.lobby-card-body {
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Dashboard Creation Form */
+.lobby-create-form {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.lobby-form-group {
+    flex: 1;
+    min-width: 150px;
+}
+
+.lobby-form-group-large {
+    flex: 1;
+    min-width: 200px;
+}
+
+.lobby-form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.lobby-select {
+    background-color: var(--bg-hover);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Lobby Details Page */
+.lobby-nav {
+    margin-bottom: 1rem;
+}
+
+.lobby-info-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.lobby-info-column {
+    flex: 1;
+    min-width: 300px;
+}
+
+.lobby-passcode {
+    font-family: monospace;
+    font-size: 1.2rem;
+}
+
+.lobby-gamelink-box {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.lobby-gamelink-text {
+    font-size: 1.5rem;
+    color: #4facfe;
+}
+
+.lobby-gamelink-note {
+    font-size: 0.8rem;
+    color: var(--gray);
+    margin-top: 0.5rem;
+}
+
+/* Host Menu */
+.lobby-host-menu {
+    margin-top: 2rem;
+    padding: 1rem;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 193, 7, 0.05);
+}
+
+.lobby-host-title {
+    color: #ffc107;
+}
+
+.lobby-action-buttons {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.lobby-transfer-section {
+    margin-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 1rem;
+}
+
+.lobby-transfer-title {
+    font-size: 1rem;
+}
+
+.lobby-transfer-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.lobby-transfer-select {
+    width: 250px;
+}
+
+/* Members Section */
+.lobby-members-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.lobby-join-form {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.lobby-role-label {
+    cursor: pointer;
+}
+
+.lobby-role-note {
+    font-size: 0.9rem;
+    color: var(--gray);
+}

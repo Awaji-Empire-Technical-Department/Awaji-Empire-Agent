@@ -6,3 +6,4 @@ pub mod db;
 pub mod bot;
 pub mod webapp;
 pub mod api;
+pub mod lobby;

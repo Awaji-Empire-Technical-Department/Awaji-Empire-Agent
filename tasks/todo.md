@@ -55,4 +55,19 @@
 - [ ] テストサーバーへのデプロイ実行
 - [ ] `database_bridge` プロセスの稼働確認 (systemctl status)
 - [ ] Bot / Webapp のログ監視 (Error が出ていないか)
-- [ ] アンケート作成・回答のE2Eテスト
+
+## Phase 4: セキュア対戦ロビーシステム（🔨 進行中）
+
+- [x] 仕様書 `docs/FEATURE_LOBBY.md` の更新
+  - [x] 自由対戦モード / 大会モードの選択機能を追記
+  - [x] ダッシュボードへのロビー一覧表示と遷移ロジックを追記
+  - [x] ホスト権限委譲、選手/スタッフ役割、CSV出力、最終承認フローを追記
+- [ ] データベースマイグレーションの作成 (`database_bridge/migrations/003_lobby_tables.sql`)
+- [ ] Rust Bridge: `LobbyRoom`, `LobbyMember` モデルとリポジトリの実装
+- [ ] Rust Bridge: `POST /lobby/rooms` で `mode`, `title` パラメータをサポート
+- [ ] Rust Bridge: `GET /lobby/export` (CSV出力) の実装
+- [ ] Webapp: `dashboard.html` にロビー作成・一覧コンポーネントを追加
+- [ ] Webapp: `lobby.html` での役割選択（選手/スタッフ）の実装
+- [ ] Webapp: ホスト専用操作（権限譲渡、CSV出力、最終承認）の実装
+- [ ] Bot: 大会終了（承認時）の優勝ロール動的付与ロジック実装
+- [x] DB/Rust/Python/UI: ロビーの「説明書き(Description)」機能のフルスタック実装 (仕様追加)
