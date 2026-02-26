@@ -90,3 +90,45 @@ try decoding as an 'Option'
 > **DB スキーマで `NOT NULL` 制約が明示されていないカラムは、  
 > Rust 側のモデル型を必ず `Option<T>` で定義すること。**  
 > `NOT NULL` が確実なカラムのみ non-Option で受けてよい。
+
+---
+
+## LESSON-004: 外部キー制約(FK Constraints)とデータ同期の不一致
+
+- **発見日**: 2026-02-26
+- **ADR**: `docs/adr/008-secure-lobby-system.md`
+
+### 何が起きたか
+
+Rust側で生成する `matchmaking_rooms` テーブルの `host_id` には、`user_networks(discord_id)` への外部キー制約が設定されていた。しかし、Python(Quart)での Discord OAuth ログイン時、DBへのユーザー登録が省略されていたため、初めてアクセスしたユーザーがロビーを作成しようとすると「外部キー制約違反（Error 1452）」で落ちる問題が起きた。
+
+### 正しい対処法
+
+Rustフロント側でロビー作成（`insert_room`）、参加（`upsert_member`）、権限譲渡（`transfer_host`）を行う直前に、`INSERT IGNORE INTO user_networks` で未登録ユーザーの暗黙的追加を行うヘルパー関数 `ensure_user_exists` を呼び出し解決した。
+
+### ルール
+
+> **外部キー制約がかかる処理を実装する場合、元のテーブルへの参照レコードが存在することを保証するライフサイクルを必ず設計・実装すること。事前に暗黙的登録（UPSERTやIGNORE等）で補うのが有効なパターンの一つ。**
+
+---
+
+## LESSON-005: Jinja2 内での Python 組み込み関数の使用不可
+
+- **発見日**: 2026-02-26
+- **ブランチ**: `feature/secure-lobby`
+
+#### 何が起きたか
+
+HTMLのJinja2テンプレートで型の厳密な比較を行うため `{% if str(m.get('user_id')) == str(user['id']) %}` と記述した結果、`UndefinedError: 'str' is undefined` が発生し `500 Internal Server Error` になった。Jinja2はPythonそのものではなく、組み込みの `str()` は利用できない。
+
+#### 正しい対処法
+
+Jinja2 の組み込みフィルター `|string` を用いて文字列変換を行う。
+
+```jinja2
+{% if m.get('user_id')|string == user['id']|string %}
+```
+
+#### ルール
+
+> **Jinja2 テンプレートエンジン内で Python 組み込み関数 (`str()`, `int()`, `len()` 等) は使えないと認識せよ。必ずマニュアルで提供される Jinja Filters (`|string`, `|int`, `|length`) を使用すること。**
