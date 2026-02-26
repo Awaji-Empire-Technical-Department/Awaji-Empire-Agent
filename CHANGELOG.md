@@ -3,9 +3,32 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
-## [1.3.2] - 2026-02-26
+## [1.4.0] - 2026-02-27
 
-Phase 4: 権限エンジンの Rust 移行、SQLAlchemy 完全撤去、設定の `.env` 統一。設計記録: `docs/adr/007-phase4-rust-permission-engine-and-config-unification.md`
+Phase 3: セキュア対戦ロビーシステムの導入。Cloudflare WARP IP 同期による物理IP隠蔽と、大会進行管理機能の実装。設計記録: `docs/adr/008-secure-lobby-system.md`
+
+### Added
+
+- **セキュア対戦ロビー基盤 (Secure Lobby System)**
+  - **Cloudflare WARP 仮想IP同期**: Discordログイン時に Cloudflare API からデバイス仮想IPを自動取得し同期する仕組みを構築。
+  - **GameLinkFormatter (Rust)**: 仮想IPを『東方憑依華』専用の12桁ゼロ埋め形式（`100.096.xxx.xxx:10800`）に自動変換。
+  - **ロビー管理機能**:
+    - 「自由対戦モード」と「大会モード」の選択、ロビー名・説明文の動的設定。
+    - ホスト権限の譲渡機能、ロビー解散（削除）機能。
+    - 参加メンバーの CSV エクスポート、大会結果の最終承認。
+- **IPC 通信の拡張**: Rust Bridge に `/lobby/sync_user` エンドポイントを新設し、Python からのユーザー属性（IP/メールアドレス）同期を可能に。
+
+### Changed
+
+- **Discord OAuth2 フロー**: Cloudflare デバイス照合のため、認証スコープに `email` を追加。
+- **ロビー削除の堅牢化**: DB制約に依存せず安全に削除できるよう、Rust Bridge 側で関連レコード（メンバー・試合）を明示的に事前クリーンアップするロジックを実装。
+
+### Fixed
+
+- **Cloudflare API 通信**: `per_page` パラメータの制限（最大100件）に伴う API エラー (400 Bad Request) を修正。
+- **Jinja2 テンプレートエラー**: ユーザーID比較時の `str()` 呼び出しをパイプラインフィルタ `|string` に修正。
+
+## [1.3.2] - 2026-02-26
 
 ### Added
 
