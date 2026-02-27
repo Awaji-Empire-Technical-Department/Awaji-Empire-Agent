@@ -144,6 +144,7 @@ mod serde_bytes_to_string {
 pub struct UserNetwork {
     pub discord_id: i64,
     pub email: String,
+    pub username: Option<String>,
     pub virtual_ip: Option<String>,
     pub is_active: Option<bool>,
     pub is_staff: Option<bool>,
@@ -177,6 +178,10 @@ pub struct LobbyRoom {
 pub struct LobbyMember {
     pub room_passcode: String,
     pub user_id: i64,
+    pub username: Option<String>,
+    pub virtual_ip: Option<String>,
+    #[sqlx(default)]
+    pub gamelink: Option<String>,
     pub role: Option<String>,
 }
 

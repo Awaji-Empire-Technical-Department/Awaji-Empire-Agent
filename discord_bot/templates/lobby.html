@@ -60,7 +60,15 @@
                             </tr>
                             <tr>
                                 <th>ステータス</th>
-                                <td>{{ '終了 (承認済)' if room.get('is_approved') else '受付中' }}</td>
+                                <td>
+                                    {% if room.get('is_approved') %}
+                                    終了 (承認済)
+                                    {% elif room.get('tournament_start_at') %}
+                                    大会進行中
+                                    {% else %}
+                                    受付中
+                                    {% endif %}
+                                </td>
                             </tr>
                             <tr>
                                 <th>有効期限</th>
@@ -86,6 +94,16 @@
                 <div class="lobby-host-menu">
                     <h3 class="lobby-host-title"><i class="fas fa-crown"></i> ホスト管理メニュー</h3>
                     <div class="lobby-action-buttons">
+                        {% if room.get('mode') == 'tournament' %}
+                        {% if not room.get('tournament_start_at') and not room.get('is_approved') %}
+                        <form action="{{ url_for('lobby.start_tournament', passcode=room.get('passcode')) }}"
+                            method="post" onsubmit="return confirm('大会を開始しますか？参加者の受付が締め切られます');">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-play"></i> 大会を開始する</button>
+                        </form>
+                        {% elif room.get('tournament_start_at') and not room.get('is_approved') %}
+                        <button class="btn btn-secondary" disabled>大会進行中...</button>
+                        {% endif %}
+
                         <form action="{{ url_for('lobby.approve_winner', passcode=room.get('passcode')) }}"
                             method="post"
                             onsubmit="return confirm('※ 最終承認を実行します。承認をすると優勝者が確定します。以降変更できなくなりますがよろしいですか？');">
@@ -94,6 +112,7 @@
                         </form>
                         <a href="{{ url_for('lobby.export_csv', passcode=room.get('passcode')) }}"
                             class="btn btn-secondary"><i class="fas fa-file-csv"></i> 結果のCSVエクスポート</a>
+                        {% endif %}
                     </div>
 
                     <div class="lobby-transfer-section">
@@ -150,22 +169,24 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ユーザーID</th>
+                        <th>ユーザー</th>
                         <th>ロール</th>
                         <th>ステータス</th>
+                        <th>接続情報</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for m in members %}
                     <tr>
                         <td>
-                            {{ m.get('user_id') }}
+                            <strong>{{ m.get('username') or m.get('user_id') }}</strong>
                             {% if m.get('user_id')|string == room.get('host_id')|string %}
                             <i class="fas fa-crown" style="color: #ffc107; margin-left: 5px;" title="ホスト"></i>
                             {% endif %}
                             {% if m.get('user_id')|string == user['id']|string %}
                             <span class="badge badge-secondary" style="font-size:0.7em;">あなた</span>
                             {% endif %}
+                            <div style="font-size: 0.8em; color: var(--gray);">ID: {{ m.get('user_id') }}</div>
                         </td>
                         <td>
                             <span class="badge {{ 'badge-primary' if m.get('role') == 'staff' else 'badge-success' }}">
@@ -174,6 +195,16 @@
                         </td>
                         <td>
                             <!-- 仮 -->入室済
+                        </td>
+                        <td>
+                            {% if m.get('gamelink') %}
+                            <button
+                                onclick="navigator.clipboard.writeText('{{ m.get('gamelink') }}'); alert('IPアドレスをコピーしました');"
+                                class="btn btn-sm btn-outline" style="padding: 2px 5px; font-size: 0.8em;"><i
+                                    class="fas fa-copy"></i> IPコピー</button>
+                            {% else %}
+                            <span style="color: var(--gray); font-size: 0.8em;">未接続</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% else %}

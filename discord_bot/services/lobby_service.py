@@ -16,11 +16,12 @@ class LobbyService:
         return res
 
     @staticmethod
-    async def sync_user(discord_id: int, email: str, virtual_ip: Optional[str] = None) -> bool:
-        """ユーザー情報(WARP IP含む)をデータベースと同期する"""
+    async def sync_user(discord_id: int, email: str, username: Optional[str] = None, virtual_ip: Optional[str] = None) -> bool:
+        """ユーザー情報(WARP IP・ユーザー名含む)をデータベースと同期する"""
         payload = {
             "discord_id": discord_id,
             "email": email,
+            "username": username,
             "virtual_ip": virtual_ip
         }
         res = await bridge_client.request("POST", "/lobby/sync_user", json=payload)
@@ -59,6 +60,12 @@ class LobbyService:
     async def delete_room(passcode: str) -> bool:
         """ロビーを削除する"""
         res = await bridge_client.request("DELETE", f"/lobby/rooms/{passcode}")
+        return res is not None and res.get("status") == "ok"
+
+    @staticmethod
+    async def start_tournament(passcode: str) -> bool:
+        """大会を開始する"""
+        res = await bridge_client.request("POST", f"/lobby/rooms/{passcode}/start")
         return res is not None and res.get("status") == "ok"
 
     @staticmethod

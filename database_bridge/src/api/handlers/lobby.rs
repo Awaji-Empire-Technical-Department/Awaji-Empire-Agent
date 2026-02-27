@@ -41,6 +41,7 @@ fn map_bridge_error(err: BridgeError) -> (StatusCode, Json<Value>) {
 pub struct SyncUserRequest {
     discord_id: i64,
     email: String,
+    username: Option<String>,
     virtual_ip: Option<String>,
 }
 
@@ -48,7 +49,7 @@ pub async fn sync_user(
     State(pool): State<MySqlPool>,
     Json(payload): Json<SyncUserRequest>,
 ) -> (StatusCode, Json<Value>) {
-    match lobby_repo::sync_user_network(&pool, payload.discord_id, &payload.email, payload.virtual_ip.as_deref()).await {
+    match lobby_repo::sync_user_network(&pool, payload.discord_id, &payload.email, payload.username.as_deref(), payload.virtual_ip.as_deref()).await {
         Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
         Err(e) => map_bridge_error(e),
     }
@@ -161,6 +162,19 @@ pub async fn update_room(
 }
 
 // ---------------------------------------------------------
+// POST /lobby/rooms/{passcode}/start
+// ---------------------------------------------------------
+pub async fn start_tournament(
+    State(pool): State<MySqlPool>,
+    Path(passcode): Path<String>,
+) -> (StatusCode, Json<Value>) {
+    match lobby_repo::start_tournament(&pool, &passcode).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+// ---------------------------------------------------------
 // GET /lobby/join/{passcode}  (Members list)
 // ---------------------------------------------------------
 pub async fn list_members(
@@ -168,7 +182,14 @@ pub async fn list_members(
     Path(passcode): Path<String>,
 ) -> (StatusCode, Json<Value>) {
     match lobby_repo::find_members(&pool, &passcode).await {
-        Ok(members) => (StatusCode::OK, Json(json!(members))),
+        Ok(mut members) => {
+            for member in &mut members {
+                if let Some(ref ip) = member.virtual_ip {
+                    member.gamelink = GameLinkFormatter::format(ip);
+                }
+            }
+            (StatusCode::OK, Json(json!(members)))
+        }
         Err(e) => map_bridge_error(e),
     }
 }

@@ -25,6 +25,7 @@ fn lobby_routes() -> Router<MySqlPool> {
         .route("/sync_user", post(crate::api::handlers::lobby::sync_user))
         .route("/rooms", get(crate::api::handlers::lobby::list_rooms).post(crate::api::handlers::lobby::create_room))
         .route("/rooms/{passcode}", get(crate::api::handlers::lobby::get_room).patch(crate::api::handlers::lobby::update_room).delete(crate::api::handlers::lobby::delete_room))
+        .route("/rooms/{passcode}/start", post(crate::api::handlers::lobby::start_tournament))
         .route("/join", post(crate::api::handlers::lobby::join_lobby))
         .route("/join/{passcode}", get(crate::api::handlers::lobby::list_members))
 }
