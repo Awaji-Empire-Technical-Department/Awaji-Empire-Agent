@@ -4,7 +4,7 @@
 
 ---
 
-## Phase 3-A: `db/` 層の実装（✅ 設計完了 / 🔨 実装中）
+## Phase 3-A: `db/` 層の実装（✅ 設計完了 / ✅ 実装完了）
 
 - [x] ブランチ `feature/phase3-rust-bridge` を作成
 - [x] 仕様書 `docs/Specifications/phase3-rust-database-bridge.md` を作成
@@ -71,3 +71,46 @@
 - [ ] Webapp: ホスト専用操作（権限譲渡、CSV出力、最終承認）の実装
 - [ ] Bot: 大会終了（承認時）の優勝ロール動的付与ロジック実装
 - [x] DB/Rust/Python/UI: ロビーの「説明書き(Description)」機能のフルスタック実装 (仕様追加)
+
+## Phase 4.1: ロビーシステムの不具合修正・仕様補完 (The Plan)
+
+### 1. Cloudflare WARP IPが切断後も表示され続ける問題
+
+**原因**: `webapp.py`においてCloudflareの`/devices` APIを使用しIPを取得しているが、デバイス情報の`ip`フィールドは現在WARPに接続中かどうかに関わらず情報を保持し続けるため、切断後も以前のIPが表示される。
+**解決策検討**:
+
+- **案A**: CFからの最終通信日時（last_seen）を見て判定する（一定時間経過で未接続扱い）。
+- **案B**: ダッシュボード上に「WARP接続情報を手動でクリアする」ボタンを設置し、ユーザーが意図的にIPを消せるようにする（確実）。
+*(※ ユーザーに方針を確認し決定する)*
+
+### 2. 有効期限を過ぎたロビーが自動的に破棄されない問題
+
+**原因**: ダッシュボード一覧（`find_active_rooms`）からは消えるが、DBから削除されておらず、個別URLではアクセスできる。
+**解決策**:
+
+- `find_room_by_passcode` クエリに `expires_at > NOW()` 条件を追加し、期限切れはNotFoundにする。
+- 一覧取得など定期的な処理の前に、`DELETE FROM matchmaking_rooms WHERE expires_at <= NOW()` を実行して遅延評価的に自動破棄する。
+
+### 3. 自由対戦モードで大会モード限定のメニューが出現している問題
+
+**原因**: `lobby.html` の「ホスト管理メニュー」のUI描画において、モード分岐が行われていない。
+**解決策**:
+
+- `lobby.html`内の「最終結果の承認」「CSVエクスポート」のブロックを `{% if room.get('mode') == 'tournament' %}` で囲み、大会モード時のみ表示する。
+
+### 4. 大会を開始するためのメニューがない問題
+
+**原因**: 練習から実大会への移行を想定した `tournament_start_at` を更新するフロー・UIが存在しない。
+**解決策**:
+
+- [x] Rust: `lobby_repo.rs` と APIに `start_tournament` エンドポイントを実装し、`tournament_start_at` を現在時刻に更新。
+- [x] Python: `routes/lobby.py` に大会開始アクションを追加。
+- [x] UI: `lobby.html` のホスト向けメニューに「▶ 大会を開始する」ボタンを追加。開始済みの場合は「大会進行中」と表示を切り替える。
+
+### 5. 追加実装 (Wanyaldeeフィードバック: 2026-02-27)
+
+- [x] **WARP IPのリアルタイム更新**: Discordログイン同期時(`webapp.py`)にCloudflareのデバイス情報から `last_seen` を確認し、一定時間（例：10分）内の最新IPのみを有効として取得する。対戦のための「確実なIP」を提供する。
+- [x] **IPコピーボタン**: `lobby.html`のメンバー一覧（対戦相手）に、IP（Game Link）をクリップボードにコピーするボタンを追加する。
+- [x] **ユーザー名の表示**: 参加メンバー一覧で無機質なユーザーIDではなく、Discordのユーザー名（サーバーネーム）を表示する。
+  - [x] DB `user_networks` テーブルに `username VARCHAR(255)` を追加（マイグレーション `004_lobby_updates.sql` 作成）。
+  - [x] `webapp.py` の同期時にユーザー名を保存し、ロビーのメンバー取得時(`get_members`)にJOINして返すようRust Bridgeを修正する。

@@ -5,8 +5,8 @@ use crate::db::models::{BridgeResult, BridgeError, LobbyRoom, LobbyMember};
 
 pub async fn ensure_user_exists(pool: &MySqlPool, discord_id: i64) -> BridgeResult<()> {
     let query = r#"
-        INSERT IGNORE INTO user_networks (discord_id, email)
-        VALUES (?, '')
+        INSERT IGNORE INTO user_networks (discord_id, email, username)
+        VALUES (?, '', NULL)
     "#;
     sqlx::query(query)
         .bind(discord_id)
@@ -15,25 +15,34 @@ pub async fn ensure_user_exists(pool: &MySqlPool, discord_id: i64) -> BridgeResu
     Ok(())
 }
 
-pub async fn sync_user_network(pool: &MySqlPool, discord_id: i64, email: &str, virtual_ip: Option<&str>) -> BridgeResult<()> {
+pub async fn sync_user_network(pool: &MySqlPool, discord_id: i64, email: &str, username: Option<&str>, virtual_ip: Option<&str>) -> BridgeResult<()> {
     let query = r#"
-        INSERT INTO user_networks (discord_id, email, virtual_ip)
-        VALUES (?, ?, ?)
+        INSERT INTO user_networks (discord_id, email, username, virtual_ip)
+        VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
         email = VALUES(email),
+        username = VALUES(username),
         virtual_ip = VALUES(virtual_ip),
         updated_at = CURRENT_TIMESTAMP
     "#;
     sqlx::query(query)
         .bind(discord_id)
         .bind(email)
+        .bind(username)
         .bind(virtual_ip)
         .execute(pool)
         .await?;
     Ok(())
 }
 
+pub async fn cleanup_expired_rooms(pool: &MySqlPool) -> BridgeResult<()> {
+    let query = "DELETE FROM matchmaking_rooms WHERE expires_at <= NOW()";
+    let _ = sqlx::query(query).execute(pool).await; // Ignore errors in lazy deletion
+    Ok(())
+}
+
 pub async fn find_active_rooms(pool: &MySqlPool) -> BridgeResult<Vec<LobbyRoom>> {
+    let _ = cleanup_expired_rooms(pool).await;
     let query = r#"
         SELECT m.passcode, m.host_id, m.mode, m.title, m.description, CAST(m.tournament_start_at AS CHAR) as tournament_start_at, m.is_approved, CAST(m.expires_at AS CHAR) as expires_at, u.virtual_ip
         FROM matchmaking_rooms m
@@ -49,7 +58,7 @@ pub async fn find_room_by_passcode(pool: &MySqlPool, passcode: &str) -> BridgeRe
         SELECT m.passcode, m.host_id, m.mode, m.title, m.description, CAST(m.tournament_start_at AS CHAR) as tournament_start_at, m.is_approved, CAST(m.expires_at AS CHAR) as expires_at, u.virtual_ip
         FROM matchmaking_rooms m
         LEFT JOIN user_networks u ON m.host_id = u.discord_id
-        WHERE m.passcode = ?
+        WHERE m.passcode = ? AND m.expires_at > NOW()
     "#;
     let room = sqlx::query_as::<_, LobbyRoom>(query)
         .bind(passcode)
@@ -113,6 +122,15 @@ pub async fn update_room_approval(pool: &MySqlPool, passcode: &str, is_approved:
     Ok(())
 }
 
+pub async fn start_tournament(pool: &MySqlPool, passcode: &str) -> BridgeResult<()> {
+    let query = "UPDATE matchmaking_rooms SET tournament_start_at = NOW() WHERE passcode = ? AND mode = 'tournament'";
+    sqlx::query(query)
+        .bind(passcode)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn transfer_host(pool: &MySqlPool, passcode: &str, new_host_id: i64) -> BridgeResult<()> {
     ensure_user_exists(pool, new_host_id).await?;
     let query = "UPDATE matchmaking_rooms SET host_id = ? WHERE passcode = ?";
@@ -125,7 +143,12 @@ pub async fn transfer_host(pool: &MySqlPool, passcode: &str, new_host_id: i64) -
 }
 
 pub async fn find_members(pool: &MySqlPool, passcode: &str) -> BridgeResult<Vec<LobbyMember>> {
-    let query = "SELECT room_passcode, user_id, role FROM lobby_members WHERE room_passcode = ?";
+    let query = r#"
+        SELECT l.room_passcode, l.user_id, u.username, u.virtual_ip, l.role 
+        FROM lobby_members l
+        LEFT JOIN user_networks u ON l.user_id = u.discord_id
+        WHERE l.room_passcode = ?
+    "#;
     let members = sqlx::query_as::<_, LobbyMember>(query)
         .bind(passcode)
         .fetch_all(pool)

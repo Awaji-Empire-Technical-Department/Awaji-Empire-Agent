@@ -123,6 +123,7 @@ async def callback():
             
             # --- Cloudflare WARP IP Sync ---
             user_email = user_data.get('email')
+            display_name = user_data.get('global_name') or user_data.get('username')
             virtual_ip = None
             
             if user_email and Config.CLOUDFLARE_ACCOUNT_ID and Config.CLOUDFLARE_API_TOKEN:
@@ -139,7 +140,21 @@ async def callback():
                             devices = cf_data.get("result", [])
                             for device in devices:
                                 if device.get("user", {}).get("email") == user_email:
-                                    virtual_ip = device.get("ip")
+                                    last_seen_str = device.get("last_seen")
+                                    if last_seen_str:
+                                        from datetime import datetime, timezone
+                                        try:
+                                            last_seen_str = last_seen_str.replace("Z", "+00:00")
+                                            last_seen = datetime.fromisoformat(last_seen_str)
+                                            now = datetime.now(timezone.utc)
+                                            # 10分(600秒)以内の通信があればアクティブとみなす
+                                            if (now - last_seen).total_seconds() <= 600:
+                                                virtual_ip = device.get("ip")
+                                        except Exception as e:
+                                            current_app.logger.warning(f"Error parsing last_seen: {e}")
+                                            virtual_ip = device.get("ip") # fallback
+                                    else:
+                                        virtual_ip = device.get("ip")
                                     break
                 except Exception as e:
                     current_app.logger.error(f"Failed to fetch CF devices: {e}")
@@ -150,6 +165,7 @@ async def callback():
                 await LobbyService.sync_user(
                     discord_id=discord_id,
                     email=user_email or "",
+                    username=display_name,
                     virtual_ip=virtual_ip
                 )
             except BridgeUnavailableError:

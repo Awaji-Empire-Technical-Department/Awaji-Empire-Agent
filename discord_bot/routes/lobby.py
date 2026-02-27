@@ -156,6 +156,28 @@ async def approve_winner(passcode):
          
     return redirect(url_for('lobby.view_lobby', passcode=passcode))
 
+@lobby_bp.route('/<passcode>/start', methods=['POST'])
+async def start_tournament(passcode):
+    user = session.get('discord_user')
+    if not user:
+        return redirect(url_for('login'))
+        
+    try:
+        room = await LobbyService.get_room(passcode)
+        if not room or str(room.get('host_id')) != str(user['id']):
+            await flash("大会開始の権限がありません", "error")
+            return redirect(url_for('lobby.view_lobby', passcode=passcode))
+            
+        success = await LobbyService.start_tournament(passcode)
+        if success:
+            await flash("大会を開始しました！", "success")
+        else:
+            await flash("大会の開始に失敗しました", "error")
+    except BridgeUnavailableError:
+         return await render_template('maintenance.html'), 503
+         
+    return redirect(url_for('lobby.view_lobby', passcode=passcode))
+
 @lobby_bp.route('/<passcode>/export_csv')
 async def export_csv(passcode):
     # 大会結果CSVエクスポート（モック実装: 実運用には試合情報が含まれる）
