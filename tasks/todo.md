@@ -4,7 +4,7 @@
 
 ---
 
-## Phase 3-A: `db/` 層の実装（✅ 設計完了 / 🔨 実装中）
+## Phase 3-A: `db/` 層の実装（✅ 設計完了 / ✅ 実装完了）
 
 - [x] ブランチ `feature/phase3-rust-bridge` を作成
 - [x] 仕様書 `docs/Specifications/phase3-rust-database-bridge.md` を作成
