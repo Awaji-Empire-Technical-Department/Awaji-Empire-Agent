@@ -96,6 +96,17 @@ function handleLobbyEvent(event) {
             location.reload();
             break;
 
+        case "user_synced":
+            // ユーザーのIP情報が更新されてオンラインになった
+            console.log(`User ${event.user_id} synced (online).`);
+            updateMemberStatus(event.user_id, 'online');
+            // IPが追加された可能性があるのでリロードを推奨、もしくはUIを部分更新
+            // 今回はシンプルにリロード
+            if (event.user_id == window.MY_USER_ID) {
+                location.reload();
+            }
+            break;
+
         default:
             console.log("Unhandled event type:", event.type);
     }
@@ -209,3 +220,33 @@ document.addEventListener("DOMContentLoaded", () => {
         loadAndRenderBracket();
     }
 });
+
+// ====================================================
+// 5. ステータス等の更新送信アクション (HTMLから呼ばれる)
+// ====================================================
+
+window.updateMyStatus = async function (status) {
+    if (!confirm(`ステータスを「${status}」に変更しますか？`)) return;
+
+    try {
+        const response = await fetch(`/lobby/api/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                passcode: window.LOBBY_PASSCODE,
+                user_id: window.MY_USER_ID,
+                status: status
+            })
+        });
+
+        const data = await response.json();
+        if (data.status === 'error') {
+            alert('ステータスの更新に失敗しました: ' + data.message);
+        }
+    } catch (e) {
+        console.error("Failed to update status:", e);
+        alert('ネットワークエラーが発生しました');
+    }
+};
