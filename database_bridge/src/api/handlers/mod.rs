@@ -1,4 +1,5 @@
 ﻿pub mod lobby;
+pub mod ws;
 
 // api/handlers.rs (now as mod.rs inside handlers/)
 // Why: 各エンドポイントの実装をここに集約する。
