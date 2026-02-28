@@ -110,18 +110,6 @@ wheels = [
 ]
 
 [[package]]
-name = "aiomysql"
-version = "0.3.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pymysql" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/29/e0/302aeffe8d90853556f47f3106b89c16cc2ec2a4d269bdfd82e3f4ae12cc/aiomysql-0.3.2.tar.gz", hash = "sha256:72d15ef5cfc34c03468eb41e1b90adb9fd9347b0b589114bd23ead569a02ac1a", size = 108311, upload-time = "2025-10-22T00:15:21.278Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/af/aae0153c3e28712adaf462328f6c7a3c196a1c1c27b491de4377dd3e6b52/aiomysql-0.3.2-py3-none-any.whl", hash = "sha256:c82c5ba04137d7afd5c693a258bea8ead2aad77101668044143a991e04632eb2", size = 71834, upload-time = "2025-10-22T00:15:15.905Z" },
-]
-
-[[package]]
 name = "aiosignal"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -325,7 +313,6 @@ dependencies = [
     { name = "aiofiles" },
     { name = "aiohappyeyeballs" },
     { name = "aiohttp" },
-    { name = "aiomysql" },
     { name = "aiosignal" },
     { name = "anyio" },
     { name = "attrs" },
@@ -382,7 +369,6 @@ requires-dist = [
     { name = "aiofiles", specifier = "==25.1.0" },
     { name = "aiohappyeyeballs", specifier = "==2.6.1" },
     { name = "aiohttp", specifier = "==3.13.2" },
-    { name = "aiomysql", specifier = "==0.3.2" },
     { name = "aiosignal", specifier = "==1.4.0" },
     { name = "anyio", specifier = "==4.12.1" },
     { name = "attrs", specifier = "==25.4.0" },
@@ -400,6 +386,7 @@ requires-dist = [
     { name = "h2", specifier = "==4.3.0" },
     { name = "hpack", specifier = "==4.1.0" },
     { name = "httpcore", specifier = "==1.0.9" },
+    { name = "httpx" },
     { name = "httpx", specifier = "==0.27.0" },
     { name = "hypercorn", specifier = "==0.18.0" },
     { name = "hyperframe", specifier = "==6.1.0" },
