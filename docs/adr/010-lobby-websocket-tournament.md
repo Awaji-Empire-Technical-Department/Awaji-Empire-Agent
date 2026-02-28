@@ -30,7 +30,7 @@ Rustバックエンド（`database_bridge`）の `axum` フレームワークに
 
 ### 3. データモデルの拡張と Discord Bot 連携
 
-* **バックエンド (Rust/DB)**: ロビー参加者に `status` (オンライン、受付中、待機中など)を付与し、さらに大会の対戦カードを追跡するため `tournament_matches` テーブルに `round_num`、`match_index`、`score` などのカラムを追加（マイグレーション `006_tournament_updates.sql`）。
+* **バックエンド (Rust/DB)**: ロビー参加者に `status` (オンライン、受付中、待機中など)を付与し、さらに大会の対戦カードを追跡するため `tournament_matches` テーブルに `round_num`、`match_index`、`score` などのカラムを追加（マイグレーション `100_tournament_updates.sql` ※旧006からリネーム）。
 * **フロントエンドからDiscordへの橋渡し**: ユーザー（ホスト）の「最終承認」アクションを受け、Python（Quart）サーバーから HTTPX を経由して Discord REST API (`/v10/guilds/{id}/roles`) を直接コール。指定された大会名の「〇〇優勝」ロールを動的に生成・付与する。これをバックグラウンドタスクや既存Bot側の常駐プロセスとは非同期かつ直接的に連携させた。
 
 ## 結果 (Consequences)

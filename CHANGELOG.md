@@ -3,6 +3,31 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
+## [1.4.1] - 2026-02-28
+
+Phase 4.2 & 4.3: セキュア対戦ロビーのWebSocketリアルタイム化、大会（Tournament）進行支援機能の実装。
+
+### Added
+
+- **WebSocket リアルタイム同期**
+  - Rust バックエンド (`database_bridge`) に WebSocket エンドポイント `/ws/hyouibana` を新設。
+  - フロントエンドからポーリングなしで、メンバーの入退室やステータス変更（受付中、対戦中など）をリアルタイムにUIへ反映する仕組み (`possession_lobby.js`) を導入。
+- **大会進行支援機能 (Tournament Mode)**
+  - トーナメント戦績を記録するためのテーブル拡張 (`100_tournament_updates.sql`)。
+  - フロントエンドに `Bracketry` ライブラリを導入し、大会のトーナメント表（ブラケット）を動的に描画。
+  - バックエンドからの試合結果（勝敗報告 API）の実装。
+- **ステータス手動更新 API**
+  - 自由対戦のホストが「受付中」や「対戦中」を宣言できる `/lobby/api/status` エンドポイントの実装。
+- **Discord ロール自動付与**
+  - トーナメント結果の最終承認時に、自動で Discord API を叩き「(大会名)優勝」ロールを作成・付与する機能を実装。
+
+### Fixed
+
+- **DB マイグレーション修正**
+  - `006_tournament_updates.sql` の名前衝突によって発生した `migration partially applied` エラーを解決するため、ファイル名を `100_tournament_updates.sql` に変更し、DB修復スクリプト (`db_repair.py`) を提供。
+- **フロントエンドのステータス表示バグ**
+  - 初期待機時に全員が「オフライン」と表示される不具合を修正し、Jinja2 テンプレート側および JS 側で正しくステータス（オンライン・対戦中など）を判定して描画するように修正。
+
 ## [1.4.0] - 2026-02-27
 
 Phase 3: セキュア対戦ロビーシステムの導入。Cloudflare WARP IP 同期による物理IP隠蔽と、大会進行管理機能の実装。設計記録: `docs/adr/008-secure-lobby-system.md`
