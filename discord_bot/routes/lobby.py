@@ -3,7 +3,7 @@ import io
 import time
 import httpx
 import os
-from quart import Blueprint, current_app, redirect, render_template, request, session, url_for, flash, make_response
+from quart import Blueprint, current_app, redirect, render_template, request, session, url_for, flash, make_response, jsonify
 from services.lobby_service import LobbyService
 from services.bridge_client import BridgeUnavailableError
 
@@ -235,6 +235,32 @@ async def approve_winner(passcode):
          return await render_template('maintenance.html'), 503
          
     return redirect(url_for('lobby.view_lobby', passcode=passcode))
+
+@lobby_bp.route('/api/status', methods=['POST'])
+async def update_my_status():
+    """フロントエンドのJSから自分のステータスを更新するAPI"""
+    user = session.get('discord_user')
+    if not user:
+        return jsonify({"status": "error", "message": "unauthorized"}), 401
+    
+    data = await request.get_json()
+    if not data:
+        return jsonify({"status": "error", "message": "bad request"}), 400
+        
+    passcode = data.get('passcode')
+    status = data.get('status')
+    
+    if not passcode or not status:
+        return jsonify({"status": "error", "message": "missing params"}), 400
+        
+    try:
+        success = await LobbyService.update_member_status(passcode, int(user['id']), status)
+        if success:
+            return jsonify({"status": "ok"})
+        else:
+            return jsonify({"status": "error", "message": "failed to update"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @lobby_bp.route('/<passcode>/start', methods=['POST'])
 async def start_tournament(passcode):

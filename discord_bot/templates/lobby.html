@@ -137,6 +137,14 @@
                         </form>
                         <a href="{{ url_for('lobby.export_csv', passcode=room.get('passcode')) }}"
                             class="btn btn-secondary"><i class="fas fa-file-csv"></i> 結果のCSVエクスポート</a>
+                        {% else %}
+                        <!-- 自由対戦モードのボタン -->
+                        <button class="btn btn-success" onclick="updateMyStatus('waiting')"><i
+                                class="fas fa-door-open"></i> 対戦待ち(受付中)にする</button>
+                        <button class="btn btn-danger" onclick="updateMyStatus('playing')"><i
+                                class="fas fa-gamepad"></i> 対戦中(締切)にする</button>
+                        <button class="btn btn-secondary" onclick="updateMyStatus('online')"><i class="fas fa-stop"></i>
+                            待機解除(オンライン)</button>
                         {% endif %}
                     </div>
 
@@ -219,9 +227,19 @@
                             </span>
                         </td>
                         <td class="member-status-cell" id="status-{{ m.get('user_id') }}">
-                            <!-- ステータスはJS側から更新される -->
+                            {% if m.get('status') == 'playing' %}
+                            <span class="badge badge-danger status-badge"><i class="fas fa-circle"
+                                    style="font-size: 0.7em;"></i> 対戦中</span>
+                            {% elif m.get('status') == 'waiting' %}
+                            <span class="badge badge-success status-badge"><i class="fas fa-circle"
+                                    style="font-size: 0.7em;"></i> 受付中(ホスト待機)</span>
+                            {% elif m.get('gamelink') %}
+                            <span class="badge badge-primary status-badge"><i class="fas fa-circle"
+                                    style="font-size: 0.7em;"></i> オンライン</span>
+                            {% else %}
                             <span class="badge badge-secondary status-badge"><i class="fas fa-circle"
                                     style="font-size: 0.7em;"></i> オフライン</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if m.get('gamelink') %}
