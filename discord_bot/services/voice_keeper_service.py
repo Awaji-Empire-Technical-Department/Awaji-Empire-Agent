@@ -72,7 +72,7 @@ class VoiceKeeperService:
             )
             return False
 
-        msg = f"【寝落ち集計】\n今回の犠牲者は **{kicked_count}人** でした。おやすみなさい。"
+        msg = f"【寝落ち集計】\n今回の犠牲者は **{kicked_count}人** でした。\n 配信以外ではコメントの書き込みを控えてください。"
         try:
             await report_ch.send(msg)
             return True
