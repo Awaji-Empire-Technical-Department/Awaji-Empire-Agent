@@ -7,6 +7,7 @@
     <title>ロビー詳細 - Awaji Agent</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+    <link href="https://cdn.jsdelivr.net/npm/bracketry/lib/bracketry.min.css" rel="stylesheet" />
 </head>
 
 <body>
@@ -46,6 +47,30 @@
                 {% endif %}
             </div>
             <div class="card-body">
+
+                <div class="alert alert-info" style="margin-bottom: 2rem;">
+                    <h4><i class="fas fa-network-wired"></i> WARP & 対戦接続ガイド</h4>
+                    <p style="margin-bottom: 0.5rem;">対戦を行うにはCloudflare
+                        WARPクライアントをインストールし、ZeroTrust設定でチーム「<strong>awaji-empire</strong>」にログインしてください。</p>
+                    <ul style="margin-left: 1.5rem; margin-bottom: 0.5rem;">
+                        <li><strong>ホスト（待機側）</strong>: ゲーム内で「Server(待機)」を選択し、ポート10800でUDP待機。</li>
+                        <li><strong>クライアント（参加側）</strong>: ゲーム内で「Client(参加)」を選択し、相手の「ゲームリンク」をIP欄に入力。</li>
+                    </ul>
+                    <p style="color: var(--primary-color)"><i class="fas fa-video"></i> <strong>配信連動推奨</strong>:
+                        対戦の観戦は、誰か一人がゲーム内で観戦に入り、Discord等で画面共有を行ってください。</p>
+                </div>
+
+                {% if room.get('mode') == 'tournament' %}
+                <div class="tournament-bracket-wrapper"
+                    style="margin-bottom: 2rem; border-top: 1px solid #444; padding-top: 1rem;">
+                    <h3><i class="fas fa-sitemap"></i> 大会ブラケット結果</h3>
+                    <div id="tournament-bracket-container"
+                        style="height: 400px; width: 100%; border: 1px solid #333; background: #222; border-radius: 8px; margin-top: 1rem; overflow: hidden;">
+                        <p style="text-align:center; padding-top:180px; color:#888;">ブラケット情報読み込み中、または大会未開始です...</p>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="lobby-info-container">
                     <div class="lobby-info-column">
                         <h3>ロビー情報</h3>
@@ -193,8 +218,10 @@
                                 {{ m.get('role')|upper }}
                             </span>
                         </td>
-                        <td>
-                            <!-- 仮 -->入室済
+                        <td class="member-status-cell" id="status-{{ m.get('user_id') }}">
+                            <!-- ステータスはJS側から更新される -->
+                            <span class="badge badge-secondary status-badge"><i class="fas fa-circle"
+                                    style="font-size: 0.7em;"></i> オフライン</span>
                         </td>
                         <td>
                             {% if m.get('gamelink') %}
@@ -216,6 +243,14 @@
             </table>
         </div>
     </div>
+
+    <script>
+        window.LOBBY_PASSCODE = "{{ room.get('passcode') }}";
+        window.MY_USER_ID = "{{ user['id'] }}";
+        window.WEBSOCKET_URL = "ws://127.0.0.1:3000/ws/hyouibana"; // Rust APIのエンドポイント
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bracketry@2.1.4/lib/bracketry.min.js"></script>
+    <script type="module" src="{{ url_for('static', filename='js/possession_lobby.js') }}"></script>
 </body>
 
 </html>

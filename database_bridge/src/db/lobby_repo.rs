@@ -144,7 +144,7 @@ pub async fn transfer_host(pool: &MySqlPool, passcode: &str, new_host_id: i64) -
 
 pub async fn find_members(pool: &MySqlPool, passcode: &str) -> BridgeResult<Vec<LobbyMember>> {
     let query = r#"
-        SELECT l.room_passcode, l.user_id, u.username, u.virtual_ip, l.role 
+        SELECT l.room_passcode, l.user_id, u.username, u.virtual_ip, l.role, l.status
         FROM lobby_members l
         LEFT JOIN user_networks u ON l.user_id = u.discord_id
         WHERE l.room_passcode = ?
@@ -177,6 +177,66 @@ pub async fn remove_member(pool: &MySqlPool, passcode: &str, user_id: i64) -> Br
     sqlx::query(query)
         .bind(passcode)
         .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn update_member_status(pool: &MySqlPool, passcode: &str, user_id: i64, status: &str) -> BridgeResult<()> {
+    let query = "UPDATE lobby_members SET status = ? WHERE room_passcode = ? AND user_id = ?";
+    sqlx::query(query)
+        .bind(status)
+        .bind(passcode)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_tournament_matches(pool: &MySqlPool, passcode: &str) -> BridgeResult<Vec<crate::db::models::TournamentMatch>> {
+    let query = r#"
+        SELECT * FROM tournament_matches WHERE room_passcode = ? ORDER BY round_num ASC, match_index ASC
+    "#;
+    let matches = sqlx::query_as::<_, crate::db::models::TournamentMatch>(query)
+        .bind(passcode)
+        .fetch_all(pool)
+        .await?;
+    Ok(matches)
+}
+
+pub async fn insert_tournament_match(
+    pool: &MySqlPool, 
+    passcode: &str, 
+    player1_id: Option<i64>, 
+    player2_id: Option<i64>,
+    round_num: i32,
+    match_index: i32,
+    win_condition: i32
+) -> BridgeResult<i32> {
+    let query = r#"
+        INSERT INTO tournament_matches (room_passcode, player1_id, player2_id, round_num, match_index, win_condition)
+        VALUES (?, ?, ?, ?, ?, ?)
+    "#;
+    let result = sqlx::query(query)
+        .bind(passcode)
+        .bind(player1_id)
+        .bind(player2_id)
+        .bind(round_num)
+        .bind(match_index)
+        .bind(win_condition)
+        .execute(pool)
+        .await?;
+    Ok(result.last_insert_id() as i32)
+}
+
+pub async fn report_match_winner(pool: &MySqlPool, match_id: i32, winner_id: i64, score1: i32, score2: i32) -> BridgeResult<()> {
+    // NOTE: Simplified logic. For full validation, we'd check if max(score1, score2) >= win_condition.
+    let query = "UPDATE tournament_matches SET winner_id = ?, status = 'finished', score1 = ?, score2 = ? WHERE match_id = ?";
+    sqlx::query(query)
+        .bind(winner_id)
+        .bind(score1)
+        .bind(score2)
+        .bind(match_id)
         .execute(pool)
         .await?;
     Ok(())

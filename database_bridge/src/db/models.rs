@@ -183,6 +183,7 @@ pub struct LobbyMember {
     #[sqlx(default)]
     pub gamelink: Option<String>,
     pub role: Option<String>,
+    pub status: Option<String>,
 }
 
 /// tournament_matches テーブルの 1 行に対応する Struct。
@@ -194,6 +195,12 @@ pub struct TournamentMatch {
     pub player2_id: Option<i64>,
     pub winner_id: Option<i64>,
     pub status: Option<String>,
+    pub round_num: Option<i32>,
+    pub match_index: Option<i32>,
+    pub next_match_id: Option<i32>,
+    pub score1: Option<i32>,
+    pub score2: Option<i32>,
+    pub win_condition: Option<i32>,
 }
 
 /// admin_logs テーブルの 1 行に対応する Struct。

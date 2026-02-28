@@ -84,3 +84,23 @@ class LobbyService:
         }
         res = await bridge_client.request("POST", "/lobby/join", json=payload)
         return res is not None and res.get("status") == "ok"
+
+    @staticmethod
+    async def _fetch_tournament_matches(passcode: str) -> List[Dict[str, Any]]:
+        """トーナメントの試合一覧を取得する"""
+        res = await bridge_client.request("GET", f"/lobby/rooms/{passcode}/matches")
+        return res if res else []
+
+    @staticmethod
+    async def update_member_status(passcode: str, user_id: int, status: str) -> bool:
+        """メンバーのステータス（待機中、対戦中など）を更新する"""
+        payload = {"status": status}
+        res = await bridge_client.request("PATCH", f"/lobby/rooms/{passcode}/members/{user_id}/status", json=payload)
+        return res is not None and res.get("status") == "ok"
+
+    @staticmethod
+    async def report_match_winner(match_id: int, winner_id: int, score1: int, score2: int) -> bool:
+        """試合の勝者を報告する"""
+        payload = {"winner_id": winner_id, "score1": score1, "score2": score2}
+        res = await bridge_client.request("POST", f"/lobby/matches/{match_id}/winner", json=payload)
+        return res is not None and res.get("status") == "ok"
