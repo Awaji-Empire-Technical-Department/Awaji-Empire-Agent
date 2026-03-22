@@ -20,7 +20,7 @@ from .logic import (
 
 logger = logging.getLogger(__name__)
 
-GUILD_ID = int(os.getenv("GUILD_ID", "0"))
+GUILD_ID = int(os.getenv("DISCORD_GUILD_ID", "0"))
 ADMIN_ROLE_NAME = "管理者"
 FALLBACK_HOUR_JST = 6
 

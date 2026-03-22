@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 ADMIN_USER_ID = os.getenv('ADMIN_USER_ID', '')
-GUILD_ID = os.getenv('GUILD_ID', '')
+DISCORD_GUILD_ID = os.getenv('DISCORD_GUILD_ID', '')
 
 # コグ（拡張機能）のリスト
 COGS = [
@@ -42,14 +42,14 @@ class MyBot(commands.Bot):
                 print(f"ERROR: {cog_name} のロードに失敗しました。")
                 print(f"Traceback: {e}")
 
-        # config.py の GUILD_ID をチェック
-        if GUILD_ID:
+        # .env の DISCORD_GUILD_ID をチェック
+        if DISCORD_GUILD_ID:
             try:
                 # 特定のサーバー(ギルド)にだけコマンドを登録・同期
-                guild = discord.Object(id=int(GUILD_ID))
+                guild = discord.Object(id=int(DISCORD_GUILD_ID))
                 self.tree.copy_global_to(guild=guild)
                 await self.tree.sync(guild=guild)
-                print(f"Command tree synced to guild {GUILD_ID} successfully.")
+                print(f"Command tree synced to guild {DISCORD_GUILD_ID} successfully.")
             except Exception as e:
                 print(f"Failed to sync to guild: {e}")
         else:
