@@ -1,4 +1,5 @@
 ﻿pub mod lobby;
+pub mod reset_log;
 pub mod ws;
 
 // api/handlers.rs (now as mod.rs inside handlers/)
@@ -19,7 +20,7 @@ use crate::bot::survey_handler;
 // 共通レスポンス
 // ============================================================
 
-fn internal_error<E: std::fmt::Display>(err: E) -> (StatusCode, Json<Value>) {
+pub(crate) fn internal_error<E: std::fmt::Display>(err: E) -> (StatusCode, Json<Value>) {
     error!("Internal server error: {}", err);
     (
         StatusCode::INTERNAL_SERVER_ERROR,
