@@ -164,6 +164,25 @@ CHANNEL_OVERWRITES_SPEC = [
 ]
 ```
 
+#### 環境変数の設定例（`.env`）
+
+```bash
+# #配信コメント チャンネル月次リセット機能
+STREAM_COMMENT_CHANNEL_NAME=配信コメント
+ADMIN_REPORT_CHANNEL_NAME=bot-log
+FALLBACK_HOUR_JST=6
+VOICE_KEEPER_REPORT_KEYWORD=寝落ち
+ADMIN_ROLE_NAME=管理者
+```
+
+| 環境変数 | 説明 | デフォルト | 変更可否 |
+|---------|------|-----------|--------|
+| `STREAM_COMMENT_CHANNEL_NAME` | リセット対象のテキストチャンネル名 | `配信コメント` | ○（別サーバー対応時） |
+| `ADMIN_REPORT_CHANNEL_NAME` | リセット完了報告先チャンネル名 | `bot-log` | ○ |
+| `FALLBACK_HOUR_JST` | フォールバック cron の実行時刻（JST） | `6` | ○（運用要件に合わせて） |
+| `VOICE_KEEPER_REPORT_KEYWORD` | VoiceKeeper 報告メッセージの検索キーワード | `寝落ち` | △（voice_keeper の仕様に依存） |
+| `ADMIN_ROLE_NAME` | スラッシュコマンド実行権限をもつロール名 | `管理者` | ○ |
+
 #### 主トリガー：Voice Keeper 報告検知
 
 ```python
