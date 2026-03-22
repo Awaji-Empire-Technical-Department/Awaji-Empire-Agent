@@ -30,3 +30,6 @@ test_result.txt
 
 # --- Gemini Antigravity ---
 .gemini/antigravity/
+
+# --- Claude ---
+.claude/
