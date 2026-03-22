@@ -18,6 +18,7 @@ COGS = [
     "cogs.survey",        # ディレクトリ化（__init__.py 経由）
     "cogs.voice_keeper",  # 変更なし
     "cogs.lobby.tournament", # セキュアロビーシステム (大会役職付与)
+    "cogs.stream_comment_reset",  # #配信コメント 月次リセット
 ]
 
 class MyBot(commands.Bot):

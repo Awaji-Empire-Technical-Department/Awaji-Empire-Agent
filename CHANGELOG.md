@@ -3,9 +3,57 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
-## [1.3.2] - 2026-02-26
+## [1.4.1] - 2026-02-28
 
-Phase 4: 権限エンジンの Rust 移行、SQLAlchemy 完全撤去、設定の `.env` 統一。設計記録: `docs/adr/007-phase4-rust-permission-engine-and-config-unification.md`
+Phase 4.2 & 4.3: セキュア対戦ロビーのWebSocketリアルタイム化、大会（Tournament）進行支援機能の実装。
+
+### Added
+
+- **WebSocket リアルタイム同期**
+  - Rust バックエンド (`database_bridge`) に WebSocket エンドポイント `/ws/hyouibana` を新設。
+  - フロントエンドからポーリングなしで、メンバーの入退室やステータス変更（受付中、対戦中など）をリアルタイムにUIへ反映する仕組み (`possession_lobby.js`) を導入。
+- **大会進行支援機能 (Tournament Mode)**
+  - トーナメント戦績を記録するためのテーブル拡張 (`100_tournament_updates.sql`)。
+  - フロントエンドに `Bracketry` ライブラリを導入し、大会のトーナメント表（ブラケット）を動的に描画。
+  - バックエンドからの試合結果（勝敗報告 API）の実装。
+- **ステータス手動更新 API**
+  - 自由対戦のホストが「受付中」や「対戦中」を宣言できる `/lobby/api/status` エンドポイントの実装。
+- **Discord ロール自動付与**
+  - トーナメント結果の最終承認時に、自動で Discord API を叩き「(大会名)優勝」ロールを作成・付与する機能を実装。
+
+### Fixed
+
+- **DB マイグレーション修正**
+  - `006_tournament_updates.sql` の名前衝突によって発生した `migration partially applied` エラーを解決するため、ファイル名を `100_tournament_updates.sql` に変更し、DB修復スクリプト (`db_repair.py`) を提供。
+- **フロントエンドのステータス表示バグ**
+  - 初期待機時に全員が「オフライン」と表示される不具合を修正し、Jinja2 テンプレート側および JS 側で正しくステータス（オンライン・対戦中など）を判定して描画するように修正。
+
+## [1.4.0] - 2026-02-27
+
+Phase 3: セキュア対戦ロビーシステムの導入。Cloudflare WARP IP 同期による物理IP隠蔽と、大会進行管理機能の実装。設計記録: `docs/adr/008-secure-lobby-system.md`
+
+### Added
+
+- **セキュア対戦ロビー基盤 (Secure Lobby System)**
+  - **Cloudflare WARP 仮想IP同期**: Discordログイン時に Cloudflare API からデバイス仮想IPを自動取得し同期する仕組みを構築。
+  - **GameLinkFormatter (Rust)**: 仮想IPを『東方憑依華』専用の12桁ゼロ埋め形式（`100.096.xxx.xxx:10800`）に自動変換。
+  - **ロビー管理機能**:
+    - 「自由対戦モード」と「大会モード」の選択、ロビー名・説明文の動的設定。
+    - ホスト権限の譲渡機能、ロビー解散（削除）機能。
+    - 参加メンバーの CSV エクスポート、大会結果の最終承認。
+- **IPC 通信の拡張**: Rust Bridge に `/lobby/sync_user` エンドポイントを新設し、Python からのユーザー属性（IP/メールアドレス）同期を可能に。
+
+### Changed
+
+- **Discord OAuth2 フロー**: Cloudflare デバイス照合のため、認証スコープに `email` を追加。
+- **ロビー削除の堅牢化**: DB制約に依存せず安全に削除できるよう、Rust Bridge 側で関連レコード（メンバー・試合）を明示的に事前クリーンアップするロジックを実装。
+
+### Fixed
+
+- **Cloudflare API 通信**: `per_page` パラメータの制限（最大100件）に伴う API エラー (400 Bad Request) を修正。
+- **Jinja2 テンプレートエラー**: ユーザーID比較時の `str()` 呼び出しをパイプラインフィルタ `|string` に修正。
+
+## [1.3.2] - 2026-02-26
 
 ### Added
 

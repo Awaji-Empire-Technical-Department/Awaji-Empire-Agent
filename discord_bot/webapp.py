@@ -19,6 +19,8 @@ class Config:
     CLIENT_SECRET = os.getenv('DISCORD_CLIENT_SECRET')
     REDIRECT_URI = os.getenv('DISCORD_REDIRECT_URI')
     TARGET_GUILD_ID = os.getenv('DISCORD_GUILD_ID')
+    CLOUDFLARE_ACCOUNT_ID = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+    CLOUDFLARE_API_TOKEN = os.getenv('CLOUDFLARE_API_TOKEN')
 
 app = Quart(__name__, static_folder='static', static_url_path='/static')
 app = cors(app, allow_origin="*")
@@ -57,7 +59,7 @@ def inject_css_version():
 # --- 認証ルート (Auth) ---
 @app.route('/login')
 async def login():
-    scope = "identify guilds"
+    scope = "identify email guilds"
     discord_auth_url = (
         f"https://discord.com/api/oauth2/authorize?client_id={Config.CLIENT_ID}"
         f"&redirect_uri={Config.REDIRECT_URI}&response_type=code&scope={scope}"
@@ -118,6 +120,58 @@ async def callback():
                 'name': user_data['username'],
                 'avatar_url': f"https://cdn.discordapp.com/avatars/{user_data['id']}/{user_data['avatar']}.png"
             }
+            
+            # --- Cloudflare WARP IP Sync ---
+            user_email = user_data.get('email')
+            display_name = user_data.get('global_name') or user_data.get('username')
+            virtual_ip = None
+            
+            if user_email and Config.CLOUDFLARE_ACCOUNT_ID and Config.CLOUDFLARE_API_TOKEN:
+                cf_url = f"https://api.cloudflare.com/client/v4/accounts/{Config.CLOUDFLARE_ACCOUNT_ID}/devices?per_page=100"
+                cf_headers = {
+                    "Authorization": f"Bearer {Config.CLOUDFLARE_API_TOKEN}",
+                    "Content-Type": "application/json"
+                }
+                try:
+                    r_cf = await client.get(cf_url, headers=cf_headers, timeout=10.0)
+                    if r_cf.status_code == 200:
+                        cf_data = r_cf.json()
+                        if cf_data.get("success"):
+                            devices = cf_data.get("result", [])
+                            for device in devices:
+                                if device.get("user", {}).get("email") == user_email:
+                                    last_seen_str = device.get("last_seen")
+                                    if last_seen_str:
+                                        from datetime import datetime, timezone
+                                        try:
+                                            last_seen_str = last_seen_str.replace("Z", "+00:00")
+                                            last_seen = datetime.fromisoformat(last_seen_str)
+                                            now = datetime.now(timezone.utc)
+                                            # 10分(600秒)以内の通信があればアクティブとみなす
+                                            if (now - last_seen).total_seconds() <= 600:
+                                                virtual_ip = device.get("ip")
+                                        except Exception as e:
+                                            current_app.logger.warning(f"Error parsing last_seen: {e}")
+                                            virtual_ip = device.get("ip") # fallback
+                                    else:
+                                        virtual_ip = device.get("ip")
+                                    break
+                except Exception as e:
+                    current_app.logger.error(f"Failed to fetch CF devices: {e}")
+
+            # Rust Bridge へユーザー情報を同期
+            discord_id = int(user_data['id'])
+            try:
+                await LobbyService.sync_user(
+                    discord_id=discord_id,
+                    email=user_email or "",
+                    username=display_name,
+                    virtual_ip=virtual_ip
+                )
+            except BridgeUnavailableError:
+                current_app.logger.warning("Failed to sync user: Bridge unavailable")
+            except Exception as e:
+                current_app.logger.error(f"Failed to sync user: {e}")
             
             # リダイレクト
             next_url = session.pop('next_url', None)

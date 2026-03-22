@@ -39,6 +39,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
+    // マイグレーションの自動実行
+    info!("🔄 Running database migrations...");
+    if let Err(e) = sqlx::migrate!("./migrations").run(&pool).await {
+        error!("❌ Failed to run database migrations: {}", e);
+        std::process::exit(1);
+    }
+    info!("✅ Database migrations applied successfully.");
+
     // ルーターの設定
     let app = database_bridge::api::create_router(pool);
 

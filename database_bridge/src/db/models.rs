@@ -144,6 +144,7 @@ mod serde_bytes_to_string {
 pub struct UserNetwork {
     pub discord_id: i64,
     pub email: String,
+    pub username: Option<String>,
     pub virtual_ip: Option<String>,
     pub is_active: Option<bool>,
     pub is_staff: Option<bool>,
@@ -167,6 +168,9 @@ pub struct LobbyRoom {
     pub is_approved: Option<bool>,
     /// CAST(expires_at AS CHAR) で取得
     pub expires_at: String,
+    pub virtual_ip: Option<String>,
+    #[sqlx(default)]
+    pub gamelink: Option<String>,
 }
 
 /// lobby_members テーブルの 1 行に対応する Struct。
@@ -174,7 +178,12 @@ pub struct LobbyRoom {
 pub struct LobbyMember {
     pub room_passcode: String,
     pub user_id: i64,
+    pub username: Option<String>,
+    pub virtual_ip: Option<String>,
+    #[sqlx(default)]
+    pub gamelink: Option<String>,
     pub role: Option<String>,
+    pub status: Option<String>,
 }
 
 /// tournament_matches テーブルの 1 行に対応する Struct。
@@ -186,6 +195,12 @@ pub struct TournamentMatch {
     pub player2_id: Option<i64>,
     pub winner_id: Option<i64>,
     pub status: Option<String>,
+    pub round_num: Option<i32>,
+    pub match_index: Option<i32>,
+    pub next_match_id: Option<i32>,
+    pub score1: Option<i32>,
+    pub score2: Option<i32>,
+    pub win_condition: Option<i32>,
 }
 
 /// admin_logs テーブルの 1 行に対応する Struct。
@@ -198,6 +213,22 @@ pub struct AdminLog {
     pub detail: Option<String>,
     /// CAST(created_at AS CHAR) で取得
     pub created_at: Option<String>,
+}
+
+// ============================================================
+// stream_comment_reset_log テーブル
+// ============================================================
+
+/// stream_comment_reset_log テーブルの 1 行に対応する Struct。
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ResetLog {
+    pub id: u64,
+    /// CAST(executed_at AS CHAR) で取得
+    pub executed_at: String,
+    pub triggered_by: String,
+    pub event_type: String,
+    pub status: String,
+    pub error_message: Option<String>,
 }
 
 // ============================================================

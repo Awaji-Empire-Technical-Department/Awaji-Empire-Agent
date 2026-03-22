@@ -7,6 +7,7 @@
     <title>ロビー詳細 - Awaji Agent</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+    <link href="https://cdn.jsdelivr.net/npm/bracketry/lib/bracketry.min.css" rel="stylesheet" />
 </head>
 
 <body>
@@ -46,6 +47,30 @@
                 {% endif %}
             </div>
             <div class="card-body">
+
+                <div class="alert alert-info" style="margin-bottom: 2rem;">
+                    <h4><i class="fas fa-network-wired"></i> WARP & 対戦接続ガイド</h4>
+                    <p style="margin-bottom: 0.5rem;">対戦を行うにはCloudflare
+                        WARPクライアントをインストールし、ZeroTrust設定でチーム「<strong>awaji-empire</strong>」にログインしてください。</p>
+                    <ul style="margin-left: 1.5rem; margin-bottom: 0.5rem;">
+                        <li><strong>ホスト（待機側）</strong>: ゲーム内で「Server(待機)」を選択し、ポート10800でUDP待機。</li>
+                        <li><strong>クライアント（参加側）</strong>: ゲーム内で「Client(参加)」を選択し、相手の「ゲームリンク」をIP欄に入力。</li>
+                    </ul>
+                    <p style="color: var(--primary-color)"><i class="fas fa-video"></i> <strong>配信連動推奨</strong>:
+                        対戦の観戦は、誰か一人がゲーム内で観戦に入り、Discord等で画面共有を行ってください。</p>
+                </div>
+
+                {% if room.get('mode') == 'tournament' %}
+                <div class="tournament-bracket-wrapper"
+                    style="margin-bottom: 2rem; border-top: 1px solid #444; padding-top: 1rem;">
+                    <h3><i class="fas fa-sitemap"></i> 大会ブラケット結果</h3>
+                    <div id="tournament-bracket-container"
+                        style="height: 400px; width: 100%; border: 1px solid #333; background: #222; border-radius: 8px; margin-top: 1rem; overflow: hidden;">
+                        <p style="text-align:center; padding-top:180px; color:#888;">ブラケット情報読み込み中、または大会未開始です...</p>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="lobby-info-container">
                     <div class="lobby-info-column">
                         <h3>ロビー情報</h3>
@@ -60,7 +85,15 @@
                             </tr>
                             <tr>
                                 <th>ステータス</th>
-                                <td>{{ '終了 (承認済)' if room.get('is_approved') else '受付中' }}</td>
+                                <td>
+                                    {% if room.get('is_approved') %}
+                                    終了 (承認済)
+                                    {% elif room.get('tournament_start_at') %}
+                                    大会進行中
+                                    {% else %}
+                                    受付中
+                                    {% endif %}
+                                </td>
                             </tr>
                             <tr>
                                 <th>有効期限</th>
@@ -86,6 +119,16 @@
                 <div class="lobby-host-menu">
                     <h3 class="lobby-host-title"><i class="fas fa-crown"></i> ホスト管理メニュー</h3>
                     <div class="lobby-action-buttons">
+                        {% if room.get('mode') == 'tournament' %}
+                        {% if not room.get('tournament_start_at') and not room.get('is_approved') %}
+                        <form action="{{ url_for('lobby.start_tournament', passcode=room.get('passcode')) }}"
+                            method="post" onsubmit="return confirm('大会を開始しますか？参加者の受付が締め切られます');">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-play"></i> 大会を開始する</button>
+                        </form>
+                        {% elif room.get('tournament_start_at') and not room.get('is_approved') %}
+                        <button class="btn btn-secondary" disabled>大会進行中...</button>
+                        {% endif %}
+
                         <form action="{{ url_for('lobby.approve_winner', passcode=room.get('passcode')) }}"
                             method="post"
                             onsubmit="return confirm('※ 最終承認を実行します。承認をすると優勝者が確定します。以降変更できなくなりますがよろしいですか？');">
@@ -94,6 +137,15 @@
                         </form>
                         <a href="{{ url_for('lobby.export_csv', passcode=room.get('passcode')) }}"
                             class="btn btn-secondary"><i class="fas fa-file-csv"></i> 結果のCSVエクスポート</a>
+                        {% else %}
+                        <!-- 自由対戦モードのボタン -->
+                        <button class="btn btn-success" onclick="updateMyStatus('waiting')"><i
+                                class="fas fa-door-open"></i> 対戦待ち(受付中)にする</button>
+                        <button class="btn btn-danger" onclick="updateMyStatus('playing')"><i
+                                class="fas fa-gamepad"></i> 対戦中(締切)にする</button>
+                        <button class="btn btn-secondary" onclick="updateMyStatus('online')"><i class="fas fa-stop"></i>
+                            待機解除(オンライン)</button>
+                        {% endif %}
                     </div>
 
                     <div class="lobby-transfer-section">
@@ -103,13 +155,20 @@
                             <select name="new_host_id" class="form-control lobby-transfer-select" required>
                                 <option value="">メンバーを選択...</option>
                                 {% for m in members %}
-                                {% if str(m.get('user_id')) != str(user['id']) %}
+                                {% if m.get('user_id')|string != user['id']|string %}
                                 <option value="{{ m.get('user_id') }}">{{ m.get('user_id') }} ({{ m.get('role') }})
                                 </option>
                                 {% endif %}
                                 {% endfor %}
                             </select>
                             <button type="submit" class="btn btn-danger btn-sm">譲渡</button>
+                        </form>
+                    </div>
+
+                    <div style="margin-top: 2rem; border-top: 1px dashed #ccc; padding-top: 1rem;">
+                        <form action="{{ url_for('lobby.delete_lobby', passcode=room.get('passcode')) }}" method="post"
+                            onsubmit="return confirm('本当にこのロビーを削除しますか？この操作は取り消せません。');">
+                            <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> ロビーを解散する</button>
                         </form>
                     </div>
                 </div>
@@ -143,30 +202,54 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ユーザーID</th>
+                        <th>ユーザー</th>
                         <th>ロール</th>
                         <th>ステータス</th>
+                        <th>接続情報</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for m in members %}
                     <tr>
                         <td>
-                            {{ m.get('user_id') }}
-                            {% if str(m.get('user_id')) == str(room.get('host_id')) %}
+                            <strong>{{ m.get('username') or m.get('user_id') }}</strong>
+                            {% if m.get('user_id')|string == room.get('host_id')|string %}
                             <i class="fas fa-crown" style="color: #ffc107; margin-left: 5px;" title="ホスト"></i>
                             {% endif %}
-                            {% if str(m.get('user_id')) == str(user['id']) %}
+                            {% if m.get('user_id')|string == user['id']|string %}
                             <span class="badge badge-secondary" style="font-size:0.7em;">あなた</span>
                             {% endif %}
+                            <div style="font-size: 0.8em; color: var(--gray);">ID: {{ m.get('user_id') }}</div>
                         </td>
                         <td>
                             <span class="badge {{ 'badge-primary' if m.get('role') == 'staff' else 'badge-success' }}">
                                 {{ m.get('role')|upper }}
                             </span>
                         </td>
+                        <td class="member-status-cell" id="status-{{ m.get('user_id') }}">
+                            {% if m.get('status') == 'playing' %}
+                            <span class="badge badge-danger status-badge"><i class="fas fa-circle"
+                                    style="font-size: 0.7em;"></i> 対戦中</span>
+                            {% elif m.get('status') == 'waiting' %}
+                            <span class="badge badge-success status-badge"><i class="fas fa-circle"
+                                    style="font-size: 0.7em;"></i> 受付中(ホスト待機)</span>
+                            {% elif m.get('gamelink') %}
+                            <span class="badge badge-primary status-badge"><i class="fas fa-circle"
+                                    style="font-size: 0.7em;"></i> オンライン</span>
+                            {% else %}
+                            <span class="badge badge-secondary status-badge"><i class="fas fa-circle"
+                                    style="font-size: 0.7em;"></i> オフライン</span>
+                            {% endif %}
+                        </td>
                         <td>
-                            <!-- 仮 -->入室済
+                            {% if m.get('gamelink') %}
+                            <button
+                                onclick="navigator.clipboard.writeText('{{ m.get('gamelink') }}'); alert('IPアドレスをコピーしました');"
+                                class="btn btn-sm btn-outline" style="padding: 2px 5px; font-size: 0.8em;"><i
+                                    class="fas fa-copy"></i> IPコピー</button>
+                            {% else %}
+                            <span style="color: var(--gray); font-size: 0.8em;">未接続</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% else %}
@@ -178,6 +261,14 @@
             </table>
         </div>
     </div>
+
+    <script>
+        window.LOBBY_PASSCODE = "{{ room.get('passcode') }}";
+        window.MY_USER_ID = "{{ user['id'] }}";
+        window.WEBSOCKET_URL = "ws://127.0.0.1:3000/ws/hyouibana"; // Rust APIのエンドポイント
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bracketry@2.1.4/lib/bracketry.min.js"></script>
+    <script type="module" src="{{ url_for('static', filename='js/possession_lobby.js') }}"></script>
 </body>
 
 </html>

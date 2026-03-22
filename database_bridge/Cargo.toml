@@ -29,7 +29,8 @@ dotenvy = "0.15"
 thiserror = "1.0"
 
 # HTTP サーバー (IPC 用)
-axum = "0.8"
+axum = { version = "0.8", features = ["ws", "macros"] }
+futures = "0.3"
 tower-http = { version = "0.6", features = ["trace"] }
 
 # 構造化ログ
