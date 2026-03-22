@@ -72,17 +72,21 @@ class StreamCommentResetService:
                 overwrites=overwrites,
                 reason=reason,
             )
+            logger.info(
+                "[StreamCommentReset] チャンネル作成成功 channel=%s(%s)",
+                new_channel.name, new_channel.id,
+            )
             return new_channel
-        except discord.Forbidden:
-            logger.warning(
-                "[StreamCommentReset] チャンネル作成権限なし guild=%s(%s)",
-                guild.name, guild.id,
+        except discord.Forbidden as e:
+            logger.error(
+                "[StreamCommentReset] チャンネル作成権限エラー guild=%s(%s) error=%s",
+                guild.name, guild.id, e,
             )
             return None
         except discord.HTTPException as e:
             logger.error(
-                "[StreamCommentReset] チャンネル作成失敗 guild=%s(%s): %s",
-                guild.name, guild.id, e,
+                "[StreamCommentReset] チャンネル作成失敗 guild=%s(%s) status=%s error=%s",
+                guild.name, guild.id, getattr(e, 'status', 'unknown'), e,
             )
             return None
 
