@@ -26,10 +26,9 @@ VOICE_KEEPER_REPORT_KEYWORD = os.getenv("VOICE_KEEPER_REPORT_KEYWORD", "寝落�
 BOT_ROLE_NAME = os.getenv("BOT_ROLE_NAME", "Bot")
 
 CHANNEL_OVERWRITES_SPEC: List[Dict[str, Any]] = [
-    {"target": "everyone",    "allow": ["view_channel"],                     "deny": ["send_messages"]},
-    {"target": "role:配信者", "allow": ["view_channel", "send_messages"],    "deny": []},
-    {"target": "bot",         "allow": ["view_channel", "send_messages",
-                                         "manage_messages", "manage_roles"], "deny": []},
+    {"target": "everyone", "allow": ["view_channel", "send_messages"], "deny": []},
+    {"target": "bot",      "allow": ["view_channel", "send_messages",
+                                     "manage_messages", "manage_roles"], "deny": []},
 ]
 
 
