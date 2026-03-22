@@ -48,6 +48,8 @@ class StreamCommentResetLogic:
         """メッセージが VoiceKeeper の寝落ち集計報告かどうかを判定する。"""
         if not message.author.bot:
             return False
+        if not isinstance(message.channel, discord.TextChannel):
+            return False
         if message.channel.name != STREAM_COMMENT_CHANNEL_NAME:
             return False
         if VOICE_KEEPER_REPORT_KEYWORD not in (message.content or ""):
