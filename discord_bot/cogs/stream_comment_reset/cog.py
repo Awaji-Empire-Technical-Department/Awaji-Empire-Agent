@@ -155,17 +155,23 @@ class StreamCommentResetCog(commands.Cog):
         interaction: discord.Interaction,
         error: app_commands.AppCommandError,
     ):
-        if isinstance(error, app_commands.MissingRole):
-            await interaction.response.send_message(
-                f"❌ このコマンドは `{ADMIN_ROLE_NAME}` ロールのみ実行できます。",
-                ephemeral=True,
-            )
+        # defer されていない場合のみ response を使用
+        if not interaction.response.is_done():
+            if isinstance(error, app_commands.MissingRole):
+                await interaction.response.defer(ephemeral=True)
+                await interaction.followup.send(
+                    f"❌ このコマンドは `{ADMIN_ROLE_NAME}` ロールのみ実行できます。",
+                    ephemeral=True,
+                )
+            else:
+                logger.error("[StreamCommentReset] コマンドエラー: %s", error)
+                await interaction.response.defer(ephemeral=True)
+                await interaction.followup.send(
+                    f"❌ 予期しないエラーが発生しました: `{error}`",
+                    ephemeral=True,
+                )
         else:
-            logger.error("[StreamCommentReset] コマンドエラー: %s", error)
-            await interaction.response.send_message(
-                f"❌ 予期しないエラーが発生しました: `{error}`",
-                ephemeral=True,
-            )
+            logger.error("[StreamCommentReset] コマンドエラー (defer済み): %s", error)
 
     # ================================================================
     # 内部ヘルパー
