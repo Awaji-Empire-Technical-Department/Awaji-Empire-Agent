@@ -3,6 +3,7 @@
 #      ctx 非依存・ステートレスな @staticmethod で実装し、
 #      I/O は services/stream_comment_reset_service.py に委譲する。
 
+import os
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -19,14 +20,15 @@ JST = timezone(timedelta(hours=9))
 # 定数（仕様書 §4.2 準拠）
 # ============================================================
 
-STREAM_COMMENT_CHANNEL_NAME = "配信コメント"
-ADMIN_REPORT_CHANNEL_NAME = "bot-log"
-VOICE_KEEPER_REPORT_KEYWORD = "寝落ち"
+STREAM_COMMENT_CHANNEL_NAME = os.getenv("STREAM_COMMENT_CHANNEL_NAME", "配信コメント")
+ADMIN_REPORT_CHANNEL_NAME = os.getenv("ADMIN_REPORT_CHANNEL_NAME", "bot-log")
+VOICE_KEEPER_REPORT_KEYWORD = os.getenv("VOICE_KEEPER_REPORT_KEYWORD", "寝落ち")
+BOT_ROLE_NAME = os.getenv("BOT_ROLE_NAME", "Bot")
 
 CHANNEL_OVERWRITES_SPEC: List[Dict[str, Any]] = [
     {"target": "everyone",    "allow": ["view_channel"],                     "deny": ["send_messages"]},
     {"target": "role:配信者", "allow": ["view_channel", "send_messages"],    "deny": []},
-    {"target": "role:Bot",    "allow": ["view_channel", "send_messages",
+    {"target": "bot",         "allow": ["view_channel", "send_messages",
                                          "manage_messages", "manage_roles"], "deny": []},
 ]
 
@@ -86,6 +88,15 @@ class StreamCommentResetLogic:
 
             if target_key == "everyone":
                 target = guild.default_role
+            elif target_key == "bot":
+                # Bot メンバーに対して権限を設定
+                target = discord.utils.get(guild.roles, name=BOT_ROLE_NAME)
+                if target is None:
+                    logger.warning(
+                        "[StreamCommentReset] Bot ロール '%s' が見つかりません — スキップ",
+                        BOT_ROLE_NAME,
+                    )
+                    continue
             else:
                 role_name = target_key.split("role:")[1]
                 target = discord.utils.get(guild.roles, name=role_name)
