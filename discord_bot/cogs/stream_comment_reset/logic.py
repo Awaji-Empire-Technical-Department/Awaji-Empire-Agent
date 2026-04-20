@@ -60,11 +60,11 @@ class StreamCommentResetLogic:
     @staticmethod
     def should_fallback_run(now: Optional[datetime] = None) -> bool:
         """フォールバック cron が実行すべきタイミングか判定する。
-        毎月2日 06:00 JST のみ True。
+        毎月21日 06:00 JST のみ True。
         """
         if now is None:
             now = datetime.now(JST)
-        return now.day == 2 and now.hour == 6
+        return now.day == 21 and now.hour == 6
 
     @staticmethod
     def is_already_reset(last_reset_month: Optional[int], now: Optional[datetime] = None) -> bool:

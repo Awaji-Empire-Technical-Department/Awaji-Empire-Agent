@@ -29,7 +29,7 @@ class StreamCommentResetCog(commands.Cog):
     """#配信コメント チャンネル月次リセット機能 (Interface Layer)
 
     - on_message: VoiceKeeper 寝落ち集計報告を検知して主トリガー発火
-    - fallback_reset: 毎月2日 06:00 JST のフォールバック cron
+    - fallback_reset: 毎月21日 06:00 JST のフォールバック cron
     - on_guild_channel_update: Self Heal（Bot 権限の自動復元）
     - /reset_stream_comments: 管理者向けスラッシュコマンド
     """
@@ -53,8 +53,8 @@ class StreamCommentResetCog(commands.Cog):
             return
 
         now = datetime.now(JST)
-        if now.day != 1:
-            return  # 毎月1日のみ主トリガー発火
+        if now.day != 20:
+            return  # 毎月20日のみ主トリガー発火
 
         await self._try_monthly_reset(triggered_by="voice_keeper")
 
