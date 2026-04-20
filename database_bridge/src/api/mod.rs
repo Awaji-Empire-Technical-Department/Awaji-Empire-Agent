@@ -33,6 +33,7 @@ pub fn create_router(pool: MySqlPool) -> Router {
         .nest("/lobby", lobby_routes())
         .route("/ws/hyouibana", get(handlers::ws::ws_handler))
         .route("/logs", get(handlers::list_recent_logs).post(handlers::log_operation))
+        .nest("/reset_logs", reset_log_routes())
         .with_state(state)
 }
 
@@ -48,6 +49,13 @@ fn lobby_routes() -> Router<AppState> {
         .route("/matches/{match_id}/winner", post(crate::api::handlers::lobby::report_winner))
         .route("/join", post(crate::api::handlers::lobby::join_lobby))
         .route("/join/{passcode}", get(crate::api::handlers::lobby::list_members))
+}
+
+/// リセットログ関連のルーティング。
+fn reset_log_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", get(handlers::reset_log::list_reset_logs).post(handlers::reset_log::insert_reset_log))
+        .route("/check_month", get(handlers::reset_log::check_month))
 }
 
 /// アンケート関連のルーティング。

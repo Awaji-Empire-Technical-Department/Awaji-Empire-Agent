@@ -216,6 +216,22 @@ pub struct AdminLog {
 }
 
 // ============================================================
+// stream_comment_reset_log テーブル
+// ============================================================
+
+/// stream_comment_reset_log テーブルの 1 行に対応する Struct。
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ResetLog {
+    pub id: u64,
+    /// CAST(executed_at AS CHAR) で取得
+    pub executed_at: String,
+    pub triggered_by: String,
+    pub event_type: String,
+    pub status: String,
+    pub error_message: Option<String>,
+}
+
+// ============================================================
 // 共通エラー型
 // ============================================================
 
