@@ -96,7 +96,9 @@ class StreamCommentResetService:
         try:
             await channel.send(
                 "🔄 **チャンネルリセット完了**\n"
-                "毎月恒例のリセットを実施しました。今月もコメントよろしくお願いします！"
+                "毎月恒例のリセットを実施しました。今月もコメントよろしくお願いします！\n"
+                "通知OFF設定をお願いします！\n"
+                "（設定方法: チャンネル名右の歯車アイコン → 通知設定 → 「このチャンネルの通知をミュートする」をON）"
             )
             return True
         except discord.HTTPException as e:
