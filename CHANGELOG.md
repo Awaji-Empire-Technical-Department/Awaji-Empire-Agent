@@ -3,6 +3,22 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
+## [1.5.0] - 2026-04-20
+
+`#配信コメント` チャンネル月次リセット機能の実装。設計記録: `docs/adr/011-stream-comment-reset.md`
+
+### Added
+
+- **#配信コメント チャンネル月次リセット機能**
+  - **主トリガー**: VoiceKeeper の寝落ち集計報告を毎月20日に検知し、チャンネルを削除→同名・同カテゴリ・同ポジションで即時再作成。
+  - **フォールバック cron**: 毎月21日 06:00 JST に未リセットであれば補完実行 (`tasks.loop(hours=24)`)。
+  - **Self Heal**: `on_guild_channel_update` で Bot の `manage_roles` overwrite が除去されたことを検知し、即座に自動再付与。MassMute の Self Heal パターンを踏襲。
+  - **スラッシュコマンド `/reset_stream_comments`**: `管理者` ロール限定・全員非表示 (`default_permissions=Permissions(0)`)。`dry_run` オプションで overwrite プレビューを確認可能。
+  - **DB ログ**: Rust Bridge 経由で `stream_comment_reset_log` テーブルに月次リセット・Self Heal・手動リセットを記録。
+  - **冪等性**: `_last_reset_month` によるメモリ上チェックで二重実行を防止。
+  - 実装層: `cogs/stream_comment_reset/` (cog.py / logic.py) + `services/stream_comment_reset_service.py` + Rust `reset_log_repo`。
+  - 仕様書: `docs/FEATURE_STREAM_COMMENT_RESET.md`
+
 ## [1.4.1] - 2026-02-28
 
 Phase 4.2 & 4.3: セキュア対戦ロビーのWebSocketリアルタイム化、大会（Tournament）進行支援機能の実装。
