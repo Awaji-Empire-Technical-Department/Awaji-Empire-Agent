@@ -32,4 +32,4 @@ test_result.txt
 .gemini/antigravity/
 
 # --- Claude ---
-.claude/
+!/.claude/.settings.local.json
