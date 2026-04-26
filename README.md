@@ -9,7 +9,7 @@
 
 ## 🚀 主要機能
 
-本システムは主に 3 つのコア機能を提供します。
+本システムは主に 4 つのコア機能を提供します。
 
 | 機能 | 概要 | 詳細ドキュメント |
 | :--- | :--- | :--- |
@@ -46,48 +46,24 @@
 
 ### 1. 環境変数の設定
 
-`.env` ファイルを作成し、必要な情報を設定します。
+`.env` ファイルを作成し、必要な情報を設定します。以下のファイルをコピーして環境変数を入力してください。
 
-```ini
-# Database
-DB_HOST=db_ip
-DB_NAME=bot_db
-DB_USER=bot_user
-DB_PASS=your_password
-
-# Discord OAuth2
-DISCORD_CLIENT_ID=bot_client_id
-DISCORD_CLIENT_SECRET=your_client_secret
-DISCORD_REDIRECT_URI=[https://dashboard.awajiempire.net/callback](https://dashboard.awajiempire.net/callback)
-
-# ★追加: 淡路帝国サーバーのID (数字のみ)
-DISCORD_GUILD_ID=server_id
-
-# Web Dashboard URL (Bot案内用)
-DASHBOARD_URL=https://dashboard.awajiempire.net
-
-# ★追加: AFK監視設定
-TARGET_USER_ID=target_user_id #監視対象ユーザー
-ACTIVE_START_HOUR=ACTIVE_START_HOUR #稼働開始時間
-ACTIVE_END_HOUR=ACTIVE_END_HOUR #稼働終了時間
-AFK_TIMEOUT_SECONDS=AFK_TIMEOUT_SECONDS #AFKタイムアウト時間（秒）
-REPORT_CHANNEL_NAME=REPORT_CHANNEL_NAME #レポート送信先チャンネル名
-```
+[./discord_bot/.env.example](./discord_bot/.env.example)
 
 ### 2. 依存関係のインストール
 
 ```Bash
-pip install -r requirements.txt
+uv sync 
 ```
 
 ### 3. サービスの起動
 
 ```Bash
 # Botの起動
-python bot.py
+uv run bot.py
 
 # Webダッシュボードの起動
-python webapp.py
+uv run webapp.py
 ```
 
 ### 4. Rust DB ブリッジの起動
