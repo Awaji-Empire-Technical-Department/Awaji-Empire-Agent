@@ -52,17 +52,17 @@
 ### 2. 依存関係のインストール
 
 ```Bash
-pip install -r requirements.txt
+uv sync 
 ```
 
 ### 3. サービスの起動
 
 ```Bash
 # Botの起動
-python bot.py
+uv run bot.py
 
 # Webダッシュボードの起動
-python webapp.py
+uv run webapp.py
 ```
 
 ## 各ディレクトリの説明
