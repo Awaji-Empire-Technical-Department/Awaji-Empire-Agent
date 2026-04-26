@@ -9,7 +9,7 @@
 
 ## 🚀 主要機能
 
-本システムは主に 3 つのコア機能を提供します。
+本システムは主に 4 つのコア機能を提供します。
 
 | 機能 | 概要 | 詳細ドキュメント |
 | :--- | :--- | :--- |
@@ -45,33 +45,9 @@
 
 ### 1. 環境変数の設定
 
-`.env` ファイルを作成し、必要な情報を設定します。
+`.env` ファイルを作成し、必要な情報を設定します。以下のファイルをコピーして環境変数を入力してください。
 
-```ini
-# Database
-DB_HOST=db_ip
-DB_NAME=bot_db
-DB_USER=bot_user
-DB_PASS=your_password
-
-# Discord OAuth2
-DISCORD_CLIENT_ID=bot_client_id
-DISCORD_CLIENT_SECRET=your_client_secret
-DISCORD_REDIRECT_URI=[https://dashboard.awajiempire.net/callback](https://dashboard.awajiempire.net/callback)
-
-# ★追加: 淡路帝国サーバーのID (数字のみ)
-DISCORD_GUILD_ID=server_id
-
-# Web Dashboard URL (Bot案内用)
-DASHBOARD_URL=https://dashboard.awajiempire.net
-
-# ★追加: AFK監視設定
-TARGET_USER_ID=target_user_id #監視対象ユーザー
-ACTIVE_START_HOUR=ACTIVE_START_HOUR #稼働開始時間
-ACTIVE_END_HOUR=ACTIVE_END_HOUR #稼働終了時間
-AFK_TIMEOUT_SECONDS=AFK_TIMEOUT_SECONDS #AFKタイムアウト時間（秒）
-REPORT_CHANNEL_NAME=REPORT_CHANNEL_NAME #レポート送信先チャンネル名
-```
+[./discord_bot/.env.example](./discord_bot/.env.example)
 
 ### 2. 依存関係のインストール
 
@@ -88,14 +64,6 @@ python bot.py
 # Webダッシュボードの起動
 python webapp.py
 ```
-
-### 4. 次世代ロードマップ：Rustによるデータアクセス層の強化
-
-現在、システムのさらなる堅牢性と安全性を追求するため、以下の実装を検討しています。
-
-- **Rust製DBブリッジの導入**: Ubuntu 26.04 LTS の動向を見据え、DB接続部を Rust (sqlx) へ移行。
-- **型安全性の担保**: コンパイル時におけるSQL検証とメモリ安全性の確保により、ランタイムエラーを根絶。
-- **パフォーマンス最適化**: Proxmox上のリソース消費を抑えつつ、Discord BotとWebアプリ間のデータ整合性を強化。
 
 ## 各ディレクトリの説明
 
