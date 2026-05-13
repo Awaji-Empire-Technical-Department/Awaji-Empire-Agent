@@ -196,6 +196,22 @@ class StreamCommentResetLogic:
         return True, "リセット完了"
 
     # ================================================================
+    # 配信中判定（フェールセーフ）
+    # ================================================================
+
+    @staticmethod
+    def is_host_in_vc(guild: discord.Guild, target_user_id: int) -> bool:
+        """ホストが現在 VC に在席しているか（= 配信中か）を返す。
+        配信中は手動リセットをブロックするフェールセーフで使用する。
+        """
+        if target_user_id == 0:
+            return False
+        member = guild.get_member(target_user_id)
+        if member is None:
+            return False
+        return member.voice is not None and member.voice.channel is not None
+
+    # ================================================================
     # Self Heal 判定・実行
     # ================================================================
 
