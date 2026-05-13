@@ -251,3 +251,76 @@ pub enum BridgeError {
 }
 
 pub type BridgeResult<T> = Result<T, BridgeError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_survey(questions_json: &str) -> Survey {
+        Survey {
+            id: 1,
+            owner_id: "user1".to_string(),
+            title: "Test Survey".to_string(),
+            questions: questions_json.as_bytes().to_vec(),
+            is_active: true,
+            created_at: "2026-01-01 00:00:00".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_question_count_valid() {
+        let json = r#"[
+            {"id":"q1","text":"Q1","type":"text","options":null},
+            {"id":"q2","text":"Q2","type":"radio","options":["A","B"]}
+        ]"#;
+        let survey = make_survey(json);
+        assert_eq!(survey.question_count(), 2);
+    }
+
+    #[test]
+    fn test_question_count_empty() {
+        let survey = make_survey("[]");
+        assert_eq!(survey.question_count(), 0);
+    }
+
+    #[test]
+    fn test_question_count_invalid_json_returns_zero() {
+        let survey = make_survey("not json");
+        assert_eq!(survey.question_count(), 0);
+    }
+
+    #[test]
+    fn test_parse_questions_types() {
+        let json = r#"[
+            {"id":"q1","text":"自由記述","type":"text","options":null},
+            {"id":"q2","text":"単一選択","type":"radio","options":["A","B"]},
+            {"id":"q3","text":"複数選択","type":"checkbox","options":["X","Y"]}
+        ]"#;
+        let survey = make_survey(json);
+        let questions = survey.parse_questions().unwrap();
+        assert_eq!(questions[0].question_type, QuestionType::Text);
+        assert_eq!(questions[1].question_type, QuestionType::Radio);
+        assert_eq!(questions[2].question_type, QuestionType::Checkbox);
+    }
+
+    #[test]
+    fn test_survey_response_parse_answers() {
+        let answers_json = r#"{"q1":"回答テキスト","q2":["選択肢A","選択肢B"]}"#;
+        let response = SurveyResponse {
+            id: 1,
+            survey_id: 1,
+            user_id: 123456789,
+            user_name: "tester".to_string(),
+            answers: answers_json.as_bytes().to_vec(),
+            submitted_at: "2026-01-01 00:00:00".to_string(),
+            dm_sent: false,
+        };
+        let answers = response.parse_answers().unwrap();
+        assert!(answers.contains_key("q1"));
+        assert!(answers.contains_key("q2"));
+        match &answers["q2"] {
+            AnswerValue::Choices(v) => assert_eq!(v.len(), 2),
+            _ => panic!("q2 should be Choices"),
+        }
+    }
+}

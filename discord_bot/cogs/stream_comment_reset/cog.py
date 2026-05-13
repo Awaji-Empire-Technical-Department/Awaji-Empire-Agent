@@ -21,6 +21,7 @@ from .logic import (
 logger = logging.getLogger(__name__)
 
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID", "0"))
+TARGET_USER_ID = int(os.getenv("TARGET_USER_ID", "0"))
 ADMIN_ROLE_NAME = "管理者"
 FALLBACK_HOUR_JST = 6
 
@@ -115,6 +116,14 @@ class StreamCommentResetCog(commands.Cog):
         guild = self.bot.get_guild(GUILD_ID)
         if guild is None:
             await interaction.followup.send("❌ ギルドが見つかりません。", ephemeral=True)
+            return
+
+        # 配信中フェールセーフ: ホストが VC 在席中はリセットをブロック
+        if not dry_run and StreamCommentResetLogic.is_host_in_vc(guild, TARGET_USER_ID):
+            await interaction.followup.send(
+                "⛔ 配信中のためリセットできません。配信終了後（寝落ち集計報告後）に再実行してください。",
+                ephemeral=True,
+            )
             return
 
         if dry_run:
