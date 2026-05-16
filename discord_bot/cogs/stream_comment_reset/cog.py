@@ -38,6 +38,7 @@ class StreamCommentResetCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._last_reset_month: int | None = None
+        self._pending_reset: bool = False
         self.fallback_reset.start()
 
     def cog_unload(self):
@@ -96,6 +97,28 @@ class StreamCommentResetCog(commands.Cog):
         )
 
     # ================================================================
+    # 予約リセット: 配信終了検知
+    # ================================================================
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ):
+        """ホストが VC を退室したとき、予約済みリセットがあれば自動実行する。"""
+        if member.id != TARGET_USER_ID:
+            return
+        if not (before.channel is not None and after.channel is None):
+            return
+        if not self._pending_reset:
+            return
+
+        self._pending_reset = False
+        await self._try_monthly_reset(triggered_by="pending_on_stream_end", force=True)
+
+    # ================================================================
     # スラッシュコマンド
     # ================================================================
 
@@ -118,10 +141,11 @@ class StreamCommentResetCog(commands.Cog):
             await interaction.followup.send("❌ ギルドが見つかりません。", ephemeral=True)
             return
 
-        # 配信中フェールセーフ: ホストが VC 在席中はリセットをブロック
+        # 配信中フェールセーフ: ホストが VC 在席中は予約して終了後に自動実行
         if not dry_run and StreamCommentResetLogic.is_host_in_vc(guild, TARGET_USER_ID):
+            self._pending_reset = True
             await interaction.followup.send(
-                "⛔ 配信中のためリセットできません。配信終了後（寝落ち集計報告後）に再実行してください。",
+                "⏳ 配信中のため即時実行できません。配信終了後（ホストが VC を退室した時点）に自動でリセットします。",
                 ephemeral=True,
             )
             return
@@ -186,12 +210,12 @@ class StreamCommentResetCog(commands.Cog):
     # 内部ヘルパー
     # ================================================================
 
-    async def _try_monthly_reset(self, triggered_by: str):
-        """当月未リセットであればリセットを実行する。"""
+    async def _try_monthly_reset(self, triggered_by: str, force: bool = False):
+        """当月未リセットであればリセットを実行する。force=True のとき冪等チェックをスキップする。"""
         now = datetime.now(JST)
 
-        # メモリ上の冪等チェック
-        if StreamCommentResetLogic.is_already_reset(self._last_reset_month, now):
+        # メモリ上の冪等チェック（管理者による明示的な予約実行はスキップ）
+        if not force and StreamCommentResetLogic.is_already_reset(self._last_reset_month, now):
             return
 
         guild = self.bot.get_guild(GUILD_ID)
