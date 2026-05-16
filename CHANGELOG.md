@@ -3,6 +3,18 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
+## [1.5.1] - 2026-05-16
+
+配信中リセット予約方式への変更。設計記録: `docs/adr/014-stream-comment-reset-streaming-guard.md`
+
+### Changed
+
+- **`/reset_stream_comments` の配信中動作を予約方式に変更**
+  - 従来: 配信中（ホスト VC 在席中）はコマンドをブロックしてエラーメッセージを返すのみ。
+  - 変更後: `_pending_reset` フラグを立てて予約し、ホストが VC を退室した時点（`on_voice_state_update`）で自動実行。
+  - 月次自動リセット（VoiceKeeper 報告・fallback cron）の動作は変更なし。
+  - `_try_monthly_reset` に `force: bool` 引数を追加。予約実行時は冪等チェックをスキップ。
+
 ## [1.5.0] - 2026-04-20
 
 `#配信コメント` チャンネル月次リセット機能の実装。設計記録: `docs/adr/011-stream-comment-reset.md`
