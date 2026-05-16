@@ -3,7 +3,7 @@
 - **ドキュメントID**: FEATURE_STREAM_COMMENT_RESET
 - **バージョン**: 1.6.0
 - **作成日**: 2026-03-18
-- **更新日**: 2026-05-13
+- **更新日**: 2026-05-16
 - **ステータス**: Implemented
 
 ---
@@ -512,6 +512,25 @@ pub async fn insert_reset_log(
 
 ## 5. 処理フロー
 
+```mermaid
+---
+title: リセットシーケンス図
+---
+sequenceDiagram
+    participant Request as ResetRequest
+    participant Reset as MonthlyResetService
+    participant Channel as 配信コメント
+    participant Log as LogService
+
+
+    Request->>Reset: リセット要求
+ 
+
+    Reset->>Channel: 既存チャンネル削除
+    Reset->>Channel: チャンネル再作成
+    Reset->>Log: 実行ログ記録
+```
+
 ### 5.1 月次リセット（主トリガー：Voice Keeper 報告検知）
 
 ```
@@ -607,6 +626,12 @@ pub async fn insert_reset_log(
 
 ```
 [/reset_stream_comments 実行]
+          │
+          ▼
+  dry_run == False かつ　`管理者`がVCに在籍している。 = 配信中
+       Yes → コメントリセット中止
+              エラー ephemeral を返信して終了
+       No  ↓
           │
           ▼
   dry_run == True か？
