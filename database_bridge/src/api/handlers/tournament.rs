@@ -161,6 +161,57 @@ pub async fn delete_title(
 }
 
 // ============================================================
+// 称号: PATCH /titles/{title_id}/discord_role  (ロールID書き戻し)
+// ============================================================
+#[derive(Deserialize)]
+pub struct UpdateDiscordRoleRequest {
+    pub discord_role_id: String,
+}
+
+pub async fn update_discord_role(
+    State(pool): State<MySqlPool>,
+    Path(title_id): Path<i32>,
+    Json(payload): Json<UpdateDiscordRoleRequest>,
+) -> (StatusCode, Json<Value>) {
+    match tournament_repo::update_title_discord_role(&pool, title_id, &payload.discord_role_id).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status":"ok"}))),
+        Err(e) => map_err(e),
+    }
+}
+
+// ============================================================
+// 称号: POST /titles/player/{user_id}/grant-rank  (MMRベース自動付与)
+// ============================================================
+#[derive(Deserialize)]
+pub struct GrantRankRequest {
+    pub mmr: i32,
+}
+
+pub async fn grant_rank_title(
+    State(pool): State<MySqlPool>,
+    Path(user_id): Path<i64>,
+    Json(payload): Json<GrantRankRequest>,
+) -> (StatusCode, Json<Value>) {
+    match tournament_repo::auto_grant_lounge_rank_title(&pool, user_id, payload.mmr).await {
+        Ok(newly_granted) => (StatusCode::OK, Json(json!({"status":"ok","newly_granted":newly_granted}))),
+        Err(e) => map_err(e),
+    }
+}
+
+// ============================================================
+// 称号: POST /titles/player/{user_id}/grant-tournament  (大会優勝自動付与)
+// ============================================================
+pub async fn grant_tournament_title(
+    State(pool): State<MySqlPool>,
+    Path(user_id): Path<i64>,
+) -> (StatusCode, Json<Value>) {
+    match tournament_repo::auto_grant_tournament_titles(&pool, user_id).await {
+        Ok(newly_granted) => (StatusCode::OK, Json(json!({"status":"ok","newly_granted":newly_granted}))),
+        Err(e) => map_err(e),
+    }
+}
+
+// ============================================================
 // 称号: GET /titles/player/{user_id}  (図鑑)
 // ============================================================
 pub async fn get_player_titles(

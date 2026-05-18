@@ -1,7 +1,9 @@
 # routes/lounge.py
 from quart import Blueprint, current_app, render_template, request, session, redirect, url_for, jsonify
 from services.lounge_service import LoungeService
+from services.tournament_service import TitleService
 from services.bridge_client import BridgeUnavailableError
+from routes.tournament import _ensure_discord_role, _assign_title_role
 
 lounge_bp = Blueprint("lounge", __name__, url_prefix="/lounge")
 
@@ -142,8 +144,32 @@ async def api_finish_session(session_id: int):
     user = _current_user()
     if not user:
         return jsonify({"status": "error"}), 401
+
     ok = await LoungeService.finish_session(session_id)
-    return jsonify({"status": "ok" if ok else "error"})
+    if not ok:
+        return jsonify({"status": "error"}), 500
+
+    # 全参加者のMMRを確認し、ランク称号を付与 → Discordロール同期
+    members = await LoungeService.list_members(session_id)
+    for member in members:
+        uid = member.get("user_id")
+        mmr = member.get("mmr", 0)
+        if not uid:
+            continue
+        newly_granted_ids = await TitleService.grant_rank(uid, mmr)
+        for title_id in newly_granted_ids:
+            title = await TitleService.get_active(uid)  # 付与されたばかりの称号を取得
+            # grant-rank で返るのは title_id のみなので全称号から該当を検索
+            all_titles = await TitleService.list_all()
+            granted_title = next((t for t in all_titles if t["id"] == title_id), None)
+            if granted_title:
+                await _ensure_discord_role(granted_title)
+                # 装備称号が未設定の場合、自動で最高ランク称号を装備
+                if title is None:
+                    await TitleService.set_active(uid, title_id)
+                await _assign_title_role(str(uid), granted_title)
+
+    return jsonify({"status": "ok"})
 
 
 @lounge_bp.route("/api/sessions/<int:session_id>/standings")

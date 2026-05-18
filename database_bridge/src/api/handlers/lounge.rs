@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use sqlx::MySqlPool;
 
 use crate::api::AppState;
-use crate::db::{lounge_repo, tournament_repo, models::BridgeError};
+use crate::db::{lounge_repo, models::BridgeError};
 
 fn map_err(err: BridgeError) -> (StatusCode, Json<Value>) {
     match err {
@@ -338,22 +338,7 @@ pub async fn finish_session(
     if let Err(e) = lounge_repo::finish_session(&state.pool, session_id).await {
         return map_err(e);
     }
-
-    // 1位プレイヤーを取得してMMR称号を自動付与
-    let standings = match lounge_repo::get_session_standings(&state.pool, session_id).await {
-        Ok(s) => s,
-        Err(e) => return map_err(e),
-    };
-
-    if let Some(first) = standings.first() {
-        if let Some(user_id) = first.get("user_id").and_then(|v| v.as_i64()) {
-            let player = lounge_repo::get_lounge_player(&state.pool, user_id).await;
-            if let Ok(p) = player {
-                let _ = tournament_repo::auto_grant_lounge_rank_title(&state.pool, user_id, p.mmr).await;
-            }
-        }
-    }
-
+    // 称号付与・Discordロール同期はPython側で行う（Discord API呼び出しを一箇所に集約するため）
     let _ = state.tx.send(json!({
         "type": "lounge.session_finished",
         "session_id": session_id,
