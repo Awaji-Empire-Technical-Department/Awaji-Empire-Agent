@@ -264,6 +264,14 @@ pub async fn set_active_title(
     Ok(())
 }
 
+pub async fn clear_active_title(pool: &MySqlPool, user_id: i64) -> BridgeResult<()> {
+    sqlx::query("DELETE FROM player_active_title WHERE user_id = ?")
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn get_active_title(
     pool: &MySqlPool,
     user_id: i64,

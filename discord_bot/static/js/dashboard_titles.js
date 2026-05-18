@@ -39,11 +39,21 @@
         const res = await fetch('/tournament/api/titles/player/list');
         const titles = await res.json();
         const grid = document.getElementById('player-titles-grid');
-        if (!titles.length) {
-            grid.innerHTML = '<span style="color:var(--gray);font-size:.9rem;">獲得済みの称号がありません</span>';
+
+        // 「称号なし」ボタン（常に先頭に表示）
+        const activeTitle = titles.find(t => t.is_active_title);
+        const noneBtn = `
+            <button class="btn ${!activeTitle ? 'btn-success' : 'btn-outline'}"
+                style="font-size:.85rem;"
+                onclick="window.clearTitle()">
+                ${!activeTitle ? '✓ ' : ''}称号なし
+            </button>`;
+
+        if (!titles.filter(t => t.earned).length) {
+            grid.innerHTML = noneBtn + '<span style="color:var(--gray);font-size:.9rem;align-self:center;">獲得済みの称号がありません</span>';
             return;
         }
-        grid.innerHTML = titles.map(t => `
+        grid.innerHTML = noneBtn + titles.map(t => `
             <button class="btn ${t.is_active_title ? 'btn-success' : (t.earned ? 'btn-primary' : 'btn-outline')}"
                 style="font-size:.85rem;"
                 ${!t.earned ? 'disabled title="未獲得"' : `onclick="window.equipTitle(${t.id})"`}>
@@ -83,6 +93,15 @@
         if (!confirm(`「${name}」を削除しますか？`)) return;
         await fetch(`/tournament/api/titles/${id}`, { method: 'DELETE' });
         loadTitles();
+    };
+
+    window.clearTitle = async function () {
+        const res = await fetch('/tournament/api/titles/player/active', { method: 'DELETE' });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            await loadActiveTitle();
+            await loadPlayerTitles();
+        }
     };
 
     window.equipTitle = async function (titleId) {

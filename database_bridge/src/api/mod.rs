@@ -81,7 +81,7 @@ fn title_routes() -> Router<AppState> {
         .route("/player/{user_id}/grant", post(handlers::tournament::grant_title))
         .route("/player/{user_id}/grant-rank", post(handlers::tournament::grant_rank_title))
         .route("/player/{user_id}/grant-tournament", post(handlers::tournament::grant_tournament_title))
-        .route("/player/{user_id}/active", get(handlers::tournament::get_active_title).post(handlers::tournament::set_active_title))
+        .route("/player/{user_id}/active", get(handlers::tournament::get_active_title).post(handlers::tournament::set_active_title).delete(handlers::tournament::clear_active_title))
 }
 
 /// ラウンジ関連のルーティング。

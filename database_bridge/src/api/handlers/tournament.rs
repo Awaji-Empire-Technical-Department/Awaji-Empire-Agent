@@ -271,6 +271,19 @@ pub async fn set_active_title(
 }
 
 // ============================================================
+// 称号: DELETE /titles/player/{user_id}/active  (称号なし)
+// ============================================================
+pub async fn clear_active_title(
+    State(pool): State<MySqlPool>,
+    Path(user_id): Path<i64>,
+) -> (StatusCode, Json<Value>) {
+    match tournament_repo::clear_active_title(&pool, user_id).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status":"ok"}))),
+        Err(e) => map_err(e),
+    }
+}
+
+// ============================================================
 // 称号: GET /titles/player/{user_id}/active
 // ============================================================
 pub async fn get_active_title(

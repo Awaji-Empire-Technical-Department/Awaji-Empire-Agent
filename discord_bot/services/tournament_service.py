@@ -93,6 +93,11 @@ class TitleService:
         return await bridge_client.request("GET", f"/titles/player/{user_id}/active")
 
     @staticmethod
+    async def clear_active(user_id: int) -> bool:
+        res = await bridge_client.request("DELETE", f"/titles/player/{user_id}/active")
+        return res is not None and res.get("status") == "ok"
+
+    @staticmethod
     async def update_discord_role_id(title_id: int, discord_role_id: str) -> bool:
         res = await bridge_client.request(
             "PATCH", f"/titles/{title_id}/discord_role",

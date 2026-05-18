@@ -305,6 +305,35 @@ async def api_set_active_title():
     return jsonify({"status": "ok" if ok else "error"})
 
 
+@tournament_bp.route("/api/titles/player/active", methods=["DELETE"])
+async def api_clear_active_title():
+    user = _current_user()
+    if not user:
+        return jsonify({"status": "error"}), 401
+
+    # 外す前に現在の称号ロールIDを取得
+    old_title = await TitleService.get_active(int(user["id"]))
+    old_role_id = old_title.get("discord_role_id") if old_title else None
+
+    ok = await TitleService.clear_active(int(user["id"]))
+    if ok and old_role_id:
+        # 旧ロールだけ外す（他のロールは一切触らない）
+        token = _get_bot_token()
+        if token and GUILD_ID:
+            import httpx as _httpx
+            headers = {"Authorization": f"Bot {token}"}
+            try:
+                async with _httpx.AsyncClient(timeout=10.0) as client:
+                    await client.delete(
+                        f"https://discord.com/api/v10/guilds/{GUILD_ID}/members/{user['id']}/roles/{old_role_id}",
+                        headers=headers,
+                    )
+            except Exception as e:
+                current_app.logger.warning(f"Role remove failed: {e}")
+
+    return jsonify({"status": "ok" if ok else "error"})
+
+
 @tournament_bp.route("/api/titles/player/list")
 async def api_player_title_list():
     user = _current_user()
