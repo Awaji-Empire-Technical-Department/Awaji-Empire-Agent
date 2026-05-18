@@ -97,9 +97,9 @@
                         <table class="table">
                             <thead><tr><th width="50">順位</th><th>プレイヤー</th><th width="80">合計</th><th width="60">1位数</th></tr></thead>
                             <tbody id="standings-tbody">
-                                {% for i, s in enumerate(standings) %}
-                                <tr class="{{ 'standings-first' if i == 0 else '' }}">
-                                    <td>{{ i + 1 }}</td>
+                                {% for s in standings %}
+                                <tr class="{{ 'standings-first' if loop.first else '' }}">
+                                    <td>{{ loop.index }}</td>
                                     <td>{{ s.get('username') or s.get('user_id') }}</td>
                                     <td><strong>{{ s.get('total_points', 0) }}</strong></td>
                                     <td style="color:var(--gray);">{{ s.get('first_place_count', 0) }}</td>

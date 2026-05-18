@@ -38,9 +38,9 @@
                         <tr><th width="50">順位</th><th>プレイヤー</th><th width="100">合計ポイント</th></tr>
                     </thead>
                     <tbody id="standings-tbody">
-                        {% for i, s in enumerate(standings) %}
-                        <tr class="{{ 'standings-first' if i == 0 else '' }}">
-                            <td>{{ i + 1 }}位</td>
+                        {% for s in standings %}
+                        <tr class="{{ 'standings-first' if loop.first else '' }}">
+                            <td>{{ loop.index }}位</td>
                             <td>{{ s.get('username') or s.get('user_id') }}</td>
                             <td>{{ s.get('total_points', 0) }}pt</td>
                         </tr>
