@@ -26,6 +26,18 @@ Phase 1（汎用大会）・Phase 2（ラウンジ）の実装に伴い、プレ
 - **単一の信頼できる情報源**: 称号の正規状態は DB が持つ。Discord ロールはその「反映先」に過ぎず、DB との整合性チェックや修正が容易になる
 - **将来の拡張性**: プロフィールページ・ランキング表示・称号図鑑など Discord を経由しない機能を自由に追加できる
 
+### ロール操作の安全性
+
+装備称号の切替時、Discord API の呼び出しは以下の2本のみである。
+
+```
+DELETE /guilds/{guild_id}/members/{user_id}/roles/{old_role_id}   # 旧称号ロールのみ剥奪
+PUT    /guilds/{guild_id}/members/{user_id}/roles/{new_role_id}   # 新称号ロールのみ付与
+```
+
+これは**1ロールを単体で操作するエンドポイント**であり、メンバーの全ロールを配列で上書きする `PATCH /members/{user_id}` は使用しない。  
+そのため YouTube Membership・Discord Server Boost・その他サーバー固有ロールなど、称号以外のロールは切替操作の影響を受けない。
+
 ---
 
 ## 決定
