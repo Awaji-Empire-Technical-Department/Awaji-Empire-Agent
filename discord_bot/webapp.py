@@ -10,6 +10,7 @@ from routes.tournament import tournament_bp
 from routes.lounge import lounge_bp
 from services.lobby_service import LobbyService
 from services.tournament_service import TournamentService
+from services.lounge_service import LoungeService
 from services.bridge_client import BridgeUnavailableError
 from services.survey_service import SurveyService
 from services.log_service import LogService
@@ -211,8 +212,9 @@ async def index():
         
         lobbies = await LobbyService.get_active_rooms()
         games = await TournamentService.list_game_titles()
+        lounge_sessions = await LoungeService.list_active_sessions()
 
-        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies, games=games)
+        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies, games=games, lounge_sessions=lounge_sessions)
         
     except BridgeUnavailableError:
         current_app.logger.warning("Bridge unavailable on index: rendering maintenance page")

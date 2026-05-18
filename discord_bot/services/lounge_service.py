@@ -5,6 +5,11 @@ from services.bridge_client import bridge_client
 
 class LoungeService:
     @staticmethod
+    async def list_active_sessions() -> List[Dict[str, Any]]:
+        res = await bridge_client.request("GET", "/lounge/sessions")
+        return res if res else []
+
+    @staticmethod
     async def create_session(room_id: str, host_id: int, mode: str = "ffa", total_races: int = 12) -> Optional[int]:
         res = await bridge_client.request("POST", "/lounge/sessions", json={
             "room_id": room_id, "host_id": host_id, "mode": mode, "total_races": total_races,

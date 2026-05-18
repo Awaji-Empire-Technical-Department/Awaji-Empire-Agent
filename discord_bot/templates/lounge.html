@@ -157,8 +157,43 @@
                     <button class="btn btn-success" id="btn-submit-session"><i class="fas fa-check"></i> 作成</button>
                 </div>
             </div>
-            <div class="card-body" style="color:var(--gray);">
-                セッション一覧は現在のバージョンでは管理側から直接URLで入場できます。
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ホスト</th>
+                            <th width="80">モード</th>
+                            <th width="120">進行</th>
+                            <th width="80">参加者</th>
+                            <th width="80">状態</th>
+                            <th width="90">アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in active_sessions %}
+                        <tr>
+                            <td><strong>{{ s.get('host_name') or s.get('host_id') }}</strong></td>
+                            <td><span class="badge badge-secondary">{{ s.get('mode', 'FFA').upper() }}</span></td>
+                            <td style="font-family:monospace;">{{ s.get('current_race', 0) }} / {{ s.get('total_races', 12) }} レース</td>
+                            <td style="text-align:center;">{{ s.get('member_count', 0) }}人</td>
+                            <td>
+                                <span class="badge {{ 'badge-warning' if s.get('status') == 'waiting' else 'badge-success' }}">
+                                    {{ '待機中' if s.get('status') == 'waiting' else '進行中' }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('lounge.session_view', session_id=s.get('id')) }}" class="btn btn-primary btn-sm">入場</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align:center; padding:2.5rem; color:var(--gray);">
+                                現在開催中のセッションはありません
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
         {% endif %}
