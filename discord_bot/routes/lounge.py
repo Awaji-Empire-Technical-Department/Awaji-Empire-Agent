@@ -48,7 +48,7 @@ async def session_view(session_id: int):
         return await render_template(
             "lounge.html",
             user=user,
-            session=session_data,
+            lounge_session=session_data,
             standings=standings,
             members=members,
             course_history=course_history,

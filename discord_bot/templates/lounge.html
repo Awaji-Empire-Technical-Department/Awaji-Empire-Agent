@@ -19,19 +19,19 @@
     </nav>
 
     <div class="container">
-        {% if view == 'session' and session %}
+        {% if view == 'session' and lounge_session %}
         <!-- ============ セッション進行ビュー ============ -->
         <div class="lounge-header">
             <div>
-                <h2 style="margin:0;">ラウンジセッション #{{ session.id }}</h2>
+                <h2 style="margin:0;">ラウンジセッション #{{ lounge_session.id }}</h2>
                 <p style="color:var(--gray); margin:4px 0 0;">
-                    モード: <strong>{{ session.mode.upper() }}</strong> &nbsp;|&nbsp;
-                    進行: <strong id="current-race">{{ session.current_race }}</strong> / {{ session.total_races }} レース
+                    モード: <strong>{{ lounge_session.mode.upper() }}</strong> &nbsp;|&nbsp;
+                    進行: <strong id="current-race">{{ lounge_session.current_race }}</strong> / {{ lounge_session.total_races }} レース
                 </p>
             </div>
             <div style="display:flex; gap:8px; align-items:center;">
-                <span class="badge {{ 'badge-success' if session.status == 'in_progress' else ('badge-secondary' if session.status == 'finished' else 'badge-warning') }}">
-                    {{ {'waiting':'待機中', 'in_progress':'進行中', 'finished':'終了'}[session.status] }}
+                <span class="badge {{ 'badge-success' if lounge_session.status == 'in_progress' else ('badge-secondary' if lounge_session.status == 'finished' else 'badge-warning') }}">
+                    {{ {'waiting':'待機中', 'in_progress':'進行中', 'finished':'終了'}[lounge_session.status] }}
                 </span>
             </div>
         </div>
@@ -52,10 +52,10 @@
                                 <option value="{{ i }}">{{ i }}位</option>
                                 {% endfor %}
                             </select>
-                            <button class="btn btn-success" id="btn-report" data-session-id="{{ session.id }}">
+                            <button class="btn btn-success" id="btn-report" data-session-id="{{ lounge_session.id }}">
                                 <i class="fas fa-paper-plane"></i> 申告する
                             </button>
-                            <button class="btn btn-warning" id="btn-disconnect" data-session-id="{{ session.id }}">
+                            <button class="btn btn-warning" id="btn-disconnect" data-session-id="{{ lounge_session.id }}">
                                 <i class="fas fa-plug"></i> 回線落ち報告
                             </button>
                         </div>
@@ -165,7 +165,7 @@
     </div>
 
     <script>
-        const SESSION_ID = {{ session.id if session else 'null' }};
+        const SESSION_ID = {{ lounge_session.id if lounge_session else 'null' }};
         let currentRaceId = null;
     </script>
     <script src="{{ url_for('static', filename='js/lounge.js') }}"></script>
