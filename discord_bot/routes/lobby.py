@@ -68,16 +68,24 @@ async def create_lobby():
 
     form = await request.form
     passcode = form.get('passcode')
-    mode = form.get('mode', 'free') # 'free' or 'tournament'
+    mode = form.get('mode', 'free')
     title = form.get('title', '新対戦ロビー')
     description = form.get('description', '').strip() or None
+    game_title_id = form.get('game_title_id')
+    bracket_format = form.get('bracket_format', 'single_elimination')
+    wins_required = form.get('wins_required', '1')
 
     if not passcode:
         await flash("合言葉は必須です", "error")
         return redirect(url_for('index'))
 
     try:
-        success = await LobbyService.create_room(passcode, int(user['id']), mode, title, description)
+        extra = {}
+        if mode == 'tournament' and game_title_id:
+            extra['game_title_id'] = int(game_title_id)
+            extra['bracket_format'] = bracket_format
+            extra['wins_required'] = int(wins_required)
+        success = await LobbyService.create_room(passcode, int(user['id']), mode, title, description, extra=extra if extra else None)
         if success:
             await flash(f"ロビー「{title}」を作成しました", "success")
             return redirect(url_for('lobby.view_lobby', passcode=passcode))

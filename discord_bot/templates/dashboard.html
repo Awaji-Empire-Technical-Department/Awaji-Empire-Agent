@@ -12,6 +12,14 @@
 <body>
     <nav class="navbar">
         <div class="navbar-brand"><i class="fas fa-robot"></i> Awaji Empire Agent</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-left:auto; margin-right:16px;">
+            <a href="{{ url_for('tournament.index') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,0.4); color:white;">
+                <i class="fas fa-trophy"></i> 大会
+            </a>
+            <a href="{{ url_for('lounge.index') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,0.4); color:white;">
+                <i class="fas fa-flag-checkered"></i> ラウンジ
+            </a>
+        </div>
         <div class="user-menu">
             <img src="{{ user['avatar_url'] }}" class="user-avatar" alt="Avatar">
             <span>{{ user['name'] }}</span>
@@ -132,14 +140,39 @@
                         <div style="display: flex; gap: 10px; margin-top: 5px;">
                             <label
                                 style="flex: 1; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; background-color: #fff; transition: all 0.2s;">
-                                <input type="radio" name="mode" value="free" checked style="margin-right: 8px;">
+                                <input type="radio" name="mode" value="free" id="mode-free" checked style="margin-right: 8px;">
                                 <strong>自由対戦モード</strong>
                             </label>
                             <label
                                 style="flex: 1; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; background-color: #fff; transition: all 0.2s;">
-                                <input type="radio" name="mode" value="tournament" style="margin-right: 8px;">
+                                <input type="radio" name="mode" value="tournament" id="mode-tournament" style="margin-right: 8px;">
                                 <strong style="color: #4a90e2;">大会モード</strong>
                             </label>
+                        </div>
+                    </div>
+                    <!-- 大会モード専用オプション -->
+                    <div id="tournament-options" style="width:100%; display:none; background:#f8f9ff; border:1px solid #d0d8ff; border-radius:6px; padding:1rem; margin-bottom:1rem;">
+                        <p style="font-size:.8rem; font-weight:600; color:#4a90e2; margin:0 0 .75rem;">大会オプション</p>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                            <div style="flex:2; min-width:160px;">
+                                <label class="lobby-form-label">ゲームタイトル</label>
+                                <select name="game_title_id" class="form-control" id="select-game-title">
+                                    {% for g in games %}
+                                    <option value="{{ g.id }}" data-match-type="{{ g.match_type }}">{{ g.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div style="flex:1; min-width:120px;" id="bracket-format-group">
+                                <label class="lobby-form-label">対戦形式</label>
+                                <select name="bracket_format" class="form-control">
+                                    <option value="single_elimination">シングルイリミネーション</option>
+                                    <option value="round_robin">総当たり</option>
+                                </select>
+                            </div>
+                            <div style="flex:1; min-width:100px;">
+                                <label class="lobby-form-label" id="wins-label">n本先取 / レース数</label>
+                                <input type="number" name="wins_required" class="form-control" value="1" min="1" max="24">
+                            </div>
                         </div>
                     </div>
                     <div style="width: 100%; margin-top: 1rem;">
@@ -151,6 +184,7 @@
                         作成</button>
                 </form>
             </div>
+            <script src="{{ url_for('static', filename='js/dashboard_lobby.js') }}"></script>
 
             <div class="table-responsive">
                 <table class="table">
@@ -204,7 +238,6 @@
         <div class="card" id="title-management-card">
             <div class="card-header">
                 <h2 class="card-title">🏅 称号管理</h2>
-                <button class="btn btn-success btn-sm" id="btn-new-title"><i class="fas fa-plus"></i> 新規称号</button>
             </div>
 
             <!-- 自分の称号装備セクション -->
