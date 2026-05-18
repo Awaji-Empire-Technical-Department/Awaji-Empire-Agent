@@ -9,7 +9,7 @@
 
 ## 🚀 主要機能
 
-本システムは主に 3 つのコア機能を提供します。
+本システムは主に 5 つのコア機能を提供します。
 
 | 機能 | 概要 | 詳細ドキュメント |
 | :--- | :--- | :--- |
@@ -17,6 +17,7 @@
 | **内製アンケート** | Webで作成しDiscordで答える、完全独自のフォームシステム | [詳細はこちら](./docs/FEATURE_SURVEY.md) |
 | **寝落ち切断** | 特定ユーザーがVCから退出して一定時間経過しても、まだVCに残っているユーザーを「寝落ち」と判定し、自動的に切断（Kick）する機能。また、切断した人数を集計し、テキストチャンネルに報告する。 | [詳細はこちら](./docs/FEATURE_VOICE_KEEPER.md) |
 | **セキュアロビー(東方憑依華専用)** | Cloudflare WARP を利用した安全なオンライン対戦ロビーシステム。IPアドレスを公開することなく、参加者同士が直接接続できる。 | [詳細はこちら](./docs/FEATURE_LOBBY.md) |
+| **配信コメントリセット** | `#配信コメント` チャンネルを毎月20日に自動リセット（削除→再作成）。VoiceKeeper 報告検知トリガー・フォールバック cron・Self Heal・管理者スラッシュコマンドの4段構え。 | [詳細はこちら](./docs/FEATURE_STREAM_COMMENT_RESET.md) |
 
 > [!NOTE]
 > **メッセージフィルタ機能**（特定チャンネルでの不正投稿を自動排除）は、ホストの意向により廃止されました（Phase 2, 2026-02-21）。
@@ -45,57 +46,32 @@
 
 ### 1. 環境変数の設定
 
-`.env` ファイルを作成し、必要な情報を設定します。
+`.env` ファイルを作成し、必要な情報を設定します。以下のファイルをコピーして環境変数を入力してください。
 
-```ini
-# Database
-DB_HOST=db_ip
-DB_NAME=bot_db
-DB_USER=bot_user
-DB_PASS=your_password
-
-# Discord OAuth2
-DISCORD_CLIENT_ID=bot_client_id
-DISCORD_CLIENT_SECRET=your_client_secret
-DISCORD_REDIRECT_URI=[https://dashboard.awajiempire.net/callback](https://dashboard.awajiempire.net/callback)
-
-# ★追加: 淡路帝国サーバーのID (数字のみ)
-DISCORD_GUILD_ID=server_id
-
-# Web Dashboard URL (Bot案内用)
-DASHBOARD_URL=https://dashboard.awajiempire.net
-
-# ★追加: AFK監視設定
-TARGET_USER_ID=target_user_id #監視対象ユーザー
-ACTIVE_START_HOUR=ACTIVE_START_HOUR #稼働開始時間
-ACTIVE_END_HOUR=ACTIVE_END_HOUR #稼働終了時間
-AFK_TIMEOUT_SECONDS=AFK_TIMEOUT_SECONDS #AFKタイムアウト時間（秒）
-REPORT_CHANNEL_NAME=REPORT_CHANNEL_NAME #レポート送信先チャンネル名
-```
+[./discord_bot/.env.example](./discord_bot/.env.example)
 
 ### 2. 依存関係のインストール
 
 ```Bash
-pip install -r requirements.txt
+uv sync 
 ```
 
 ### 3. サービスの起動
 
 ```Bash
 # Botの起動
-python bot.py
+uv run bot.py
 
 # Webダッシュボードの起動
-python webapp.py
+uv run webapp.py
 ```
 
-### 4. 次世代ロードマップ：Rustによるデータアクセス層の強化
+### 4. Rust DB ブリッジの起動
 
-現在、システムのさらなる堅牢性と安全性を追求するため、以下の実装を検討しています。
-
-- **Rust製DBブリッジの導入**: Ubuntu 26.04 LTS の動向を見据え、DB接続部を Rust (sqlx) へ移行。
-- **型安全性の担保**: コンパイル時におけるSQL検証とメモリ安全性の確保により、ランタイムエラーを根絶。
-- **パフォーマンス最適化**: Proxmox上のリソース消費を抑えつつ、Discord BotとWebアプリ間のデータ整合性を強化。
+```bash
+cd database_bridge
+cargo run
+```
 
 ## 各ディレクトリの説明
 

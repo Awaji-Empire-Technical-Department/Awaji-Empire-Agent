@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ラウンジ - Awaji Empire</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lounge.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><i class="fas fa-flag-checkered"></i> ラウンジ</div>
+        <div class="user-menu">
+            <img src="{{ user['avatar_url'] }}" class="user-avatar" alt="">
+            <span>{{ user['name'] }}</span>
+            <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,.3);color:white;">ダッシュボード</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% if view == 'session' and session %}
+        <!-- ============ セッション進行ビュー ============ -->
+        <div class="lounge-header">
+            <div>
+                <h2 style="margin:0;">ラウンジセッション #{{ session.id }}</h2>
+                <p style="color:var(--gray); margin:4px 0 0;">
+                    モード: <strong>{{ session.mode.upper() }}</strong> &nbsp;|&nbsp;
+                    進行: <strong id="current-race">{{ session.current_race }}</strong> / {{ session.total_races }} レース
+                </p>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span class="badge {{ 'badge-success' if session.status == 'in_progress' else ('badge-secondary' if session.status == 'finished' else 'badge-warning') }}">
+                    {{ {'waiting':'待機中', 'in_progress':'進行中', 'finished':'終了'}[session.status] }}
+                </span>
+            </div>
+        </div>
+
+        <div style="background:#fff3cd; border:1px solid #ffc107; border-radius:var(--radius); padding:1rem; margin-bottom:1.5rem;">
+            📸 <strong>結果画面のスクリーンショットを必ず保存してください。</strong> 申告内容に異議が生じた場合、証拠として提出を求めることがあります。
+        </div>
+
+        <div class="lounge-grid">
+            <!-- 左: スコア申告 / Staff操作 -->
+            <div>
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">順位申告</h3></div>
+                    <div class="card-body">
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <select id="report-position" class="form-control">
+                                {% for i in range(1, 25) %}
+                                <option value="{{ i }}">{{ i }}位</option>
+                                {% endfor %}
+                            </select>
+                            <button class="btn btn-success" id="btn-report" data-session-id="{{ session.id }}">
+                                <i class="fas fa-paper-plane"></i> 申告する
+                            </button>
+                            <button class="btn btn-warning" id="btn-disconnect" data-session-id="{{ session.id }}">
+                                <i class="fas fa-plug"></i> 回線落ち報告
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Staff用操作パネル -->
+                <div class="card" style="margin-top:1rem;" id="staff-panel">
+                    <div class="card-header"><h3 class="card-title">Staff操作</h3></div>
+                    <div class="card-body" style="display:flex; flex-direction:column; gap:8px;">
+                        <div>
+                            <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">コース名</label>
+                            <input type="text" id="course-name-input" class="form-control" placeholder="例: レインボーロード">
+                        </div>
+                        <button class="btn btn-primary" id="btn-new-race">
+                            <i class="fas fa-flag"></i> レース開始
+                        </button>
+                        <button class="btn btn-secondary" id="btn-approve-race">
+                            <i class="fas fa-check"></i> レース結果を承認
+                        </button>
+                        <button class="btn btn-outline" id="btn-next-race">
+                            <i class="fas fa-forward"></i> 次のレースへ
+                        </button>
+                        <button class="btn btn-danger" id="btn-finish-session">
+                            <i class="fas fa-stop"></i> セッション終了
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右: ランキング / コース履歴 -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">累計ランキング</h3>
+                        <button class="btn btn-sm btn-outline" id="btn-refresh-standings"><i class="fas fa-sync"></i></button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead><tr><th width="50">順位</th><th>プレイヤー</th><th width="80">合計</th><th width="60">1位数</th></tr></thead>
+                            <tbody id="standings-tbody">
+                                {% for i, s in enumerate(standings) %}
+                                <tr class="{{ 'standings-first' if i == 0 else '' }}">
+                                    <td>{{ i + 1 }}</td>
+                                    <td>{{ s.get('username') or s.get('user_id') }}</td>
+                                    <td><strong>{{ s.get('total_points', 0) }}</strong></td>
+                                    <td style="color:var(--gray);">{{ s.get('first_place_count', 0) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="4" style="text-align:center;padding:2rem;color:var(--gray);">まだ結果がありません</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top:1rem;">
+                    <div class="card-header"><h3 class="card-title">コース使用履歴</h3></div>
+                    <div class="card-body">
+                        <div id="course-history-list" style="display:flex; flex-wrap:wrap; gap:6px;">
+                            {% for c in course_history %}
+                            <span class="badge badge-secondary">{{ c }}</span>
+                            {% else %}
+                            <span style="color:var(--gray); font-size:.9rem;">なし</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- ============ ラウンジ一覧ビュー ============ -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🏎️ ラウンジセッション</h2>
+                <button class="btn btn-success btn-sm" id="btn-create-session">
+                    <i class="fas fa-plus"></i> セッション作成
+                </button>
+            </div>
+            <div class="card-body" id="create-session-form" style="display:none; border-bottom:1px solid var(--border-color); padding-bottom:1.5rem;">
+                <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">モード</label>
+                        <select id="new-session-mode" class="form-control" style="width:120px;">
+                            <option value="ffa">FFA</option>
+                            <option value="2v">2v</option>
+                            <option value="3v">3v</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">レース数</label>
+                        <input type="number" id="new-session-races" class="form-control" value="12" style="width:80px;" min="1" max="24">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">ルームID</label>
+                        <input type="text" id="new-session-room" class="form-control" placeholder="合言葉" style="width:140px;">
+                    </div>
+                    <button class="btn btn-success" id="btn-submit-session"><i class="fas fa-check"></i> 作成</button>
+                </div>
+            </div>
+            <div class="card-body" style="color:var(--gray);">
+                セッション一覧は現在のバージョンでは管理側から直接URLで入場できます。
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const SESSION_ID = {{ session.id if session else 'null' }};
+        let currentRaceId = null;
+    </script>
+    <script src="{{ url_for('static', filename='js/lounge.js') }}"></script>
+</body>
+</html>

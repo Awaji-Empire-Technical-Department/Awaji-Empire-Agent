@@ -60,11 +60,11 @@ class StreamCommentResetLogic:
     @staticmethod
     def should_fallback_run(now: Optional[datetime] = None) -> bool:
         """フォールバック cron が実行すべきタイミングか判定する。
-        毎月2日 06:00 JST のみ True。
+        毎月21日 06:00 JST のみ True。
         """
         if now is None:
             now = datetime.now(JST)
-        return now.day == 2 and now.hour == 6
+        return now.day == 21 and now.hour == 6
 
     @staticmethod
     def is_already_reset(last_reset_month: Optional[int], now: Optional[datetime] = None) -> bool:
@@ -194,6 +194,22 @@ class StreamCommentResetLogic:
         await svc.log_to_db(triggered_by, event_type, "success")
 
         return True, "リセット完了"
+
+    # ================================================================
+    # 配信中判定（フェールセーフ）
+    # ================================================================
+
+    @staticmethod
+    def is_host_in_vc(guild: discord.Guild, target_user_id: int) -> bool:
+        """ホストが現在 VC に在席しているか（= 配信中か）を返す。
+        配信中は手動リセットをブロックするフェールセーフで使用する。
+        """
+        if target_user_id == 0:
+            return False
+        member = guild.get_member(target_user_id)
+        if member is None:
+            return False
+        return member.voice is not None and member.voice.channel is not None
 
     # ================================================================
     # Self Heal 判定・実行

@@ -1,33 +1,43 @@
-# P2P Lobby System: 開発・実装計画
+# Phase 1 / Phase 2 実装計画
 
-## 目的
-
-本計画は、東方憑依華向けP2Pロビー機能の拡張（WebSocketによるリアルタイム通信、自由対戦・大会モードの挙動追加、およびUXの大幅向上）を実施する手順を定義します。
-
-## 実装ステップ
-
-### 1. 仕様書の更新 (docs/FEATURE_LOBBY.md)
-
-今回の要求事項である「憑依華専用 IP Formatterの明確化」「WebSocket通信(`/ws/hyouibana`)」「自由対戦・大会モードの詳細な挙動」「UI/UXガイドライン」をドキュメントに統合し、チーム内で認識を合わせる。
-
-### 2. バックエンド(Rust) 拡張
-
-- `axum` と `tokio::sync::broadcast` を用いて、独立したWebSocketエンドポイント `/ws/hyouibana` を構築。
-- プレイヤーの状態（オフライン、オンライン、受付中、対戦中）やWARP接続ステータスをリアルタイム監視・配信するロジックの実装。
-- 大会モードにおける、ブラケット自動生成・進行、プレイヤーへのHost/Client強制作り分けAPIの実装。
-- 勝利条件(n本先取)のフェーズ別自動変更と、報告時のバリデーション機能実装。
-
-### 3. フロントエンド (Discord Bot Dashboard)
-
-- **UIガイドの追加**: Cloudflare WARPのインストール・`awaji-empire`連携手順や、Discordでの画面共有推奨のアナウンスをロビー内にインラインで追加。
-- **機能JSの分離**: `form.js`に干渉しない専用の `possession_lobby.js` を作成し、ページリロードなしの動的状態反映を実装。
-- **ビジュアルデザイン**: プレイヤーの状態に応じたバッジ表示や、受付時の「憑依する」ボタンのハイライト、ダッシュボードでのトーナメント表（軽量JSライブラリ `Bracketry` をCDNから導入し描画）。
-
-### 4. Discord Bot 連携と自動化
-
-- 大会の最終結果（完了報告）が行われたとき、Discord Botが自動で対象の競技者に「優勝ロール」を付与する仕組み（Webhooks連携や定期タスクなど）の構築。
+## ステータス: 実装完了（コードレビュー・DB適用待ち）
 
 ---
 
-**Wanyaldee 様へ**
-以上のステップで実装を進めます。特に大会モードのトーナメント表（ブラケット）のフロントエンド実装について、既存のCSS等でシンプルに構築するか、軽量ライブラリを導入するかの方針等を含め、この計画で承認いただけるでしょうか？問題なければ実装フェーズに入ります。
+## Phase 1: 汎用大会システム + 称号システム
+
+### 完了済み
+- [x] `database_bridge/migrations/006_general_tournament.sql` — game_titles, match_scores, point_tables, titles, player_titles, player_active_title
+- [x] `database_bridge/src/db/models.rs` — GameTitle, MatchScore, PointTable, Title, TitleWithStatus, Lounge系Struct追加
+- [x] `database_bridge/src/db/tournament_repo.rs` — 大会・称号CRUD、自動称号付与ロジック
+- [x] `database_bridge/src/api/handlers/tournament.rs` — HTTPハンドラ（スコア申告・承認・称号CRUD）
+- [x] `database_bridge/src/api/mod.rs` — /tournament/* /titles/* ルーター登録
+- [x] `discord_bot/services/tournament_service.py` — Bridge APIラッパー
+- [x] `discord_bot/routes/tournament.py` — Blueprint（大会・称号API）
+- [x] `discord_bot/webapp.py` — tournament_bp / lounge_bp 登録
+- [x] `discord_bot/templates/tournament.html` — 大会進行UI
+- [x] `discord_bot/static/js/tournament.js` — 大会JS（外部ファイル）
+- [x] `discord_bot/static/css/tournament.css`
+- [x] `discord_bot/templates/dashboard.html` — 称号管理カード追加
+- [x] `discord_bot/static/js/dashboard_titles.js` — 称号管理JS（外部ファイル）
+
+## Phase 2: ラウンジシステム
+
+### 完了済み
+- [x] `database_bridge/migrations/007_lounge.sql` — lounge_* テーブル
+- [x] `database_bridge/src/db/lounge_repo.rs` — ラウンジDBクエリ（MMR・セッション・レース・チーム）
+- [x] `database_bridge/src/api/handlers/lounge.rs` — HTTPハンドラ（セッション・レース・申告・承認）
+- [x] `database_bridge/src/api/mod.rs` — /lounge/* ルーター登録
+- [x] `discord_bot/services/lounge_service.py` — Bridge APIラッパー
+- [x] `discord_bot/routes/lounge.py` — Blueprint
+- [x] `discord_bot/templates/lounge.html` — ラウンジ進行UI
+- [x] `discord_bot/static/js/lounge.js` — ラウンジJS（外部ファイル）
+- [x] `discord_bot/static/css/lounge.css`
+
+## 残タスク（未着手）
+
+- [ ] ADR-011 更新（docs/adr/011-general-tournament-system.md）
+- [ ] ADR-013 更新（docs/adr/013-lounge-system.md）
+- [ ] Discord Cog: 称号ロール自動付与のトリガー統合（Discord Bot側）
+- [ ] ラウンジMMR増減計算式の詳細設計（現在は単純スコア加算）
+- [ ] tournament.htmlへの Bracketry ブラケット図統合（1v1用）

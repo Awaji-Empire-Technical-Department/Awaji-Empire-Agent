@@ -200,7 +200,92 @@
             </div>
         </div>
 
+        <!-- 称号管理カード -->
+        <div class="card" id="title-management-card">
+            <div class="card-header">
+                <h2 class="card-title">🏅 称号管理</h2>
+                <button class="btn btn-success btn-sm" id="btn-new-title"><i class="fas fa-plus"></i> 新規称号</button>
+            </div>
+
+            <!-- 自分の称号装備セクション -->
+            <div class="card-body" style="border-bottom: 1px solid var(--border-color); padding-bottom: 1.5rem;">
+                <h3 style="font-size:0.95rem; color:var(--gray); margin-bottom:1rem;">装備中の称号</h3>
+                <div id="active-title-display" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span id="active-title-badge" class="badge badge-secondary" style="font-size:1rem; padding:6px 14px;">読込中...</span>
+                    <button class="btn btn-outline btn-sm" id="btn-change-title">称号を変更する</button>
+                </div>
+                <!-- 獲得称号一覧（折りたたみ） -->
+                <div id="player-titles-panel" style="display:none; margin-top:1rem;">
+                    <p style="font-size:0.85rem; color:var(--gray); margin-bottom:0.5rem;">獲得済みの称号から選んで装備できます</p>
+                    <div id="player-titles-grid" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+                </div>
+            </div>
+
+            <!-- 称号マスタ一覧（Staff向け） -->
+            <div class="table-responsive">
+                <table class="table" id="titles-table">
+                    <thead>
+                        <tr>
+                            <th width="40">ID</th>
+                            <th>称号名</th>
+                            <th width="110">解除条件</th>
+                            <th width="80">閾値</th>
+                            <th width="160">Discord ロールID</th>
+                            <th width="140">アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody id="titles-tbody">
+                        <tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--gray);">読込中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 称号編集モーダル -->
+        <div id="title-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:#fff; border-radius:var(--radius); padding:2rem; width:480px; max-width:95vw; box-shadow:0 8px 32px rgba(0,0,0,.2);">
+                <h3 id="modal-title-heading" style="margin:0 0 1.5rem;">称号を編集</h3>
+                <input type="hidden" id="modal-title-id">
+                <div style="display:flex; flex-direction:column; gap:1rem;">
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">称号名 <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="modal-name" class="form-control" placeholder="例: 金">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">説明</label>
+                        <input type="text" id="modal-description" class="form-control" placeholder="例: ラウンジランク金 達成">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">解除条件</label>
+                        <select id="modal-unlock-type" class="form-control">
+                            <option value="manual">手動付与</option>
+                            <option value="lounge_rank">ラウンジMMR帯</option>
+                            <option value="tournament_win">大会優勝回数</option>
+                        </select>
+                    </div>
+                    <div id="modal-threshold-row">
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">閾値（MMR下限 / 優勝回数）</label>
+                        <input type="number" id="modal-threshold" class="form-control" placeholder="例: 6000">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">Discord ロールID（任意）</label>
+                        <input type="text" id="modal-role-id" class="form-control" placeholder="例: 1234567890123456789">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">表示順</label>
+                        <input type="number" id="modal-order" class="form-control" value="0">
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:1.5rem; justify-content:flex-end;">
+                    <button class="btn btn-outline" id="modal-cancel">キャンセル</button>
+                    <button class="btn btn-success" id="modal-save">保存</button>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard_titles.js') }}"></script>
 </body>
 
 </html>

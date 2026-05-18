@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 
 from routes.survey import survey_bp
 from routes.lobby import lobby_bp
+from routes.tournament import tournament_bp
+from routes.lounge import lounge_bp
 from services.lobby_service import LobbyService
 from services.bridge_client import BridgeUnavailableError
 from services.survey_service import SurveyService
@@ -29,6 +31,8 @@ app.secret_key = Config.SECRET_KEY
 # Blueprintの登録
 app.register_blueprint(survey_bp)
 app.register_blueprint(lobby_bp)
+app.register_blueprint(tournament_bp)
+app.register_blueprint(lounge_bp)
 
 # --- ライフサイクル ---
 @app.before_serving

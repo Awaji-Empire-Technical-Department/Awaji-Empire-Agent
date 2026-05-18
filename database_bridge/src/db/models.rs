@@ -216,6 +216,139 @@ pub struct AdminLog {
 }
 
 // ============================================================
+// 汎用大会システム (game_titles, match_scores, point_tables)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct GameTitle {
+    pub id: i32,
+    pub name: String,
+    pub match_type: String,
+    pub max_players: i8,
+    pub score_type: String,
+    pub is_active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct MatchScore {
+    pub id: i64,
+    pub match_id: i32,
+    pub user_id: i64,
+    pub position: i8,
+    pub points: i32,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PointTable {
+    pub game_title_id: i32,
+    pub position: i8,
+    pub points: i32,
+}
+
+// ============================================================
+// 称号システム (titles, player_titles, player_active_title)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Title {
+    pub id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub unlock_type: String,
+    pub unlock_threshold: Option<i32>,
+    pub discord_role_id: Option<String>,
+    pub is_active: bool,
+    pub display_order: i32,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PlayerTitle {
+    pub id: i64,
+    pub user_id: i64,
+    pub title_id: i32,
+    pub earned_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PlayerActiveTitle {
+    pub user_id: i64,
+    pub title_id: i32,
+    pub updated_at: String,
+}
+
+/// 称号一覧取得用（称号情報 + 獲得済みフラグ）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TitleWithStatus {
+    pub id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub unlock_type: String,
+    pub unlock_threshold: Option<i32>,
+    pub discord_role_id: Option<String>,
+    pub is_active: bool,
+    pub display_order: i32,
+    pub earned: bool,
+    pub is_active_title: bool,
+}
+
+// ============================================================
+// ラウンジシステム (lounge_*)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoungePlayer {
+    pub user_id: i64,
+    pub mmr: i32,
+    pub peak_mmr: i32,
+    pub total_races: i32,
+    pub total_sessions: i32,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoungeSession {
+    pub id: i64,
+    pub room_id: String,
+    pub mode: String,
+    pub total_races: i8,
+    pub current_race: i8,
+    pub status: String,
+    pub host_id: i64,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoungeRaceResult {
+    pub id: i64,
+    pub session_id: i64,
+    pub race_number: i8,
+    pub course_name: String,
+    pub is_void: bool,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoungeRaceScore {
+    pub id: i64,
+    pub race_result_id: i64,
+    pub user_id: i64,
+    pub position: Option<i8>,
+    pub points: i32,
+    pub is_disconnect: bool,
+    pub disconnect_reported_at: Option<String>,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoungeTeam {
+    pub id: i64,
+    pub session_id: i64,
+    pub tag: String,
+}
+
+// ============================================================
 // stream_comment_reset_log テーブル
 // ============================================================
 
@@ -251,3 +384,76 @@ pub enum BridgeError {
 }
 
 pub type BridgeResult<T> = Result<T, BridgeError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_survey(questions_json: &str) -> Survey {
+        Survey {
+            id: 1,
+            owner_id: "user1".to_string(),
+            title: "Test Survey".to_string(),
+            questions: questions_json.as_bytes().to_vec(),
+            is_active: true,
+            created_at: "2026-01-01 00:00:00".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_question_count_valid() {
+        let json = r#"[
+            {"id":"q1","text":"Q1","type":"text","options":null},
+            {"id":"q2","text":"Q2","type":"radio","options":["A","B"]}
+        ]"#;
+        let survey = make_survey(json);
+        assert_eq!(survey.question_count(), 2);
+    }
+
+    #[test]
+    fn test_question_count_empty() {
+        let survey = make_survey("[]");
+        assert_eq!(survey.question_count(), 0);
+    }
+
+    #[test]
+    fn test_question_count_invalid_json_returns_zero() {
+        let survey = make_survey("not json");
+        assert_eq!(survey.question_count(), 0);
+    }
+
+    #[test]
+    fn test_parse_questions_types() {
+        let json = r#"[
+            {"id":"q1","text":"自由記述","type":"text","options":null},
+            {"id":"q2","text":"単一選択","type":"radio","options":["A","B"]},
+            {"id":"q3","text":"複数選択","type":"checkbox","options":["X","Y"]}
+        ]"#;
+        let survey = make_survey(json);
+        let questions = survey.parse_questions().unwrap();
+        assert_eq!(questions[0].question_type, QuestionType::Text);
+        assert_eq!(questions[1].question_type, QuestionType::Radio);
+        assert_eq!(questions[2].question_type, QuestionType::Checkbox);
+    }
+
+    #[test]
+    fn test_survey_response_parse_answers() {
+        let answers_json = r#"{"q1":"回答テキスト","q2":["選択肢A","選択肢B"]}"#;
+        let response = SurveyResponse {
+            id: 1,
+            survey_id: 1,
+            user_id: 123456789,
+            user_name: "tester".to_string(),
+            answers: answers_json.as_bytes().to_vec(),
+            submitted_at: "2026-01-01 00:00:00".to_string(),
+            dm_sent: false,
+        };
+        let answers = response.parse_answers().unwrap();
+        assert!(answers.contains_key("q1"));
+        assert!(answers.contains_key("q2"));
+        match &answers["q2"] {
+            AnswerValue::Choices(v) => assert_eq!(v.len(), 2),
+            _ => panic!("q2 should be Choices"),
+        }
+    }
+}

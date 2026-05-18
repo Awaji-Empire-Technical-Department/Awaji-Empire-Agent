@@ -23,7 +23,7 @@ class NotificationService:
         user_id: str,
         survey_title: str,
         survey_id: int,
-        dashboard_base_url: str = "http://dashboard.awajiempire.net",
+        dashboard_base_url: str = "https://dashboard.awajiempire.net",
     ) -> bool:
         """ユーザーにDMでアンケート回答確認と編集リンクを送信する。
 
