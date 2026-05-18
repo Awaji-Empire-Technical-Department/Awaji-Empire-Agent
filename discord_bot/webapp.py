@@ -9,6 +9,7 @@ from routes.lobby import lobby_bp
 from routes.tournament import tournament_bp
 from routes.lounge import lounge_bp
 from services.lobby_service import LobbyService
+from services.tournament_service import TournamentService
 from services.bridge_client import BridgeUnavailableError
 from services.survey_service import SurveyService
 from services.log_service import LogService
@@ -208,10 +209,10 @@ async def index():
         # LogService 経由で取得 (Rust Bridge を利用)
         logs = await LogService.get_recent_logs(None, limit=30)
         
-        # LobbyService 経由でアクティブなロビーを取得
         lobbies = await LobbyService.get_active_rooms()
+        games = await TournamentService.list_game_titles()
 
-        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies)
+        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies, games=games)
         
     except BridgeUnavailableError:
         current_app.logger.warning("Bridge unavailable on index: rendering maintenance page")

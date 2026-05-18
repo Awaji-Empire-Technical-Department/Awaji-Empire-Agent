@@ -28,7 +28,7 @@ class LobbyService:
         return res is not None and res.get("status") == "ok"
 
     @staticmethod
-    async def create_room(passcode: str, host_id: int, mode: str, title: str, description: Optional[str] = None, expires_in_hours: int = 24) -> bool:
+    async def create_room(passcode: str, host_id: int, mode: str, title: str, description: Optional[str] = None, expires_in_hours: int = 24, extra: Optional[Dict[str, Any]] = None) -> bool:
         """新規ロビーを作成する"""
         payload = {
             "passcode": passcode,
@@ -36,8 +36,10 @@ class LobbyService:
             "mode": mode,
             "title": title,
             "description": description,
-            "expires_in_hours": expires_in_hours
+            "expires_in_hours": expires_in_hours,
         }
+        if extra:
+            payload.update(extra)
         res = await bridge_client.request("POST", "/lobby/rooms", json=payload)
         return res is not None and res.get("status") == "ok"
 

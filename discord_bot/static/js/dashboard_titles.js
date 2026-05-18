@@ -110,19 +110,16 @@
         document.getElementById('modal-order').value = '0';
     }
 
-    document.getElementById('btn-new-title').addEventListener('click', () => {
-        document.getElementById('modal-title-heading').textContent = '新規称号を作成';
-        hideModal();
-        showModal();
-    });
     document.getElementById('modal-cancel').addEventListener('click', hideModal);
 
     document.getElementById('modal-save').addEventListener('click', async () => {
         const id = document.getElementById('modal-title-id').value;
+        if (!id) { alert('編集対象の称号が選択されていません'); return; }
         const name = document.getElementById('modal-name').value.trim();
         if (!name) { alert('称号名を入力してください'); return; }
 
         const body = {
+            id: parseInt(id),
             name,
             description: document.getElementById('modal-description').value.trim() || null,
             unlock_type: document.getElementById('modal-unlock-type').value,
@@ -131,7 +128,6 @@
             discord_role_id: document.getElementById('modal-role-id').value.trim() || null,
             display_order: parseInt(document.getElementById('modal-order').value) || 0,
         };
-        if (id) body.id = parseInt(id);
 
         await fetch('/tournament/api/titles/save', {
             method: 'POST',
