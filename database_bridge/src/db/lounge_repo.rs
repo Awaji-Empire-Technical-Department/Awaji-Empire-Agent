@@ -73,6 +73,37 @@ pub async fn create_session(
     Ok(result.last_insert_id() as i64)
 }
 
+pub async fn list_active_sessions(pool: &MySqlPool) -> BridgeResult<Vec<serde_json::Value>> {
+    let rows = sqlx::query(
+        r#"SELECT ls.id, ls.room_id, ls.mode, ls.total_races, ls.current_race, ls.status,
+                  ls.host_id, u.username as host_name,
+                  CAST(ls.created_at AS CHAR) as created_at,
+                  COUNT(lsm.user_id) as member_count
+           FROM lounge_sessions ls
+           LEFT JOIN user_networks u ON u.discord_id = ls.host_id
+           LEFT JOIN lounge_session_members lsm ON lsm.session_id = ls.id
+           WHERE ls.status IN ('waiting', 'in_progress')
+           GROUP BY ls.id
+           ORDER BY ls.created_at DESC"#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    use sqlx::Row;
+    Ok(rows.iter().map(|r| serde_json::json!({
+        "id":           r.get::<i64, _>("id"),
+        "room_id":      r.get::<String, _>("room_id"),
+        "mode":         r.get::<String, _>("mode"),
+        "total_races":  r.get::<i8, _>("total_races"),
+        "current_race": r.get::<i8, _>("current_race"),
+        "status":       r.get::<String, _>("status"),
+        "host_id":      r.get::<i64, _>("host_id"),
+        "host_name":    r.get::<Option<String>, _>("host_name"),
+        "created_at":   r.get::<String, _>("created_at"),
+        "member_count": r.get::<i64, _>("member_count"),
+    })).collect())
+}
+
 pub async fn get_session(pool: &MySqlPool, session_id: i64) -> BridgeResult<LoungeSession> {
     sqlx::query_as::<_, LoungeSession>(
         r#"SELECT id, room_id, mode, total_races, current_race, status, host_id,

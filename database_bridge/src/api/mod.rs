@@ -87,7 +87,7 @@ fn title_routes() -> Router<AppState> {
 /// ラウンジ関連のルーティング。
 fn lounge_routes() -> Router<AppState> {
     Router::new()
-        .route("/sessions", post(handlers::lounge::create_session))
+        .route("/sessions", get(handlers::lounge::list_sessions).post(handlers::lounge::create_session))
         .route("/sessions/{id}", get(handlers::lounge::get_session))
         .route("/sessions/{id}/next-race", patch(handlers::lounge::next_race))
         .route("/sessions/{id}/finish", post(handlers::lounge::finish_session))

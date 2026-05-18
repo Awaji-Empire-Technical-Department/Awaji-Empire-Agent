@@ -29,7 +29,11 @@ async def index():
     if redir:
         return redir
     user = _current_user()
-    return await render_template("lounge.html", user=user, view="list")
+    try:
+        active_sessions = await LoungeService.list_active_sessions()
+    except Exception:
+        active_sessions = []
+    return await render_template("lounge.html", user=user, view="list", active_sessions=active_sessions)
 
 
 @lounge_bp.route("/sessions/<int:session_id>")

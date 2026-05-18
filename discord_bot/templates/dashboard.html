@@ -29,6 +29,24 @@
     </nav>
 
     <div class="container">
+        {% for s in lounge_sessions %}
+        <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); color:#fff; border-radius:var(--radius); padding:1rem 1.5rem; margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span style="font-size:1.5rem;">🏎️</span>
+                <div>
+                    <strong style="font-size:1rem;">ラウンジ募集中！</strong>
+                    <div style="font-size:.85rem; opacity:.8; margin-top:2px;">
+                        ホスト: {{ s.get('host_name') or s.get('host_id') }}
+                        &nbsp;|&nbsp; {{ s.get('mode', 'FFA').upper() }}
+                        &nbsp;|&nbsp; {{ s.get('current_race', 0) }} / {{ s.get('total_races', 12) }} レース
+                        &nbsp;|&nbsp; {{ s.get('member_count', 0) }}人参加中
+                    </div>
+                </div>
+            </div>
+            <a href="{{ url_for('lounge.session_view', session_id=s.get('id')) }}" class="btn btn-success btn-sm">参加する</a>
+        </div>
+        {% endfor %}
+
         {% for cat, msg in get_flashed_messages(with_categories=true) %}
         <div class="alert {% if cat == 'error' %}alert-danger{% endif %}">
             <i class="fas {% if cat == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"

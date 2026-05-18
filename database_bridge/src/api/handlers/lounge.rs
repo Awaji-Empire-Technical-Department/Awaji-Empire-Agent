@@ -46,6 +46,16 @@ pub async fn create_session(
 }
 
 // ============================================================
+// GET /lounge/sessions  (アクティブセッション一覧)
+// ============================================================
+pub async fn list_sessions(State(pool): State<MySqlPool>) -> (StatusCode, Json<Value>) {
+    match lounge_repo::list_active_sessions(&pool).await {
+        Ok(sessions) => (StatusCode::OK, Json(json!(sessions))),
+        Err(e) => map_err(e),
+    }
+}
+
+// ============================================================
 // GET /lounge/sessions/{id}
 // ============================================================
 pub async fn get_session(
