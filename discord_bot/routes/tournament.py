@@ -10,6 +10,18 @@ tournament_bp = Blueprint("tournament", __name__, url_prefix="/tournament")
 
 GUILD_ID = os.getenv("DISCORD_GUILD_ID", "")
 
+# ランク称号ごとのDiscordロール色（unlock_threshold → color int）
+_LOUNGE_RANK_COLORS = {
+    0:     0x95A5A6,  # 鉄: グレー
+    2000:  0xCD7F32,  # 銅: ブロンズ
+    4000:  0xBDC3C7,  # 銀: シルバー
+    6000:  0xF1C40F,  # 金: ゴールド
+    8000:  0x00BFFF,  # プラチナ: ライトブルー
+    10000: 0x1ABC9C,  # ダイヤ: シアン
+    13000: 0x9B59B6,  # マスター: パープル
+}
+_TOURNAMENT_WIN_COLOR = 0xFFD700  # 大会優勝系: ゴールド
+
 
 def _get_bot_token() -> str:
     try:
@@ -51,6 +63,69 @@ async def _sync_discord_title_role(user_id: str, new_title: dict, old_role_id: s
                 )
     except Exception as e:
         current_app.logger.warning(f"Discord role sync failed: {e}")
+
+
+async def _ensure_discord_role(title: dict) -> str | None:
+    """称号に紐づくDiscordロールを確保する。
+    - discord_role_id が設定済みならそのまま返す
+    - 未設定なら新規作成してDBに書き戻してから返す
+    """
+    role_id = title.get("discord_role_id")
+    if role_id:
+        return role_id
+
+    token = _get_bot_token()
+    if not token or not GUILD_ID:
+        return None
+
+    unlock_type = title.get("unlock_type", "manual")
+    threshold = title.get("unlock_threshold")
+
+    if unlock_type == "lounge_rank":
+        color = _LOUNGE_RANK_COLORS.get(threshold, 0x95A5A6)
+    elif unlock_type == "tournament_win":
+        color = _TOURNAMENT_WIN_COLOR
+    else:
+        color = 0x95A5A6
+
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(
+                f"https://discord.com/api/v10/guilds/{GUILD_ID}/roles",
+                headers=headers,
+                json={"name": title["name"], "color": color, "hoist": False, "mentionable": False},
+            )
+            if res.status_code not in (200, 201):
+                current_app.logger.warning(f"Role create failed: {res.status_code} {res.text}")
+                return None
+            new_role_id = res.json()["id"]
+
+        await TitleService.update_discord_role_id(title["id"], new_role_id)
+        current_app.logger.info(f"Created Discord role '{title['name']}' → {new_role_id}")
+        return new_role_id
+    except Exception as e:
+        current_app.logger.warning(f"ensure_discord_role failed: {e}")
+        return None
+
+
+async def _assign_title_role(discord_user_id: str, title: dict):
+    """ロールを確保してそのユーザーに付与する（装備称号切替ではなく獲得時の付与）"""
+    role_id = await _ensure_discord_role(title)
+    if not role_id:
+        return
+    token = _get_bot_token()
+    if not token or not GUILD_ID:
+        return
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.put(
+                f"https://discord.com/api/v10/guilds/{GUILD_ID}/members/{discord_user_id}/roles/{role_id}",
+                headers=headers,
+            )
+    except Exception as e:
+        current_app.logger.warning(f"assign_title_role failed: {e}")
 
 
 # ============================================================
@@ -124,8 +199,27 @@ async def api_approve_match(match_id: int):
     user = _current_user()
     if not user:
         return jsonify({"status": "error", "message": "unauthorized"}), 401
+
     ok = await TournamentService.approve_match(match_id)
-    return jsonify({"status": "ok" if ok else "error"})
+    if not ok:
+        return jsonify({"status": "error"})
+
+    # winner_id が渡された場合、大会優勝称号を自動付与
+    data = await request.get_json(silent=True) or {}
+    winner_id = data.get("winner_id")
+    if winner_id:
+        newly_granted_ids = await TitleService.grant_tournament_win(int(winner_id))
+        all_titles = await TitleService.list_all()
+        for title_id in newly_granted_ids:
+            granted_title = next((t for t in all_titles if t["id"] == title_id), None)
+            if granted_title:
+                await _ensure_discord_role(granted_title)
+                active = await TitleService.get_active(int(winner_id))
+                if active is None:
+                    await TitleService.set_active(int(winner_id), title_id)
+                await _assign_title_role(str(winner_id), granted_title)
+
+    return jsonify({"status": "ok"})
 
 
 # ============================================================
@@ -208,6 +302,35 @@ async def api_set_active_title():
         new_title = await TitleService.get_active(int(user["id"]))
         if new_title:
             await _sync_discord_title_role(user["id"], new_title, old_role_id)
+    return jsonify({"status": "ok" if ok else "error"})
+
+
+@tournament_bp.route("/api/titles/player/active", methods=["DELETE"])
+async def api_clear_active_title():
+    user = _current_user()
+    if not user:
+        return jsonify({"status": "error"}), 401
+
+    # 外す前に現在の称号ロールIDを取得
+    old_title = await TitleService.get_active(int(user["id"]))
+    old_role_id = old_title.get("discord_role_id") if old_title else None
+
+    ok = await TitleService.clear_active(int(user["id"]))
+    if ok and old_role_id:
+        # 旧ロールだけ外す（他のロールは一切触らない）
+        token = _get_bot_token()
+        if token and GUILD_ID:
+            import httpx as _httpx
+            headers = {"Authorization": f"Bot {token}"}
+            try:
+                async with _httpx.AsyncClient(timeout=10.0) as client:
+                    await client.delete(
+                        f"https://discord.com/api/v10/guilds/{GUILD_ID}/members/{user['id']}/roles/{old_role_id}",
+                        headers=headers,
+                    )
+            except Exception as e:
+                current_app.logger.warning(f"Role remove failed: {e}")
+
     return jsonify({"status": "ok" if ok else "error"})
 
 

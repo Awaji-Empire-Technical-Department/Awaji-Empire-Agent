@@ -162,6 +162,15 @@ pub async fn upsert_title(
     }
 }
 
+pub async fn update_title_discord_role(pool: &MySqlPool, title_id: i32, discord_role_id: &str) -> BridgeResult<()> {
+    sqlx::query("UPDATE titles SET discord_role_id = ? WHERE id = ?")
+        .bind(discord_role_id)
+        .bind(title_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn delete_title(pool: &MySqlPool, title_id: i32) -> BridgeResult<()> {
     sqlx::query("DELETE FROM titles WHERE id = ?")
         .bind(title_id)
@@ -252,6 +261,14 @@ pub async fn set_active_title(
     .bind(title_id)
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+pub async fn clear_active_title(pool: &MySqlPool, user_id: i64) -> BridgeResult<()> {
+    sqlx::query("DELETE FROM player_active_title WHERE user_id = ?")
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 

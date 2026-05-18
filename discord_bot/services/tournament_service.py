@@ -91,3 +91,33 @@ class TitleService:
     @staticmethod
     async def get_active(user_id: int) -> Optional[Dict[str, Any]]:
         return await bridge_client.request("GET", f"/titles/player/{user_id}/active")
+
+    @staticmethod
+    async def clear_active(user_id: int) -> bool:
+        res = await bridge_client.request("DELETE", f"/titles/player/{user_id}/active")
+        return res is not None and res.get("status") == "ok"
+
+    @staticmethod
+    async def update_discord_role_id(title_id: int, discord_role_id: str) -> bool:
+        res = await bridge_client.request(
+            "PATCH", f"/titles/{title_id}/discord_role",
+            json={"discord_role_id": discord_role_id}
+        )
+        return res is not None and res.get("status") == "ok"
+
+    @staticmethod
+    async def grant_rank(user_id: int, mmr: int) -> List[int]:
+        """MMRに応じたランク称号を自動付与。新規付与された title_id のリストを返す。"""
+        res = await bridge_client.request(
+            "POST", f"/titles/player/{user_id}/grant-rank",
+            json={"mmr": mmr}
+        )
+        return res.get("newly_granted", []) if res else []
+
+    @staticmethod
+    async def grant_tournament_win(user_id: int) -> List[int]:
+        """大会優勝回数に応じた称号を自動付与。新規付与された title_id のリストを返す。"""
+        res = await bridge_client.request(
+            "POST", f"/titles/player/{user_id}/grant-tournament"
+        )
+        return res.get("newly_granted", []) if res else []

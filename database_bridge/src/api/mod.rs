@@ -76,9 +76,12 @@ fn title_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(handlers::tournament::list_titles).post(handlers::tournament::upsert_title))
         .route("/{title_id}", delete(handlers::tournament::delete_title))
+        .route("/{title_id}/discord_role", patch(handlers::tournament::update_discord_role))
         .route("/player/{user_id}", get(handlers::tournament::get_player_titles))
         .route("/player/{user_id}/grant", post(handlers::tournament::grant_title))
-        .route("/player/{user_id}/active", get(handlers::tournament::get_active_title).post(handlers::tournament::set_active_title))
+        .route("/player/{user_id}/grant-rank", post(handlers::tournament::grant_rank_title))
+        .route("/player/{user_id}/grant-tournament", post(handlers::tournament::grant_tournament_title))
+        .route("/player/{user_id}/active", get(handlers::tournament::get_active_title).post(handlers::tournament::set_active_title).delete(handlers::tournament::clear_active_title))
 }
 
 /// ラウンジ関連のルーティング。
