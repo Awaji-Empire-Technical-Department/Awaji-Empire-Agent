@@ -1,0 +1,25 @@
+/* lounge.css */
+.lounge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+}
+
+.lounge-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 768px) {
+    .lounge-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.standings-first td {
+    background-color: #fffbea;
+    font-weight: 600;
+}
