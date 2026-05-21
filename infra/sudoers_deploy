@@ -1,12 +1,21 @@
-# /etc/sudoers.d/database_bridge_deploy
-# Why: Allow non-interactive deployment for the Rust bridge.
-# Note: Replace <USER> with the actual username of the GitHub Actions runner (e.g., github-runner).
+# /etc/sudoers.d/awaji_deploy
+# Why: Allow non-interactive deployment.
+# Note: Replace <USER> with the actual deploy user (e.g., github-runner, ubuntu).
+# 適用方法: sudo cp /Awaji-Empire-Agent/infra/sudoers_deploy /etc/sudoers.d/awaji_deploy
 
-# Allow execution of the setup script
+# デプロイスクリプト一式
+<USER> ALL=(ALL) NOPASSWD: /Awaji-Empire-Agent/scripts/deploy.sh
 <USER> ALL=(ALL) NOPASSWD: /Awaji-Empire-Agent/scripts/setup-systemd.sh
 
-# Allow specific systemctl commands for the bridge service
+# systemctl
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl daemon-reload
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable database_bridge.service
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart database_bridge.service
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl status database_bridge.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart awaji-webapp.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl status awaji-webapp.service
+
+# nginx
+<USER> ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload nginx
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart nginx
