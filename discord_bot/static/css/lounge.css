@@ -1,25 +1,160 @@
-/* lounge.css */
+/* =========================================
+   LOUNGE: セッション・ランキング画面
+   ========================================= */
+
+/* ---- ヘッダー ---- */
 .lounge-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
+/* ---- 2カラムグリッド ---- */
 .lounge-grid {
     display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 1.5rem;
+    grid-template-columns: 260px 1fr;
+    gap: 1.25rem;
     align-items: start;
 }
 
-@media (max-width: 768px) {
-    .lounge-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
+/* ---- スタンディング 1位ハイライト ---- */
 .standings-first td {
     background-color: #fffbea;
     font-weight: 600;
+}
+
+/* ---- ラウンジ用テーブル（min-widthをリセットして小画面対応） ---- */
+.lounge-table {
+    min-width: unset;
+    width: 100%;
+}
+
+/* ---- 一覧ビュー セッション作成フォーム ---- */
+.lounge-create-form {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+/* ---- モーダルオーバーレイ共通 ---- */
+.lounge-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .65);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+/* ============================================================
+   モバイル対応 (max-width: 640px)
+   ============================================================ */
+@media (max-width: 640px) {
+
+    /* ナビバー：ユーザー名を非表示 */
+    .user-menu .user-name {
+        display: none;
+    }
+    .user-menu {
+        gap: 8px;
+    }
+
+    /* コンテナの余白を縮小 */
+    .container {
+        padding: 0 .75rem;
+        margin: 1rem auto;
+    }
+
+    /* カードのパディングを縮小 */
+    .card {
+        padding: 1rem;
+    }
+    .card-header {
+        margin: -1rem -1rem 1rem;
+        padding: .75rem 1rem;
+    }
+
+    /* ラウンジグリッド: 1カラム */
+    .lounge-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    /* ヘッダー */
+    .lounge-header h2 {
+        font-size: 1.1rem;
+    }
+
+    /* Staffパネルのボタン: フル幅 */
+    #staff-panel .btn {
+        width: 100%;
+    }
+    #staff-panel .card-body {
+        gap: 10px;
+    }
+
+    /* 一覧ビューの作成フォーム: 縦並び */
+    .lounge-create-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .lounge-create-form > div {
+        width: 100% !important;
+    }
+    .lounge-create-form input,
+    .lounge-create-form select {
+        width: 100% !important;
+    }
+    .lounge-create-form .btn {
+        width: 100%;
+    }
+
+    /* セッション一覧テーブル: 横スクロール許可 */
+    .lounge-sessions-table {
+        min-width: 480px;
+    }
+
+    /* 順位申告モーダル内のボタン行 */
+    #modal-report-section > div {
+        flex-wrap: wrap;
+    }
+    #modal-report-section .btn {
+        flex: 1;
+        min-width: 100px;
+    }
+
+    /* ランキングテーブル: コンパクト */
+    .lounge-table th,
+    .lounge-table td {
+        padding: 8px 6px;
+        font-size: .82rem;
+    }
+
+    /* 注意バナー */
+    .lounge-warning {
+        font-size: .82rem;
+        padding: .75rem;
+    }
+
+    /* モーダルの申告ボタン */
+    #modal-btn-finalize {
+        font-size: .9rem;
+        padding: .65rem 1rem;
+    }
+}
+
+/* ============================================================
+   タブレット対応 (641px ~ 900px)
+   ============================================================ */
+@media (min-width: 641px) and (max-width: 900px) {
+    .lounge-grid {
+        grid-template-columns: 220px 1fr;
+        gap: 1rem;
+    }
 }

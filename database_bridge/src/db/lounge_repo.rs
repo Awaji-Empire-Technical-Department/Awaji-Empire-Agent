@@ -197,6 +197,51 @@ pub async fn create_race(
     Ok(result.last_insert_id() as i64)
 }
 
+/// セッションの最新レース（未承認含む）を返す。ページリロード時の復元用。
+pub async fn get_active_race(pool: &MySqlPool, session_id: i64) -> BridgeResult<Option<serde_json::Value>> {
+    let row = sqlx::query(
+        r#"SELECT id, course_name, race_number
+           FROM lounge_race_results
+           WHERE session_id = ?
+           ORDER BY race_number DESC LIMIT 1"#
+    )
+    .bind(session_id)
+    .fetch_optional(pool)
+    .await?;
+
+    use sqlx::Row;
+    Ok(row.map(|r| serde_json::json!({
+        "race_id":      r.get::<i64, _>("id"),
+        "course_name":  r.get::<String, _>("course_name"),
+        "race_number":  r.get::<i8, _>("race_number"),
+    })))
+}
+
+/// スコア一覧にユーザー名を付加して返す。
+pub async fn list_race_scores_named(pool: &MySqlPool, race_result_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
+    let rows = sqlx::query(
+        r#"SELECT lrs.user_id, u.username, lrs.position, lrs.points,
+                  lrs.is_disconnect, lrs.status
+           FROM lounge_race_scores lrs
+           LEFT JOIN user_networks u ON u.discord_id = lrs.user_id
+           WHERE lrs.race_result_id = ?
+           ORDER BY lrs.position"#
+    )
+    .bind(race_result_id)
+    .fetch_all(pool)
+    .await?;
+
+    use sqlx::Row;
+    Ok(rows.iter().map(|r| serde_json::json!({
+        "user_id":       r.get::<i64, _>("user_id"),
+        "username":      r.get::<Option<String>, _>("username"),
+        "position":      r.get::<Option<i8>, _>("position"),
+        "points":        r.get::<Option<i32>, _>("points"),
+        "is_disconnect": r.get::<bool, _>("is_disconnect"),
+        "status":        r.get::<String, _>("status"),
+    })).collect())
+}
+
 pub async fn list_races(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<LoungeRaceResult>> {
     sqlx::query_as::<_, LoungeRaceResult>(
         r#"SELECT id, session_id, race_number, course_name, is_void,

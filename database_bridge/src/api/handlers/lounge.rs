@@ -248,6 +248,52 @@ pub async fn approve_race(
 }
 
 // ============================================================
+// GET /lounge/players/{user_id}
+// ============================================================
+pub async fn get_player(
+    State(pool): State<MySqlPool>,
+    Path(user_id): Path<i64>,
+) -> (StatusCode, Json<Value>) {
+    match lounge_repo::get_lounge_player(&pool, user_id).await {
+        Ok(p) => (StatusCode::OK, Json(json!({
+            "user_id": p.user_id,
+            "mmr": p.mmr,
+            "peak_mmr": p.peak_mmr,
+            "total_races": p.total_races,
+            "total_sessions": p.total_sessions,
+        }))),
+        Err(e) => map_err(e),
+    }
+}
+
+// ============================================================
+// GET /lounge/sessions/{id}/active-race
+// ============================================================
+pub async fn get_active_race(
+    State(pool): State<MySqlPool>,
+    Path(session_id): Path<i64>,
+) -> (StatusCode, Json<Value>) {
+    match lounge_repo::get_active_race(&pool, session_id).await {
+        Ok(Some(race)) => (StatusCode::OK, Json(race)),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"status":"none"}))),
+        Err(e) => map_err(e),
+    }
+}
+
+// ============================================================
+// GET /lounge/races/{race_id}/scores/named
+// ============================================================
+pub async fn list_race_scores_named(
+    State(pool): State<MySqlPool>,
+    Path(race_id): Path<i64>,
+) -> (StatusCode, Json<Value>) {
+    match lounge_repo::list_race_scores_named(&pool, race_id).await {
+        Ok(scores) => (StatusCode::OK, Json(json!(scores))),
+        Err(e) => map_err(e),
+    }
+}
+
+// ============================================================
 // GET /lounge/sessions/{id}/standings
 // ============================================================
 pub async fn get_standings(
