@@ -168,6 +168,7 @@ pub async fn create_race(
             (StatusCode::OK, Json(json!({
                 "status": "ok",
                 "race_id": race_id,
+                "race_number": next_race_num,
                 "duplicate_course": !is_new,
             })))
         },
