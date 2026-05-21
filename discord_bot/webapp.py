@@ -82,13 +82,17 @@ async def shutdown():
 
 # --- コンテキストプロセッサ ---
 @app.context_processor
-def inject_css_version():
-    try:
-        css_path = os.path.join(app.static_folder, 'style.css')
-        version = int(os.path.getmtime(css_path))
-    except:
-        version = 1
-    return dict(css_ver=version)
+def inject_static_versions():
+    """静的ファイルのmtimeをキャッシュバスターとして返す。"""
+    def _mtime(rel_path):
+        try:
+            return int(os.path.getmtime(os.path.join(app.static_folder, rel_path)))
+        except Exception:
+            return 1
+    return dict(
+        css_ver=_mtime('style.css'),
+        js_ver=_mtime('js/lounge.js'),
+    )
 
 # --- 認証ルート (Auth) ---
 # ... (login, callback, logout は変更なしのため省略。実際はそのまま残す)
