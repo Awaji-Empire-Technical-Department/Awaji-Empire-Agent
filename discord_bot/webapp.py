@@ -1,6 +1,8 @@
 import os
+import asyncio
+import aiohttp
 import httpx
-from quart import Quart, render_template, request, redirect, url_for, session, current_app
+from quart import Quart, render_template, request, redirect, url_for, session, current_app, websocket
 from quart_cors import cors
 from dotenv import load_dotenv
 
@@ -35,6 +37,37 @@ app.register_blueprint(survey_bp)
 app.register_blueprint(lobby_bp)
 app.register_blueprint(tournament_bp)
 app.register_blueprint(lounge_bp)
+
+# --- WebSocket プロキシ (Rust Bridge → ブラウザ) ---
+BRIDGE_WS_URL = "ws://127.0.0.1:7878/ws/hyouibana"
+
+@app.websocket('/ws/hyouibana')
+async def ws_proxy():
+    """ブラウザのWSリクエストをRust Bridgeへ中継する。"""
+    async with aiohttp.ClientSession() as sess:
+        try:
+            async with sess.ws_connect(BRIDGE_WS_URL) as bridge_ws:
+
+                async def bridge_to_client():
+                    async for msg in bridge_ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            await websocket.send(msg.data)
+                        elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            break
+
+                async def client_to_bridge():
+                    while True:
+                        try:
+                            data = await websocket.receive()
+                            await bridge_ws.send_str(data)
+                        except Exception:
+                            break
+
+                await asyncio.gather(bridge_to_client(), client_to_bridge())
+
+        except Exception as e:
+            current_app.logger.warning(f"WS proxy error: {e}")
+
 
 # --- ライフサイクル ---
 @app.before_serving
