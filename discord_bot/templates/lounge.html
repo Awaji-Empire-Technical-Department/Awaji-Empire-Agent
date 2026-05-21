@@ -46,15 +46,11 @@
                 {% if is_host %}
                 <div class="card" id="staff-panel">
                     <div class="card-header"><h3 class="card-title">Staff操作</h3></div>
-                    <div class="card-body" style="display:flex; flex-direction:column; gap:8px;">
-                        <div>
-                            <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">コース名</label>
-                            <input type="text" id="course-name-input" class="form-control" placeholder="例: レインボーロード">
-                        </div>
+                    <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
                         <button class="btn btn-primary" id="btn-new-race">
                             <i class="fas fa-flag"></i> レース開始
                         </button>
-                        <button class="btn btn-danger" id="btn-finish-session" style="margin-top:8px;">
+                        <button class="btn btn-danger" id="btn-finish-session">
                             <i class="fas fa-stop"></i> セッション終了
                         </button>
                     </div>
@@ -149,50 +145,75 @@
         </div>
 
         <!-- ============ 順位申告モーダル ============ -->
-        <div id="race-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:1000; align-items:center; justify-content:center;">
-            <div style="background:#fff; border-radius:var(--radius); width:min(520px,95vw); max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.3);">
+        <div id="race-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:1000; align-items:center; justify-content:center; padding:1rem;">
+            <div style="background:#fff; border-radius:var(--radius); width:min(520px,95vw); max-height:92vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.3);">
+
+                <!-- ヘッダー -->
                 <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); color:#fff; padding:1.25rem 1.5rem; border-radius:var(--radius) var(--radius) 0 0; display:flex; align-items:center; justify-content:space-between;">
                     <div>
-                        <div style="font-size:.8rem; opacity:.7;">レース進行中</div>
+                        <div style="font-size:.8rem; opacity:.7;" id="modal-header-label">レース設定</div>
                         <div style="font-size:1.1rem; font-weight:700;" id="modal-course-name">—</div>
                     </div>
                     <span style="font-size:.85rem; opacity:.7;" id="modal-race-num"></span>
                 </div>
+
                 <div style="padding:1.25rem 1.5rem;">
-                    <!-- 自分の申告フォーム -->
-                    <div id="modal-report-section">
-                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:6px;">あなたの順位</label>
-                        <div style="display:flex; gap:8px;">
-                            <select id="modal-report-position" class="form-control" style="width:120px;">
-                                {% for i in range(1, 25) %}
-                                <option value="{{ i }}">{{ i }}位</option>
-                                {% endfor %}
-                            </select>
-                            <button class="btn btn-success" id="modal-btn-report"><i class="fas fa-paper-plane"></i> 申告する</button>
-                            <button class="btn btn-warning" id="modal-btn-disconnect"><i class="fas fa-plug"></i> 回線落ち</button>
-                        </div>
-                        <div id="modal-my-submitted" style="display:none; margin-top:8px; color:#28a745; font-size:.9rem;">
-                            <i class="fas fa-check-circle"></i> 申告済み
-                        </div>
-                    </div>
 
-                    <!-- 提出状況 -->
-                    <div style="margin-top:1.25rem;">
-                        <div style="font-size:.85rem; font-weight:600; margin-bottom:6px; display:flex; justify-content:space-between;">
-                            <span>提出状況</span>
-                            <span id="modal-submitted-count" style="color:var(--gray);"></span>
-                        </div>
-                        <div id="modal-submission-list" style="display:flex; flex-direction:column; gap:4px;"></div>
-                    </div>
-
-                    <!-- ホスト確定ボタン -->
+                    <!-- ① セットアップフェーズ（ホストのみ・レース開始前） -->
                     {% if is_host %}
-                    <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border-color);">
-                        <button class="btn btn-primary" id="modal-btn-finalize" style="width:100%;">
-                            <i class="fas fa-check-double"></i> 結果確定・次のレースへ
+                    <div id="modal-phase-setup">
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:6px;">コース名</label>
+                        <input type="text" id="modal-course-input" class="form-control" placeholder="例: レインボーロード" style="margin-bottom:10px;">
+                        <button class="btn btn-primary" id="modal-btn-start-race" style="width:100%;">
+                            <i class="fas fa-flag"></i> このコースでレースを開始する
                         </button>
+                        <p style="font-size:.8rem; color:var(--gray); margin-top:8px; text-align:center;">開始すると全参加者に通知されます</p>
                     </div>
                     {% endif %}
+
+                    <!-- ② 申告フェーズ（全員・レース開始後） -->
+                    <div id="modal-phase-report" style="display:none;">
+
+                        <!-- 自分の順位入力 -->
+                        <div id="modal-report-section">
+                            <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:6px;">あなたの順位</label>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <select id="modal-report-position" class="form-control" style="width:110px; flex-shrink:0;">
+                                    {% for i in range(1, 25) %}
+                                    <option value="{{ i }}">{{ i }}位</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="btn btn-success" id="modal-btn-report" style="flex:1; min-width:100px;">
+                                    <i class="fas fa-paper-plane"></i> 申告する
+                                </button>
+                                <button class="btn btn-warning" id="modal-btn-disconnect" style="flex:1; min-width:100px;">
+                                    <i class="fas fa-plug"></i> 回線落ち
+                                </button>
+                            </div>
+                            <div id="modal-my-submitted" style="display:none; margin-top:8px; color:#28a745; font-size:.9rem; font-weight:600;">
+                                <i class="fas fa-check-circle"></i> 申告済みです
+                            </div>
+                        </div>
+
+                        <!-- 提出状況 -->
+                        <div style="margin-top:1.25rem;">
+                            <div style="font-size:.85rem; font-weight:600; margin-bottom:6px; display:flex; justify-content:space-between;">
+                                <span>提出状況</span>
+                                <span id="modal-submitted-count" style="color:var(--gray);"></span>
+                            </div>
+                            <div id="modal-submission-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+                        </div>
+
+                        <!-- ホスト確定ボタン -->
+                        {% if is_host %}
+                        <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                            <button class="btn btn-primary" id="modal-btn-finalize" style="width:100%;">
+                                <i class="fas fa-check-double"></i> 結果確定・次のレースへ
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+
                 </div>
             </div>
         </div>
