@@ -49,6 +49,7 @@ async def session_view(session_id: int):
         standings = await LoungeService.get_standings(session_id)
         members = await LoungeService.list_members(session_id)
         course_history = await LoungeService.get_course_history(session_id)
+        is_host = str(user["id"]) == str(session_data.get("host_id", ""))
         return await render_template(
             "lounge.html",
             user=user,
@@ -57,6 +58,7 @@ async def session_view(session_id: int):
             members=members,
             course_history=course_history,
             view="session",
+            is_host=is_host,
         )
     except BridgeUnavailableError:
         return await render_template("maintenance.html"), 503
@@ -95,6 +97,9 @@ async def api_create_race(session_id: int):
     user = _current_user()
     if not user:
         return jsonify({"status": "error"}), 401
+    session_data = await LoungeService.get_session(session_id)
+    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
+        return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
     data = await request.get_json()
     course_name = data.get("course_name", "")
     result = await LoungeService.create_race(session_id, course_name)
@@ -125,11 +130,14 @@ async def api_disconnect(race_id: int):
     return jsonify({"status": "ok" if ok else "error"})
 
 
-@lounge_bp.route("/api/races/<int:race_id>/approve", methods=["POST"])
-async def api_approve_race(race_id: int):
+@lounge_bp.route("/api/sessions/<int:session_id>/races/<int:race_id>/approve", methods=["POST"])
+async def api_approve_race(session_id: int, race_id: int):
     user = _current_user()
     if not user:
         return jsonify({"status": "error"}), 401
+    session_data = await LoungeService.get_session(session_id)
+    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
+        return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
     ok = await LoungeService.approve_race(race_id)
     return jsonify({"status": "ok" if ok else "error"})
 
@@ -139,6 +147,9 @@ async def api_next_race(session_id: int):
     user = _current_user()
     if not user:
         return jsonify({"status": "error"}), 401
+    session_data = await LoungeService.get_session(session_id)
+    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
+        return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
     ok = await LoungeService.next_race(session_id)
     return jsonify({"status": "ok" if ok else "error"})
 
@@ -148,6 +159,9 @@ async def api_finish_session(session_id: int):
     user = _current_user()
     if not user:
         return jsonify({"status": "error"}), 401
+    session_data = await LoungeService.get_session(session_id)
+    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
+        return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
 
     ok = await LoungeService.finish_session(session_id)
     if not ok:

@@ -62,7 +62,8 @@
                     </div>
                 </div>
 
-                <!-- Staff用操作パネル -->
+                {% if is_host %}
+                <!-- Staff用操作パネル（ホストのみ表示） -->
                 <div class="card" style="margin-top:1rem;" id="staff-panel">
                     <div class="card-header"><h3 class="card-title">Staff操作</h3></div>
                     <div class="card-body" style="display:flex; flex-direction:column; gap:8px;">
@@ -84,6 +85,7 @@
                         </button>
                     </div>
                 </div>
+                {% endif %}
             </div>
 
             <!-- 右: ランキング / コース履歴 -->
@@ -152,7 +154,8 @@
                     </div>
                     <div>
                         <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">ルームID</label>
-                        <input type="text" id="new-session-room" class="form-control" placeholder="合言葉" style="width:140px;">
+                        <input type="text" id="new-session-room" class="form-control" placeholder="例: ABC123" maxlength="6" style="width:140px; font-family:monospace; text-transform:uppercase; letter-spacing:.1em;">
+                        <small style="color:var(--gray); display:block; margin-top:3px;">6桁の英数字（MKWルームID）</small>
                     </div>
                     <button class="btn btn-success" id="btn-submit-session"><i class="fas fa-check"></i> 作成</button>
                 </div>
@@ -201,6 +204,7 @@
 
     <script>
         const SESSION_ID = {{ lounge_session.id if lounge_session else 'null' }};
+        const IS_HOST = {{ 'true' if is_host is defined and is_host else 'false' }};
         let currentRaceId = null;
     </script>
     <script src="{{ url_for('static', filename='js/lounge.js') }}"></script>
