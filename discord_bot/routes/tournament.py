@@ -341,3 +341,39 @@ async def api_player_title_list():
         return jsonify([])
     titles = await TitleService.get_player_titles(int(user["id"]))
     return jsonify(titles)
+
+
+@tournament_bp.route("/api/titles/staff-grant", methods=["POST"])
+async def api_staff_grant():
+    """Staff用: 称号付与 + Discordロール自動作成・即時付与のテスト用エンドポイント。"""
+    user = _current_user()
+    if not user:
+        return jsonify({"status": "error", "message": "unauthorized"}), 401
+
+    data = await request.get_json()
+    target_user_id = data.get("user_id")   # 対象ユーザーのDiscord ID（省略時は自分）
+    title_id = data.get("title_id")
+    if not title_id:
+        return jsonify({"status": "error", "message": "title_id required"}), 400
+
+    if not target_user_id:
+        target_user_id = int(user["id"])
+
+    # 1. 称号をDBに付与
+    granted = await TitleService.grant(int(target_user_id), int(title_id))
+
+    # 2. 称号情報を取得してDiscordロールを確保・付与
+    all_titles = await TitleService.list_all()
+    title = next((t for t in all_titles if t["id"] == int(title_id)), None)
+    if not title:
+        return jsonify({"status": "error", "message": "title not found"}), 404
+
+    role_id = await _ensure_discord_role(title)
+    await _assign_title_role(str(target_user_id), title)
+
+    return jsonify({
+        "status": "ok",
+        "newly_granted": granted,
+        "discord_role_id": role_id,
+        "title_name": title["name"],
+    })

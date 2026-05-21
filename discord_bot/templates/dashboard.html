@@ -41,6 +41,13 @@
                         &nbsp;|&nbsp; {{ s.get('current_race', 0) }} / {{ s.get('total_races', 12) }} レース
                         &nbsp;|&nbsp; {{ s.get('member_count', 0) }}人参加中
                     </div>
+                    {% if s.get('room_id') %}
+                    <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:.8rem; opacity:.7;">ゲーム内ルームID:</span>
+                        <span style="font-family:monospace; font-size:1.1rem; font-weight:700; letter-spacing:.15em; background:rgba(255,255,255,.12); padding:2px 10px; border-radius:6px;">{{ s.get('room_id') }}</span>
+                        <span style="font-size:.75rem; opacity:.6;">← これをゲーム内で入力</span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             <a href="{{ url_for('lounge.session_view', session_id=s.get('id')) }}" class="btn btn-success btn-sm">参加する</a>
@@ -273,6 +280,27 @@
             </div>
 
             <!-- 称号マスタ一覧（Staff向け） -->
+            <!-- Staff テスト: 称号付与 + ロール即時付与 -->
+            <div class="card-body" style="border-bottom:1px solid var(--border-color); padding-bottom:1.5rem;">
+                <h3 style="font-size:.9rem; font-weight:600; color:var(--gray); margin-bottom:.75rem;">🔧 Staff テスト: ロール付与確認</h3>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                    <div>
+                        <label style="font-size:.8rem; display:block; margin-bottom:4px;">対象DiscordユーザーID（省略で自分）</label>
+                        <input type="text" id="test-target-user" class="form-control" placeholder="例: 123456789012345678" style="width:220px;">
+                    </div>
+                    <div>
+                        <label style="font-size:.8rem; display:block; margin-bottom:4px;">称号</label>
+                        <select id="test-title-select" class="form-control" style="width:160px;">
+                            <option value="">読込中...</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-warning btn-sm" id="btn-staff-grant">
+                        <i class="fas fa-bolt"></i> 付与 + ロール作成
+                    </button>
+                </div>
+                <div id="staff-grant-result" style="margin-top:.75rem; font-size:.85rem; display:none;"></div>
+            </div>
+
             <div class="table-responsive">
                 <table class="table" id="titles-table">
                     <thead>

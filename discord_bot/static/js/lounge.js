@@ -10,11 +10,17 @@
             form.style.display = form.style.display === 'none' ? 'block' : 'none';
         });
 
+        const roomInput = document.getElementById('new-session-room');
+        roomInput?.addEventListener('input', () => {
+            roomInput.value = roomInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        });
+
         document.getElementById('btn-submit-session')?.addEventListener('click', async () => {
             const mode = document.getElementById('new-session-mode').value;
             const races = parseInt(document.getElementById('new-session-races').value);
-            const room = document.getElementById('new-session-room').value.trim();
+            const room = roomInput.value.trim().toUpperCase();
             if (!room) { alert('ルームIDを入力してください'); return; }
+            if (!/^[A-Z0-9]{6}$/.test(room)) { alert('ルームIDは6桁の英数字で入力してください（例: ABC123）'); return; }
 
             const res = await fetch('/lounge/api/sessions', {
                 method: 'POST',
@@ -84,7 +90,7 @@
     document.getElementById('btn-approve-race')?.addEventListener('click', async () => {
         if (!currentRaceId) { alert('承認するレースがありません'); return; }
         if (!confirm('このレースの結果を承認しますか？')) return;
-        await fetch(`/lounge/api/races/${currentRaceId}/approve`, { method: 'POST' });
+        await fetch(`/lounge/api/sessions/${SESSION_ID}/races/${currentRaceId}/approve`, { method: 'POST' });
         await refreshStandings();
         currentRaceId = null;
     });
