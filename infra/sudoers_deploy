@@ -12,8 +12,8 @@
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable database_bridge.service
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart database_bridge.service
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl status database_bridge.service
-<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart awaji-webapp.service
-<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl status awaji-webapp.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart discord_webapp.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl status discord_webapp.service
 
 # nginx
 <USER> ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t

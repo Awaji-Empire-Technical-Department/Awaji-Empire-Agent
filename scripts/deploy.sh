@@ -17,7 +17,7 @@ set -euo pipefail
 # 設定（環境に合わせて変更）
 # ============================================================
 REPO_DIR="/Awaji-Empire-Agent"
-WEBAPP_SERVICE="awaji-webapp.service"      # Python webapp の systemd サービス名
+WEBAPP_SERVICE="discord_webapp.service"      # Python webapp の systemd サービス名
 BRIDGE_SERVICE="database_bridge.service"   # Rust bridge の systemd サービス名
 NGINX_CONF_SRC="${REPO_DIR}/infra/nginx-awaji.conf"
 NGINX_CONF_DEST="/etc/nginx/sites-available/awaji-empire"
