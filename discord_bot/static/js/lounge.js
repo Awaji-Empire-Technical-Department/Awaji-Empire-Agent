@@ -3,7 +3,7 @@
     'use strict';
 
     if (SESSION_ID === null) {
-        // 一覧ビュー
+        // ============ 一覧ビュー ============
         const btnCreate = document.getElementById('btn-create-session');
         const form = document.getElementById('create-session-form');
         btnCreate?.addEventListener('click', () => {
@@ -39,45 +39,171 @@
 
     // ============ セッション進行ビュー ============
 
-    // 参加登録
+    // 参加登録（重複はDBがINSERT IGNOREで吸収）
     fetch(`/lounge/api/sessions/${SESSION_ID}/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
 
-    // 順位申告
-    document.getElementById('btn-report')?.addEventListener('click', async () => {
-        if (!currentRaceId) { alert('現在進行中のレースがありません'); return; }
-        const position = parseInt(document.getElementById('report-position').value);
+    // --- モーダル制御 ---
+    const overlay = document.getElementById('race-modal-overlay');
+    const modalCourseName = document.getElementById('modal-course-name');
+    const modalRaceNum = document.getElementById('modal-race-num');
+    const modalSubmissionList = document.getElementById('modal-submission-list');
+    const modalSubmittedCount = document.getElementById('modal-submitted-count');
+    const modalMySubmitted = document.getElementById('modal-my-submitted');
+
+    // 提出状況: user_id -> {submitted: bool, position: int|null, is_disconnect: bool}
+    let submissionState = {};
+
+    function openModal(raceId, courseName, raceNumber) {
+        currentRaceId = raceId;
+        modalCourseName.textContent = courseName;
+        modalRaceNum.textContent = `第 ${raceNumber} レース`;
+        overlay.style.display = 'flex';
+        // 自分の申告フォームをリセット
+        const reportSection = document.getElementById('modal-report-section');
+        if (reportSection) {
+            document.getElementById('modal-report-position').value = '1';
+            modalMySubmitted.style.display = 'none';
+            document.getElementById('modal-btn-report').disabled = false;
+            document.getElementById('modal-btn-disconnect').disabled = false;
+        }
+        // 提出状況をロード
+        submissionState = {};
+        loadSubmissions(raceId);
+    }
+
+    function closeModal() {
+        overlay.style.display = 'none';
+        currentRaceId = null;
+        submissionState = {};
+    }
+
+    async function loadSubmissions(raceId) {
+        try {
+            const res = await fetch(`/lounge/api/sessions/${SESSION_ID}/races/${raceId}/scores`);
+            if (!res.ok) return;
+            const scores = await res.json();
+            scores.forEach(s => {
+                submissionState[String(s.user_id)] = {
+                    submitted: true,
+                    position: s.position,
+                    is_disconnect: s.is_disconnect,
+                };
+            });
+            renderSubmissions();
+        } catch (_) {}
+    }
+
+    function renderSubmissions() {
+        const memberIds = Object.keys(MEMBERS);
+        const submittedIds = Object.keys(submissionState).filter(id => submissionState[id].submitted);
+        const total = memberIds.length;
+        const done = submittedIds.length;
+
+        modalSubmittedCount.textContent = `${done} / ${total} 人提出済み`;
+
+        // 自分が提出済みか
+        if (submissionState[MY_USER_ID]?.submitted) {
+            modalMySubmitted.style.display = 'block';
+            const btn = document.getElementById('modal-btn-report');
+            if (btn) btn.disabled = true;
+            const dc = document.getElementById('modal-btn-disconnect');
+            if (dc) dc.disabled = true;
+        }
+
+        // 提出一覧
+        const allIds = [...new Set([...memberIds, ...submittedIds])];
+        modalSubmissionList.innerHTML = allIds.map(uid => {
+            const name = MEMBERS[uid] || uid;
+            const s = submissionState[uid];
+            if (s?.submitted) {
+                const label = s.is_disconnect
+                    ? '<span style="color:#dc3545;">回線落ち</span>'
+                    : `<strong>${s.position}位</strong>`;
+                return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#f0fdf4;border-radius:4px;font-size:.88rem;">
+                    <span><i class="fas fa-check" style="color:#28a745;margin-right:6px;"></i>${name}</span>
+                    <span>${label}</span>
+                </div>`;
+            } else {
+                return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#fafafa;border-radius:4px;font-size:.88rem;color:var(--gray);">
+                    <span><i class="fas fa-hourglass-half" style="margin-right:6px;"></i>${name}</span>
+                    <span>未提出</span>
+                </div>`;
+            }
+        }).join('');
+    }
+
+    // モーダル内申告
+    document.getElementById('modal-btn-report')?.addEventListener('click', async () => {
+        if (!currentRaceId) return;
+        const position = parseInt(document.getElementById('modal-report-position').value);
         const res = await fetch(`/lounge/api/races/${currentRaceId}/report`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ position }),
         });
         const data = await res.json();
-        alert(data.status === 'ok' ? '申告しました！' : '申告に失敗しました');
+        if (data.status === 'ok') {
+            submissionState[MY_USER_ID] = { submitted: true, position, is_disconnect: false };
+            renderSubmissions();
+        } else {
+            alert('申告に失敗しました');
+        }
     });
 
-    // 回線落ち報告
-    document.getElementById('btn-disconnect')?.addEventListener('click', async () => {
-        if (!currentRaceId) { alert('現在進行中のレースがありません'); return; }
+    document.getElementById('modal-btn-disconnect')?.addEventListener('click', async () => {
+        if (!currentRaceId) return;
         if (!confirm('回線落ちを報告しますか？')) return;
-        await fetch(`/lounge/api/races/${currentRaceId}/disconnect`, {
+        const res = await fetch(`/lounge/api/races/${currentRaceId}/disconnect`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            submissionState[MY_USER_ID] = { submitted: true, position: null, is_disconnect: true };
+            renderSubmissions();
+        }
     });
 
-    // レース開始（Staff）
+    // ホスト: 結果確定・次のレースへ
+    document.getElementById('modal-btn-finalize')?.addEventListener('click', async () => {
+        if (!currentRaceId) return;
+        const memberCount = Object.keys(MEMBERS).length;
+        const submittedCount = Object.values(submissionState).filter(s => s.submitted).length;
+        if (submittedCount < memberCount) {
+            const proceed = confirm(`まだ ${memberCount - submittedCount} 人が未提出です。それでも確定しますか？`);
+            if (!proceed) return;
+        }
+        const btn = document.getElementById('modal-btn-finalize');
+        btn.disabled = true;
+        btn.textContent = '処理中...';
+        const res = await fetch(`/lounge/api/sessions/${SESSION_ID}/races/${currentRaceId}/finalize`, {
+            method: 'POST',
+        });
+        const data = await res.json();
+        if (data.status !== 'ok') {
+            alert('確定に失敗しました');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check-double"></i> 結果確定・次のレースへ';
+        }
+        // 成功時はWS lounge.race_advanced でモーダルが閉じる
+    });
+
+    // レース開始（ホストのみ）
     document.getElementById('btn-new-race')?.addEventListener('click', async () => {
         const course = document.getElementById('course-name-input').value.trim();
         if (!course) { alert('コース名を入力してください'); return; }
+        const btn = document.getElementById('btn-new-race');
+        btn.disabled = true;
         const res = await fetch(`/lounge/api/sessions/${SESSION_ID}/races`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ course_name: course }),
         });
         const data = await res.json();
+        btn.disabled = false;
         if (data.status === 'ok') {
-            currentRaceId = data.race_id;
             document.getElementById('course-name-input').value = '';
+            // WSイベントでモーダルが開く（ホスト自身も受信する）
             if (data.duplicate_course) {
                 alert(`⚠️ 「${course}」は既にこのセッションで使用されたコースです！`);
             }
@@ -86,22 +212,7 @@
         }
     });
 
-    // レース承認（Staff）
-    document.getElementById('btn-approve-race')?.addEventListener('click', async () => {
-        if (!currentRaceId) { alert('承認するレースがありません'); return; }
-        if (!confirm('このレースの結果を承認しますか？')) return;
-        await fetch(`/lounge/api/sessions/${SESSION_ID}/races/${currentRaceId}/approve`, { method: 'POST' });
-        await refreshStandings();
-        currentRaceId = null;
-    });
-
-    // 次レースへ（Staff）
-    document.getElementById('btn-next-race')?.addEventListener('click', async () => {
-        await fetch(`/lounge/api/sessions/${SESSION_ID}/next-race`, { method: 'POST' });
-        location.reload();
-    });
-
-    // セッション終了（Staff）
+    // セッション終了（ホストのみ）
     document.getElementById('btn-finish-session')?.addEventListener('click', async () => {
         if (!confirm('セッションを終了しますか？')) return;
         await fetch(`/lounge/api/sessions/${SESSION_ID}/finish`, { method: 'POST' });
@@ -129,22 +240,58 @@
         `).join('');
     }
 
-    // WebSocketでリアルタイム更新
+    // ページロード時: 進行中のレースがあればモーダルを復元
+    (async () => {
+        try {
+            const res = await fetch(`/lounge/api/sessions/${SESSION_ID}/active-race`);
+            if (res.ok) {
+                const race = await res.json();
+                if (race.race_id) {
+                    openModal(race.race_id, race.course_name, race.race_number);
+                }
+            }
+        } catch (_) {}
+    })();
+
+    // WebSocket リアルタイム更新
     const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${wsProto}://${location.host}/ws/hyouibana`);
     ws.addEventListener('message', (e) => {
         try {
             const msg = JSON.parse(e.data);
-            if (msg.session_id !== SESSION_ID) return;
-            if (msg.type === 'lounge.race_approved') {
-                refreshStandings();
-            } else if (msg.type === 'lounge.race_created') {
-                currentRaceId = msg.race_id;
-                document.getElementById('current-race').textContent = msg.race_number;
+
+            if (msg.type === 'lounge.race_created' && msg.session_id === SESSION_ID) {
+                openModal(msg.race_id, msg.course_name, msg.race_number);
                 if (msg.duplicate_course) {
                     alert(`⚠️ コース重複: 「${msg.course_name}」は既に使用済みです！`);
                 }
-            } else if (msg.type === 'lounge.session_finished') {
+            }
+
+            if (msg.type === 'lounge.score_reported' && msg.race_id === currentRaceId) {
+                const uid = String(msg.user_id);
+                if (!submissionState[uid]?.submitted) {
+                    // 位置情報はWS経由では届かないのでAPIで補完
+                    loadSubmissions(currentRaceId);
+                }
+            }
+
+            if (msg.type === 'lounge.disconnect_reported' && msg.race_id === currentRaceId) {
+                loadSubmissions(currentRaceId);
+            }
+
+            if (msg.type === 'lounge.race_advanced' && msg.session_id === SESSION_ID) {
+                closeModal();
+                refreshStandings();
+                const el = document.getElementById('current-race');
+                if (el) el.textContent = parseInt(el.textContent) + 1;
+            }
+
+            if (msg.type === 'lounge.race_approved' && currentRaceId) {
+                refreshStandings();
+            }
+
+            if (msg.type === 'lounge.session_finished' && msg.session_id === SESSION_ID) {
+                closeModal();
                 alert('セッションが終了しました');
                 location.reload();
             }

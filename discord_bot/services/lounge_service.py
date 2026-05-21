@@ -97,3 +97,12 @@ class LoungeService:
     async def list_teams(session_id: int) -> List[Dict[str, Any]]:
         res = await bridge_client.request("GET", f"/lounge/sessions/{session_id}/teams")
         return res if res else []
+
+    @staticmethod
+    async def get_active_race(session_id: int) -> Optional[Dict[str, Any]]:
+        return await bridge_client.request("GET", f"/lounge/sessions/{session_id}/active-race")
+
+    @staticmethod
+    async def list_race_scores_named(race_id: int) -> List[Dict[str, Any]]:
+        res = await bridge_client.request("GET", f"/lounge/races/{race_id}/scores/named")
+        return res if res else []

@@ -198,6 +198,40 @@ async def api_standings(session_id: int):
     return jsonify(standings)
 
 
+@lounge_bp.route("/api/sessions/<int:session_id>/active-race")
+async def api_active_race(session_id: int):
+    if not _current_user():
+        return jsonify({"status": "none"}), 401
+    race = await LoungeService.get_active_race(session_id)
+    if not race:
+        return jsonify({"status": "none"}), 404
+    return jsonify(race)
+
+
+@lounge_bp.route("/api/sessions/<int:session_id>/races/<int:race_id>/scores")
+async def api_race_scores(session_id: int, race_id: int):
+    if not _current_user():
+        return jsonify([]), 401
+    scores = await LoungeService.list_race_scores_named(race_id)
+    return jsonify(scores)
+
+
+@lounge_bp.route("/api/sessions/<int:session_id>/races/<int:race_id>/finalize", methods=["POST"])
+async def api_finalize_race(session_id: int, race_id: int):
+    """承認 + 次のレースへ を一括処理（ホストのみ）"""
+    user = _current_user()
+    if not user:
+        return jsonify({"status": "error"}), 401
+    session_data = await LoungeService.get_session(session_id)
+    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
+        return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
+    ok1 = await LoungeService.approve_race(race_id)
+    if not ok1:
+        return jsonify({"status": "error", "message": "承認に失敗しました"}), 500
+    ok2 = await LoungeService.next_race(session_id)
+    return jsonify({"status": "ok" if ok2 else "error"})
+
+
 @lounge_bp.route("/api/sessions/<int:session_id>/teams", methods=["GET", "POST"])
 async def api_teams(session_id: int):
     user = _current_user()
