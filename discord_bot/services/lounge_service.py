@@ -99,6 +99,10 @@ class LoungeService:
         return res if res else []
 
     @staticmethod
+    async def get_player(user_id: int) -> Optional[Dict[str, Any]]:
+        return await bridge_client.request("GET", f"/lounge/players/{user_id}")
+
+    @staticmethod
     async def get_active_race(session_id: int) -> Optional[Dict[str, Any]]:
         return await bridge_client.request("GET", f"/lounge/sessions/{session_id}/active-race")
 

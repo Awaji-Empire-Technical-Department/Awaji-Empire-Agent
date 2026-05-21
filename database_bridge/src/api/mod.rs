@@ -98,6 +98,7 @@ fn lounge_routes() -> Router<AppState> {
         .route("/sessions/{id}/course-history", get(handlers::lounge::get_course_history))
         .route("/sessions/{id}/teams", post(handlers::lounge::create_team).get(handlers::lounge::list_teams))
         .route("/sessions/{id}/active-race", get(handlers::lounge::get_active_race))
+        .route("/players/{user_id}", get(handlers::lounge::get_player))
         .route("/races/{race_id}/scores/report", post(handlers::lounge::report_score))
         .route("/races/{race_id}/scores", get(handlers::lounge::list_race_scores))
         .route("/races/{race_id}/scores/named", get(handlers::lounge::list_race_scores_named))

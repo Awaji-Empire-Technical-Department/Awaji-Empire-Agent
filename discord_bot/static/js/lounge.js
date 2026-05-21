@@ -212,13 +212,6 @@
         }
     });
 
-    // セッション終了（ホストのみ）
-    document.getElementById('btn-finish-session')?.addEventListener('click', async () => {
-        if (!confirm('セッションを終了しますか？')) return;
-        await fetch(`/lounge/api/sessions/${SESSION_ID}/finish`, { method: 'POST' });
-        location.reload();
-    });
-
     // ランキング更新
     document.getElementById('btn-refresh-standings')?.addEventListener('click', refreshStandings);
 
@@ -252,6 +245,33 @@
             }
         } catch (_) {}
     })();
+
+    // --- セッション終了・MMR結果モーダル ---
+    async function showResultModal() {
+        const overlay = document.getElementById('result-modal-overlay');
+        if (!overlay) { location.href = '/'; return; }
+        overlay.style.display = 'flex';
+        try {
+            const res = await fetch('/lounge/api/me');
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('result-mmr').textContent = `${data.mmr} MMR`;
+                document.getElementById('result-rank').textContent = data.rank_name || '—';
+            }
+        } catch (_) {}
+        document.getElementById('result-btn-dashboard')?.addEventListener('click', () => {
+            location.href = '/';
+        });
+        // 15秒後に自動リダイレクト
+        setTimeout(() => { location.href = '/'; }, 15000);
+    }
+
+    // セッション終了ボタン（ホストが手動終了する場合も結果モーダルを表示）
+    document.getElementById('btn-finish-session')?.addEventListener('click', async () => {
+        if (!confirm('セッションを終了しますか？')) return;
+        await fetch(`/lounge/api/sessions/${SESSION_ID}/finish`, { method: 'POST' });
+        // WSイベント lounge.session_finished でモーダルが開く
+    });
 
     // WebSocket リアルタイム更新
     const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -292,8 +312,7 @@
 
             if (msg.type === 'lounge.session_finished' && msg.session_id === SESSION_ID) {
                 closeModal();
-                alert('セッションが終了しました');
-                location.reload();
+                showResultModal();
             }
         } catch (_) {}
     });

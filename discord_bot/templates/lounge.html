@@ -13,7 +13,7 @@
         <div class="navbar-brand"><i class="fas fa-flag-checkered"></i> ラウンジ</div>
         <div class="user-menu">
             <img src="{{ user['avatar_url'] }}" class="user-avatar" alt="">
-            <span>{{ user['name'] }}</span>
+            <span class="user-name">{{ user['name'] }}</span>
             <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,.3);color:white;">ダッシュボード</a>
         </div>
     </nav>
@@ -36,7 +36,7 @@
             </div>
         </div>
 
-        <div style="background:#fff3cd; border:1px solid #ffc107; border-radius:var(--radius); padding:1rem; margin-bottom:1.5rem;">
+        <div class="lounge-warning" style="background:#fff3cd; border:1px solid #ffc107; border-radius:var(--radius); padding:1rem; margin-bottom:1.25rem;">
             📸 <strong>結果画面のスクリーンショットを必ず保存してください。</strong> 申告内容に異議が生じた場合、証拠として提出を求めることがあります。
         </div>
 
@@ -65,7 +65,7 @@
                 <div class="card" style="margin-top:{% if is_host %}1rem{% else %}0{% endif %};">
                     <div class="card-header"><h3 class="card-title">参加者</h3></div>
                     <div class="card-body" style="padding:0;">
-                        <table class="table" style="margin:0;">
+                        <table class="table lounge-table" style="margin:0;">
                             <thead><tr><th>プレイヤー</th><th width="70" style="text-align:right;">MMR</th></tr></thead>
                             <tbody id="members-tbody">
                                 {% for m in members %}
@@ -90,7 +90,7 @@
                         <button class="btn btn-sm btn-outline" id="btn-refresh-standings"><i class="fas fa-sync"></i></button>
                     </div>
                     <div class="table-responsive">
-                        <table class="table">
+                        <table class="table lounge-table">
                             <thead><tr><th width="40">順位</th><th>プレイヤー</th><th width="70">合計pt</th><th width="55">1位数</th></tr></thead>
                             <tbody id="standings-tbody">
                                 {% for s in standings %}
@@ -119,6 +119,31 @@
                             {% endfor %}
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ セッション終了・MMR結果モーダル ============ -->
+        <div id="result-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:2000; align-items:center; justify-content:center; padding:1rem;">
+            <div style="background:#fff; border-radius:var(--radius); width:min(420px,95vw); box-shadow:0 8px 32px rgba(0,0,0,.4); overflow:hidden; text-align:center;">
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); padding:2rem 1.5rem 1.5rem;">
+                    <div style="font-size:2.5rem; margin-bottom:.5rem;">🏆</div>
+                    <div style="color:#fff; font-size:1.1rem; font-weight:700;">セッション終了！</div>
+                </div>
+                <div style="padding:1.75rem 1.5rem;">
+                    <div style="font-size:2rem; font-weight:800; color:var(--primary);" id="result-mmr">—</div>
+                    <div style="color:var(--gray); font-size:.9rem; margin-top:2px;">現在のMMR</div>
+                    <div style="margin-top:1.25rem; background:#f8f9fa; border-radius:8px; padding:1rem;">
+                        <div style="font-size:1.25rem; font-weight:700; color:var(--accent);" id="result-rank">—</div>
+                        <div style="font-size:.85rem; color:var(--gray); margin-top:4px;">現在のランク</div>
+                    </div>
+                    <div style="margin-top:1rem; font-size:.82rem; color:var(--gray); line-height:1.6; background:#e8f4fd; border-radius:8px; padding:.75rem;">
+                        <i class="fab fa-discord" style="color:#5865F2;"></i>
+                        このランクはDiscordのロールで称号として付与されます
+                    </div>
+                    <button class="btn btn-primary" id="result-btn-dashboard" style="width:100%; margin-top:1.25rem;">
+                        <i class="fas fa-home"></i> ダッシュボードへ戻る
+                    </button>
                 </div>
             </div>
         </div>
@@ -182,7 +207,7 @@
                 </button>
             </div>
             <div class="card-body" id="create-session-form" style="display:none; border-bottom:1px solid var(--border-color); padding-bottom:1.5rem;">
-                <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                <div class="lounge-create-form">
                     <div>
                         <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">モード</label>
                         <select id="new-session-mode" class="form-control" style="width:120px;">
@@ -204,7 +229,7 @@
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table">
+                <table class="table lounge-sessions-table">
                     <thead>
                         <tr>
                             <th>ホスト</th>

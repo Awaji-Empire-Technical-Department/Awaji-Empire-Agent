@@ -1,7 +1,7 @@
 # routes/lounge.py
 from quart import Blueprint, current_app, render_template, request, session, redirect, url_for, jsonify
 from services.lounge_service import LoungeService
-from services.tournament_service import TitleService
+from services.tournament_service import TitleService, TournamentService
 from services.bridge_client import BridgeUnavailableError
 from routes.tournament import _ensure_discord_role, _assign_title_role
 
@@ -196,6 +196,25 @@ async def api_standings(session_id: int):
         return jsonify([])
     standings = await LoungeService.get_standings(session_id)
     return jsonify(standings)
+
+
+@lounge_bp.route("/api/me")
+async def api_me():
+    """ログインユーザーのMMRとランク称号を返す（セッション終了結果表示用）"""
+    user = _current_user()
+    if not user:
+        return jsonify({}), 401
+    uid = int(user["id"])
+    player = await LoungeService.get_player(uid)
+    titles = await TitleService.get_player_titles(uid)
+    # lounge_rank タイプの称号で最も閾値が高いものを現在ランクとする
+    rank_title = None
+    for t in sorted(titles, key=lambda x: x.get("unlock_threshold") or 0, reverse=True):
+        if t.get("unlock_type") == "lounge_rank" and t.get("earned"):
+            rank_title = t.get("name")
+            break
+    mmr = player.get("mmr", 1000) if player else 1000
+    return jsonify({"mmr": mmr, "rank_name": rank_title or "—"})
 
 
 @lounge_bp.route("/api/sessions/<int:session_id>/active-race")

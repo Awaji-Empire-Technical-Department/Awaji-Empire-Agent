@@ -248,6 +248,25 @@ pub async fn approve_race(
 }
 
 // ============================================================
+// GET /lounge/players/{user_id}
+// ============================================================
+pub async fn get_player(
+    State(pool): State<MySqlPool>,
+    Path(user_id): Path<i64>,
+) -> (StatusCode, Json<Value>) {
+    match lounge_repo::get_lounge_player(&pool, user_id).await {
+        Ok(p) => (StatusCode::OK, Json(json!({
+            "user_id": p.user_id,
+            "mmr": p.mmr,
+            "peak_mmr": p.peak_mmr,
+            "total_races": p.total_races,
+            "total_sessions": p.total_sessions,
+        }))),
+        Err(e) => map_err(e),
+    }
+}
+
+// ============================================================
 // GET /lounge/sessions/{id}/active-race
 // ============================================================
 pub async fn get_active_race(
