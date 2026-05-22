@@ -393,8 +393,9 @@ pub async fn approve_race_scores(pool: &MySqlPool, race_result_id: i64) -> Bridg
 
 pub async fn get_session_standings(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
     let rows = sqlx::query(
-        r#"SELECT lrs.user_id, u.username, SUM(lrs.points) as total_points,
-                  COUNT(CASE WHEN lrs.position = 1 THEN 1 END) as first_place_count
+        r#"SELECT lrs.user_id, u.username,
+                  CAST(COALESCE(SUM(lrs.points), 0) AS SIGNED) as total_points,
+                  CAST(COUNT(CASE WHEN lrs.position = 1 THEN 1 END) AS SIGNED) as first_place_count
            FROM lounge_race_scores lrs
            JOIN lounge_race_results lrr ON lrr.id = lrs.race_result_id
            LEFT JOIN user_networks u ON u.discord_id = lrs.user_id
@@ -417,7 +418,8 @@ pub async fn get_session_standings(pool: &MySqlPool, session_id: i64) -> BridgeR
 
 pub async fn get_team_standings(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
     let rows = sqlx::query(
-        r#"SELECT lt.tag, SUM(lrs.points) as team_points
+        r#"SELECT lt.tag,
+                  CAST(COALESCE(SUM(lrs.points), 0) AS SIGNED) as team_points
            FROM lounge_race_scores lrs
            JOIN lounge_race_results lrr ON lrr.id = lrs.race_result_id
            JOIN lounge_team_members ltm ON ltm.user_id = lrs.user_id

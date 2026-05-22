@@ -196,6 +196,8 @@ pub async fn report_score(
                 "type": "lounge.score_reported",
                 "race_id": race_id,
                 "user_id": payload.user_id,
+                "position": payload.position,
+                "is_disconnect": false,
             }).to_string());
             (StatusCode::OK, Json(json!({"status":"ok"})))
         },
@@ -222,6 +224,8 @@ pub async fn report_disconnect(
                 "type": "lounge.disconnect_reported",
                 "race_id": race_id,
                 "user_id": payload.user_id,
+                "position": null,
+                "is_disconnect": true,
             }).to_string());
             (StatusCode::OK, Json(json!({"status":"ok"})))
         },
