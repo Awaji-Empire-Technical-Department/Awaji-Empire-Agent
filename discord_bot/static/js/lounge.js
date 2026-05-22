@@ -382,27 +382,16 @@
     }
 
     // ============================================================
-    // WebSocket
+    // WebSocket（自動再接続付き）
     // ============================================================
     const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${wsProto}://${location.host}/ws/hyouibana`);
+    let ws = null;
+    let wsReconnectTimer = null;
 
-    ws.addEventListener('open', () => {
-        console.log('[Lounge WS] connected');
-    });
-    ws.addEventListener('error', (e) => {
-        console.warn('[Lounge WS] error', e);
-    });
-
-    ws.addEventListener('message', (e) => {
-        let msg;
-        try { msg = JSON.parse(e.data); } catch (_) { return; }
-
+    function handleWsMessage(msg) {
         const msgSid = Number(msg.session_id);
 
         if (msg.type === 'lounge.race_created' && msgSid === SESSION_ID) {
-            // ゲストはWSでモーダルを開く。ホストは既にopenReportPhaseを呼んでいるが、
-            // まだcurrentRaceIdが未設定の場合（リロード直後など）は開く
             if (!IS_HOST || !currentRaceId) {
                 openReportPhase(msg.race_id, msg.course_name, msg.race_number);
             }
@@ -411,12 +400,15 @@
             }
         }
 
-        if (msg.type === 'lounge.score_reported' && Number(msg.race_id) === currentRaceId) {
-            loadSubmissions(currentRaceId);
-        }
-
-        if (msg.type === 'lounge.disconnect_reported' && Number(msg.race_id) === currentRaceId) {
-            loadSubmissions(currentRaceId);
+        // 申告データをWSメッセージから直接反映（HTTPフェッチ不要）
+        if ((msg.type === 'lounge.score_reported' || msg.type === 'lounge.disconnect_reported')
+                && Number(msg.race_id) === currentRaceId) {
+            submissionState[String(msg.user_id)] = {
+                submitted: true,
+                position: msg.position ?? null,
+                is_disconnect: msg.is_disconnect ?? false,
+            };
+            renderSubmissions();
         }
 
         if (msg.type === 'lounge.race_advanced' && msgSid === SESSION_ID) {
@@ -434,5 +426,31 @@
             hideModal();
             showResultModal();
         }
-    });
+    }
+
+    function connectWs() {
+        if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+        ws = new WebSocket(`${wsProto}://${location.host}/ws/hyouibana`);
+
+        ws.addEventListener('open', () => {
+            console.log('[Lounge WS] connected');
+        });
+
+        ws.addEventListener('message', (e) => {
+            let msg;
+            try { msg = JSON.parse(e.data); } catch (_) { return; }
+            handleWsMessage(msg);
+        });
+
+        ws.addEventListener('error', (e) => {
+            console.warn('[Lounge WS] error', e);
+        });
+
+        ws.addEventListener('close', () => {
+            console.warn('[Lounge WS] disconnected, reconnecting in 3s...');
+            wsReconnectTimer = setTimeout(connectWs, 3000);
+        });
+    }
+
+    connectWs();
 })();
