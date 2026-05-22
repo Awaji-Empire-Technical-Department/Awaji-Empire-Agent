@@ -81,6 +81,15 @@ pub async fn next_race(
                 "type": "lounge.race_advanced",
                 "session_id": session_id,
             }).to_string());
+            // レース上限到達でセッション自動終了
+            if let Ok(sess) = lounge_repo::get_session(&state.pool, session_id).await {
+                if sess.status == "finished" {
+                    let _ = state.tx.send(json!({
+                        "type": "lounge.session_finished",
+                        "session_id": session_id,
+                    }).to_string());
+                }
+            }
             (StatusCode::OK, Json(json!({"status":"ok"})))
         },
         Err(e) => map_err(e),
@@ -143,16 +152,22 @@ pub async fn create_race(
 ) -> (StatusCode, Json<Value>) {
     let course_key = normalize_course_key(&payload.course_name);
 
+    let session = match lounge_repo::get_session(&state.pool, session_id).await {
+        Ok(s) => s,
+        Err(e) => return map_err(e),
+    };
+
+    // レース上限チェック
+    if session.current_race >= session.total_races {
+        return (StatusCode::FORBIDDEN, Json(json!({"status":"error","message":"レース上限に達しています"})));
+    }
+
     // コース重複チェック
     let is_new = match lounge_repo::check_and_register_course(&state.pool, session_id, &course_key).await {
         Ok(v) => v,
         Err(e) => return map_err(e),
     };
 
-    let session = match lounge_repo::get_session(&state.pool, session_id).await {
-        Ok(s) => s,
-        Err(e) => return map_err(e),
-    };
     let next_race_num = session.current_race + 1;
 
     match lounge_repo::create_race(&state.pool, session_id, next_race_num, &payload.course_name).await {
@@ -195,7 +210,7 @@ pub async fn report_score(
             let _ = state.tx.send(json!({
                 "type": "lounge.score_reported",
                 "race_id": race_id,
-                "user_id": payload.user_id,
+                "user_id": payload.user_id.to_string(),
                 "position": payload.position,
                 "is_disconnect": false,
             }).to_string());
@@ -223,7 +238,7 @@ pub async fn report_disconnect(
             let _ = state.tx.send(json!({
                 "type": "lounge.disconnect_reported",
                 "race_id": race_id,
-                "user_id": payload.user_id,
+                "user_id": payload.user_id.to_string(),
                 "position": null,
                 "is_disconnect": true,
             }).to_string());

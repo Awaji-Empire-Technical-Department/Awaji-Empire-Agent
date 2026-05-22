@@ -171,11 +171,14 @@ pub async fn list_session_members(pool: &MySqlPool, session_id: i64) -> BridgeRe
     .await?;
 
     use sqlx::Row;
-    Ok(rows.iter().map(|r| serde_json::json!({
-        "user_id": r.get::<i64, _>("user_id"),
-        "username": r.get::<Option<String>, _>("username"),
-        "mmr": r.get::<Option<i32>, _>("mmr").unwrap_or(1000),
-    })).collect())
+    Ok(rows.iter().map(|r| {
+        let uid: i64 = r.get("user_id");
+        serde_json::json!({
+            "user_id": uid.to_string(),
+            "username": r.get::<Option<String>, _>("username"),
+            "mmr": r.get::<Option<i32>, _>("mmr").unwrap_or(1000),
+        })
+    }).collect())
 }
 
 // ============================================================
@@ -232,14 +235,17 @@ pub async fn list_race_scores_named(pool: &MySqlPool, race_result_id: i64) -> Br
     .await?;
 
     use sqlx::Row;
-    Ok(rows.iter().map(|r| serde_json::json!({
-        "user_id":       r.get::<i64, _>("user_id"),
-        "username":      r.get::<Option<String>, _>("username"),
-        "position":      r.get::<Option<i8>, _>("position"),
-        "points":        r.get::<Option<i32>, _>("points"),
-        "is_disconnect": r.get::<bool, _>("is_disconnect"),
-        "status":        r.get::<String, _>("status"),
-    })).collect())
+    Ok(rows.iter().map(|r| {
+        let uid: i64 = r.get("user_id");
+        serde_json::json!({
+            "user_id":       uid.to_string(),
+            "username":      r.get::<Option<String>, _>("username"),
+            "position":      r.get::<Option<i8>, _>("position"),
+            "points":        r.get::<Option<i32>, _>("points"),
+            "is_disconnect": r.get::<bool, _>("is_disconnect"),
+            "status":        r.get::<String, _>("status"),
+        })
+    }).collect())
 }
 
 pub async fn list_races(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<LoungeRaceResult>> {
@@ -408,12 +414,15 @@ pub async fn get_session_standings(pool: &MySqlPool, session_id: i64) -> BridgeR
     .await?;
 
     use sqlx::Row;
-    Ok(rows.iter().map(|r| serde_json::json!({
-        "user_id": r.get::<i64, _>("user_id"),
-        "username": r.get::<Option<String>, _>("username"),
-        "total_points": r.get::<Option<i64>, _>("total_points").unwrap_or(0),
-        "first_place_count": r.get::<Option<i64>, _>("first_place_count").unwrap_or(0),
-    })).collect())
+    Ok(rows.iter().map(|r| {
+        let uid: i64 = r.get("user_id");
+        serde_json::json!({
+            "user_id": uid.to_string(),
+            "username": r.get::<Option<String>, _>("username"),
+            "total_points": r.get::<Option<i64>, _>("total_points").unwrap_or(0),
+            "first_place_count": r.get::<Option<i64>, _>("first_place_count").unwrap_or(0),
+        })
+    }).collect())
 }
 
 pub async fn get_team_standings(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
