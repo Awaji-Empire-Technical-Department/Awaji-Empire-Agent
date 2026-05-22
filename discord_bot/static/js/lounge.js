@@ -298,7 +298,10 @@
             try {
                 const res  = await fetch(`/lounge/api/sessions/${SESSION_ID}/races/${currentRaceId}/finalize`, { method: 'POST' });
                 const data = await res.json();
-                if (data.status !== 'ok') {
+                if (data.status === 'ok') {
+                    // API成功時点で即座にモーダルを閉じる（WS到着を待たない）
+                    hideModal();
+                } else {
                     alert('確定に失敗しました');
                     btnFinalize.disabled = false;
                     btnFinalize.innerHTML = '<i class="fas fa-check-double"></i> 結果確定・次のレースへ';
@@ -308,6 +311,16 @@
                 btnFinalize.disabled = false;
                 btnFinalize.innerHTML = '<i class="fas fa-check-double"></i> 結果確定・次のレースへ';
             }
+        });
+    }
+
+    // モーダル×ボタン・オーバーレイクリックで閉じる
+    const btnClose = $id('modal-btn-close');
+    if (btnClose) btnClose.addEventListener('click', hideModal);
+    const overlay = $id('race-modal-overlay');
+    if (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) hideModal();
         });
     }
 
