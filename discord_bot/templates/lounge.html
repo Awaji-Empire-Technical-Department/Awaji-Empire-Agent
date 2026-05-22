@@ -119,25 +119,46 @@
             </div>
         </div>
 
-        <!-- ============ セッション終了・MMR結果モーダル ============ -->
+        <!-- ============ セッション終了・結果モーダル ============ -->
         <div id="result-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:2000; align-items:center; justify-content:center; padding:1rem;">
-            <div style="background:#fff; border-radius:var(--radius); width:min(420px,95vw); box-shadow:0 8px 32px rgba(0,0,0,.4); overflow:hidden; text-align:center;">
-                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); padding:2rem 1.5rem 1.5rem;">
-                    <div style="font-size:2.5rem; margin-bottom:.5rem;">🏆</div>
+            <div style="background:#fff; border-radius:var(--radius); width:min(460px,95vw); box-shadow:0 8px 32px rgba(0,0,0,.4); overflow:hidden; text-align:center;">
+                <div id="result-header" style="background:linear-gradient(135deg,#1a1a2e,#16213e); padding:2rem 1.5rem 1.5rem;">
+                    <div id="result-trophy" style="font-size:2.5rem; margin-bottom:.5rem;">🏁</div>
                     <div style="color:#fff; font-size:1.1rem; font-weight:700;">セッション終了！</div>
                 </div>
-                <div style="padding:1.75rem 1.5rem;">
-                    <div style="font-size:2rem; font-weight:800; color:var(--primary);" id="result-mmr">—</div>
-                    <div style="color:var(--gray); font-size:.9rem; margin-top:2px;">現在のMMR</div>
-                    <div style="margin-top:1.25rem; background:#f8f9fa; border-radius:8px; padding:1rem;">
-                        <div style="font-size:1.25rem; font-weight:700; color:var(--accent);" id="result-rank">—</div>
-                        <div style="font-size:.85rem; color:var(--gray); margin-top:4px;">現在のランク</div>
+                <div style="padding:1.5rem;">
+                    <!-- 順位 -->
+                    <div style="display:flex; align-items:baseline; justify-content:center; gap:6px; margin-bottom:.25rem;">
+                        <span id="result-rank-num" style="font-size:3rem; font-weight:800; color:var(--primary); line-height:1;">—</span>
+                        <span style="font-size:1rem; color:var(--gray);">位</span>
+                        <span id="result-total-players" style="font-size:.9rem; color:var(--gray);"></span>
                     </div>
-                    <div style="margin-top:1rem; font-size:.82rem; color:var(--gray); line-height:1.6; background:#e8f4fd; border-radius:8px; padding:.75rem;">
-                        <i class="fab fa-discord" style="color:#5865F2;"></i>
-                        このランクはDiscordのロールで称号として付与されます
+                    <div style="color:var(--gray); font-size:.85rem; margin-bottom:1.25rem;">セッション内最終順位</div>
+
+                    <!-- ポイント / MMR / ランク -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:1rem;">
+                        <div style="background:#f8f9fa; border-radius:8px; padding:.85rem;">
+                            <div style="font-size:1.4rem; font-weight:700; color:var(--primary);" id="result-points">—</div>
+                            <div style="font-size:.8rem; color:var(--gray); margin-top:2px;">合計ポイント</div>
+                        </div>
+                        <div style="background:#f8f9fa; border-radius:8px; padding:.85rem;">
+                            <div style="font-size:1.4rem; font-weight:700; color:var(--accent);" id="result-mmr">—</div>
+                            <div style="font-size:.8rem; color:var(--gray); margin-top:2px;">現在のMMR</div>
+                        </div>
                     </div>
-                    <button class="btn btn-primary" id="result-btn-dashboard" style="width:100%; margin-top:1.25rem;">
+                    <div style="background:#f0f4ff; border-radius:8px; padding:.85rem; margin-bottom:1rem;">
+                        <div style="font-size:1rem; font-weight:700; color:#3b4cca;" id="result-rank-name">—</div>
+                        <div style="font-size:.8rem; color:var(--gray); margin-top:2px;">現在のランク</div>
+                    </div>
+
+                    <!-- 特別メッセージ（優勝など） -->
+                    <div id="result-special-msg" style="display:none; background:linear-gradient(135deg,#fff8e1,#fffde7); border:1px solid #ffc107; border-radius:8px; padding:.9rem; margin-bottom:1rem; font-size:.88rem; line-height:1.6;"></div>
+
+                    <!-- カウントダウン -->
+                    <div style="font-size:.82rem; color:var(--gray); margin-bottom:.75rem;">
+                        <span id="result-countdown">10</span>秒後に自動でダッシュボードへ戻ります
+                    </div>
+                    <button class="btn btn-primary" id="result-btn-dashboard" style="width:100%;">
                         <i class="fas fa-home"></i> ダッシュボードへ戻る
                     </button>
                 </div>
@@ -203,6 +224,13 @@
                             </div>
                             <div id="modal-submission-list" style="display:flex; flex-direction:column; gap:4px;"></div>
                         </div>
+
+                        <!-- 全員提出済み → 非ホスト向け承認待ちメッセージ -->
+                        {% if not is_host %}
+                        <div id="modal-waiting-host" style="display:none; margin-top:1rem; background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:.75rem; font-size:.88rem; text-align:center; color:#856404;">
+                            <i class="fas fa-hourglass-half"></i> ホストが結果を確認・承認するまでお待ちください
+                        </div>
+                        {% endif %}
 
                         <!-- ホスト確定ボタン -->
                         {% if is_host %}
