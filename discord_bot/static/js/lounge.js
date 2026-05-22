@@ -167,6 +167,12 @@
             if (d) d.disabled = true;
         }
 
+        // 全員提出済みかつ非ホスト → 承認待ちメッセージを表示
+        const waitingEl = $id('modal-waiting-host');
+        if (waitingEl) {
+            waitingEl.style.display = (done >= total && total > 0) ? 'block' : 'none';
+        }
+
         const allIds = [...new Set([...memberIds, ...submittedIds])];
         listEl.innerHTML = allIds.map(uid => {
             const name = MEMBERS[uid] || ('ID:' + uid);
@@ -363,22 +369,55 @@
     // セッション終了結果モーダル
     // ============================================================
     async function showResultModal() {
-        const el = $id('result-modal-overlay');
-        if (!el) { location.href = '/'; return; }
-        el.style.display = 'flex';
+        const overlay = $id('result-modal-overlay');
+        if (!overlay) { location.href = '/'; return; }
+        overlay.style.display = 'flex';
+
         try {
-            const res  = await fetch('/lounge/api/me');
+            const res = await fetch(`/lounge/api/sessions/${SESSION_ID}/my-result`);
             if (res.ok) {
-                const data = await res.json();
-                const m = $id('result-mmr');
-                const r = $id('result-rank');
-                if (m) m.textContent = data.mmr + ' MMR';
-                if (r) r.textContent = data.rank_name || '—';
+                const d = await res.json();
+
+                // 順位
+                const rankNum = $id('result-rank-num');
+                if (rankNum) rankNum.textContent = d.rank ?? '—';
+                const totalPl = $id('result-total-players');
+                if (totalPl) totalPl.textContent = d.total_players ? `/ ${d.total_players}人中` : '';
+
+                // ポイント・MMR・ランク
+                const pts = $id('result-points');
+                if (pts) pts.textContent = (d.total_points ?? 0) + ' pt';
+                const mmr = $id('result-mmr');
+                if (mmr) mmr.textContent = (d.mmr ?? '—') + ' MMR';
+                const rankName = $id('result-rank-name');
+                if (rankName) rankName.textContent = d.rank_name || '—';
+
+                // 優勝演出
+                if (d.is_winner) {
+                    const header = $id('result-header');
+                    if (header) header.style.background = 'linear-gradient(135deg,#b8860b,#ffd700)';
+                    const trophy = $id('result-trophy');
+                    if (trophy) trophy.textContent = '🏆';
+                    const msg = $id('result-special-msg');
+                    if (msg) {
+                        msg.style.display = 'block';
+                        msg.innerHTML = '🏆 <strong>セッション優勝！</strong><br>称号「覇者」が進呈される可能性があります。<br><span style="font-size:.82rem;color:var(--gray);">3回優勝で「連覇の王」も狙えます</span>';
+                    }
+                }
             }
         } catch (_) {}
+
+        // 10秒カウントダウン → ダッシュボードへ
+        let sec = 10;
+        const cdEl = $id('result-countdown');
+        const timer = setInterval(() => {
+            sec--;
+            if (cdEl) cdEl.textContent = sec;
+            if (sec <= 0) { clearInterval(timer); location.href = '/'; }
+        }, 1000);
+
         const btnDash = $id('result-btn-dashboard');
-        if (btnDash) btnDash.addEventListener('click', () => { location.href = '/'; });
-        setTimeout(() => { location.href = '/'; }, 15000);
+        if (btnDash) btnDash.addEventListener('click', () => { clearInterval(timer); location.href = '/'; });
     }
 
     // ============================================================

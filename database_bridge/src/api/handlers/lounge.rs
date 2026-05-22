@@ -81,15 +81,6 @@ pub async fn next_race(
                 "type": "lounge.race_advanced",
                 "session_id": session_id,
             }).to_string());
-            // レース上限到達でセッション自動終了
-            if let Ok(sess) = lounge_repo::get_session(&state.pool, session_id).await {
-                if sess.status == "finished" {
-                    let _ = state.tx.send(json!({
-                        "type": "lounge.session_finished",
-                        "session_id": session_id,
-                    }).to_string());
-                }
-            }
             (StatusCode::OK, Json(json!({"status":"ok"})))
         },
         Err(e) => map_err(e),
