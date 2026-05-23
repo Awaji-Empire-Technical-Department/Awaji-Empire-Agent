@@ -141,12 +141,26 @@ async def _do_finish_session(session_id: int):
     results = res.get("results", [])
     all_titles = await TitleService.list_all()
 
+    # 1位（セッション優勝者）を特定
+    winner_uid = next(
+        (e.get("user_id") for e in results if e.get("final_rank") == 1),
+        None,
+    )
+
     for entry in results:
         uid = entry.get("user_id")
         new_mmr = entry.get("new_mmr", 0)
         if not uid:
             continue
+
+        # MMR ベースのランク称号付与
         newly_granted_ids = await TitleService.grant_rank(uid, new_mmr)
+
+        # 1位ならセッション優勝称号（tournament_win タイプ）も付与
+        if uid == winner_uid:
+            win_ids = await TitleService.grant_tournament_win(uid)
+            newly_granted_ids = list(set(newly_granted_ids + win_ids))
+
         for title_id in newly_granted_ids:
             active = await TitleService.get_active(uid)
             granted_title = next((t for t in all_titles if t["id"] == title_id), None)
@@ -205,6 +219,16 @@ async def api_my_result(session_id: int):
         "rank_name":       active_title_name or "—",
         "is_winner":       final_rank == 1,
     })
+
+
+@lounge_bp.route("/api/sessions/<int:session_id>/status")
+async def api_session_status(session_id: int):
+    """セッションのステータスのみを返す（非ホストのモーダル自動表示用）。"""
+    if not _current_user():
+        return jsonify({}), 401
+    session_data = await LoungeService.get_session(session_id)
+    status = session_data.get("status", "unknown") if session_data else "unknown"
+    return jsonify({"status": status})
 
 
 @lounge_bp.route("/api/sessions/<int:session_id>/standings")
