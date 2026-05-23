@@ -3,6 +3,53 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
+## [1.6.0] - 2026-05-23
+
+マリオカートワールド ラウンジシステム Phase 3 — 申告方式刷新・MMR・称号の完全実装。
+設計記録: `docs/adr/018` 〜 `020`
+
+### Added
+
+- **ラウンジ最終順位申告方式**（ADR-018）
+  - レースごとの申告フローを廃止。12レース終了後に最終順位（1〜24位）を1回だけ申告する方式に変更
+  - MMRデルタテーブル: 全順位プラスのみ（1位 +150 〜 24位 +5 参加賞）。身内向け運用のためマイナスなし
+  - ホストによる参加者「除外」機能: 接続障害等でMMR対象外にしたいプレイヤーをワンタップで除外
+  - `lounge_session_final_scores` テーブル追加・廃止テーブル（`lounge_race_results` / `lounge_race_scores` / `lounge_course_history`）DROP
+  - WS イベント: `lounge.final_score_reported`, `lounge.member_excluded` を新設
+
+- **ダッシュボードへのMMR表示**
+  - ラウンジ参加履歴があるユーザーのダッシュボードに現在MMR・最高MMR・参加回数カードを表示
+
+- **セッション結果モーダルの改善**
+  - 「合計ポイント」表示を廃止し「MMR増加 (+X)」「現在のMMR」に変更
+  - セッション終了後にページをリロードしても結果モーダルが表示される
+
+### Fixed
+
+- **覇者称号が付与されない問題**（ADR-020）
+  - セッション1位のプレイヤーに `grant_tournament_win` を呼び出すよう修正
+  - `grant_rank`（MMRベース）と `grant_tournament_win`（優勝回数ベース）の両方を付与対象に
+
+- **非ホストの結果モーダルが自動表示されない問題**（ADR-019, 020）
+  - WS 単一経路への依存をやめ、WS受信・API成功・ポーリングの3経路でモーダルを表示
+  - `resultModalShown` フラグで二重表示を防止
+
+- **モバイルUI: ボタンレイアウトの崩れ**（ADR-019）
+  - `#staff-panel` → `#action-panel` セレクタ修正
+  - タッチターゲット `min-height: 48px` 確保
+  - 申告フォームの select + ボタン行をモバイルで縦並びに変更
+
+- **WS切断中の申告状況消失**
+  - WS切断中は10秒ポーリングで申告状況を補完
+  - WS再接続時に `pollTick()` で切断中の差分を一括同期
+
+### Changed
+
+- **`lounge_session_members`**: `excluded` カラム追加（migration 008）
+- **`lounge_players`**: `total_sessions` のインクリメントを除外プレイヤー以外に限定
+
+---
+
 ## [1.5.1] - 2026-05-16
 
 配信中リセット予約方式への変更。設計記録: `docs/adr/014-stream-comment-reset-streaming-guard.md`
