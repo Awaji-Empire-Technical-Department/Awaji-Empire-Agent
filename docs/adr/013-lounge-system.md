@@ -1,6 +1,6 @@
 # ADR-013: マリオカートワールド ラウンジシステムのアーキテクチャ方針
 
-- **ステータス**: 採用
+- **ステータス**: 採用（Phase 3 で申告方式を変更 — [ADR-018](018-lounge-final-score-reporting.md) 参照）
 - **作成日**: 2026-05-07
 - **作成者**: Wanyaldee
 - **関連ADR**: [ADR-012](012-general-tournament-system.md)

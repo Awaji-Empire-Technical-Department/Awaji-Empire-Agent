@@ -1,10 +1,39 @@
 // db/lounge_repo.rs
-// Why: ラウンジシステム固有のDB操作をカプセル化する。
+// Phase 3: セッション最終順位申告方式。レースごとの申告フローは廃止。
 use sqlx::MySqlPool;
 use crate::db::models::{
     BridgeResult, BridgeError,
-    LoungeSession, LoungeRaceResult, LoungeRaceScore, LoungeTeam, LoungePlayer,
+    LoungeSession, LoungeTeam, LoungePlayer,
 };
+
+// 順位 1〜24 に対する MMR 増加量（index 0 は未使用）
+const MMR_DELTA: [i32; 25] = [
+    0,   // 未使用
+    150, // 1位
+    120, // 2位
+    100, // 3位
+    90,  // 4位
+    80,  // 5位
+    75,  // 6位
+    70,  // 7位
+    65,  // 8位
+    60,  // 9位
+    55,  // 10位
+    50,  // 11位
+    45,  // 12位
+    40,  // 13位
+    35,  // 14位
+    30,  // 15位
+    25,  // 16位
+    20,  // 17位
+    20,  // 18位
+    15,  // 19位
+    15,  // 20位
+    10,  // 21位
+    10,  // 22位
+    5,   // 23位
+    5,   // 24位
+];
 
 // ============================================================
 // lounge_players（MMR管理）
@@ -33,26 +62,6 @@ pub async fn get_lounge_player(pool: &MySqlPool, user_id: i64) -> BridgeResult<L
     .map_err(BridgeError::Sqlx)
 }
 
-pub async fn update_mmr(pool: &MySqlPool, user_id: i64, delta: i32) -> BridgeResult<i32> {
-    ensure_lounge_player(pool, user_id).await?;
-    sqlx::query(
-        r#"UPDATE lounge_players
-           SET mmr = GREATEST(0, mmr + ?),
-               peak_mmr = GREATEST(peak_mmr, GREATEST(0, mmr + ?)),
-               total_races = total_races + 1
-           WHERE user_id = ?"#
-    )
-    .bind(delta).bind(delta).bind(user_id)
-    .execute(pool)
-    .await?;
-
-    let new_mmr: i32 = sqlx::query_scalar("SELECT mmr FROM lounge_players WHERE user_id = ?")
-        .bind(user_id)
-        .fetch_one(pool)
-        .await?;
-    Ok(new_mmr)
-}
-
 // ============================================================
 // lounge_sessions
 // ============================================================
@@ -65,7 +74,7 @@ pub async fn create_session(
     host_id: i64,
 ) -> BridgeResult<i64> {
     let result = sqlx::query(
-        "INSERT INTO lounge_sessions (room_id, mode, total_races, host_id) VALUES (?, ?, ?, ?)"
+        "INSERT INTO lounge_sessions (room_id, mode, total_races, host_id, status) VALUES (?, ?, ?, ?, 'in_progress')"
     )
     .bind(room_id).bind(mode).bind(total_races).bind(host_id)
     .execute(pool)
@@ -75,14 +84,14 @@ pub async fn create_session(
 
 pub async fn list_active_sessions(pool: &MySqlPool) -> BridgeResult<Vec<serde_json::Value>> {
     let rows = sqlx::query(
-        r#"SELECT ls.id, ls.room_id, ls.mode, ls.total_races, ls.current_race, ls.status,
+        r#"SELECT ls.id, ls.room_id, ls.mode, ls.total_races, ls.status,
                   ls.host_id, u.username as host_name,
                   CAST(ls.created_at AS CHAR) as created_at,
                   COUNT(lsm.user_id) as member_count
            FROM lounge_sessions ls
            LEFT JOIN user_networks u ON u.discord_id = ls.host_id
            LEFT JOIN lounge_session_members lsm ON lsm.session_id = ls.id
-           WHERE ls.status IN ('waiting', 'in_progress')
+           WHERE ls.status = 'in_progress'
            GROUP BY ls.id
            ORDER BY ls.created_at DESC"#
     )
@@ -95,7 +104,6 @@ pub async fn list_active_sessions(pool: &MySqlPool) -> BridgeResult<Vec<serde_js
         "room_id":      r.get::<String, _>("room_id"),
         "mode":         r.get::<String, _>("mode"),
         "total_races":  r.get::<i8, _>("total_races"),
-        "current_race": r.get::<i8, _>("current_race"),
         "status":       r.get::<String, _>("status"),
         "host_id":      r.get::<i64, _>("host_id"),
         "host_name":    r.get::<Option<String>, _>("host_name"),
@@ -116,30 +124,17 @@ pub async fn get_session(pool: &MySqlPool, session_id: i64) -> BridgeResult<Loun
     .ok_or_else(|| BridgeError::NotFound(format!("Session {} not found", session_id)))
 }
 
-pub async fn advance_session_race(pool: &MySqlPool, session_id: i64) -> BridgeResult<()> {
-    sqlx::query(
-        r#"UPDATE lounge_sessions
-           SET current_race = current_race + 1,
-               status = CASE WHEN current_race + 1 >= total_races THEN 'finished' ELSE 'in_progress' END
-           WHERE id = ?"#
-    )
-    .bind(session_id)
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
 pub async fn finish_session(pool: &MySqlPool, session_id: i64) -> BridgeResult<()> {
     sqlx::query("UPDATE lounge_sessions SET status = 'finished' WHERE id = ?")
         .bind(session_id)
         .execute(pool)
         .await?;
-    // total_sessions をインクリメント
+    // 除外されていないメンバーの total_sessions をインクリメント
     sqlx::query(
         r#"UPDATE lounge_players lp
            JOIN lounge_session_members lsm ON lsm.user_id = lp.user_id
            SET lp.total_sessions = lp.total_sessions + 1
-           WHERE lsm.session_id = ?"#
+           WHERE lsm.session_id = ? AND lsm.excluded = FALSE"#
     )
     .bind(session_id)
     .execute(pool)
@@ -159,7 +154,7 @@ pub async fn add_session_member(pool: &MySqlPool, session_id: i64, user_id: i64)
 
 pub async fn list_session_members(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
     let rows = sqlx::query(
-        r#"SELECT lsm.user_id, u.username, lp.mmr
+        r#"SELECT lsm.user_id, lsm.excluded, u.username, lp.mmr
            FROM lounge_session_members lsm
            LEFT JOIN user_networks u ON u.discord_id = lsm.user_id
            LEFT JOIN lounge_players lp ON lp.user_id = lsm.user_id
@@ -174,278 +169,169 @@ pub async fn list_session_members(pool: &MySqlPool, session_id: i64) -> BridgeRe
     Ok(rows.iter().map(|r| {
         let uid: i64 = r.get("user_id");
         serde_json::json!({
-            "user_id": uid.to_string(),
+            "user_id":  uid.to_string(),
             "username": r.get::<Option<String>, _>("username"),
-            "mmr": r.get::<Option<i32>, _>("mmr").unwrap_or(1000),
+            "mmr":      r.get::<Option<i32>, _>("mmr").unwrap_or(1000),
+            "excluded": r.get::<bool, _>("excluded"),
         })
     }).collect())
 }
 
 // ============================================================
-// lounge_race_results
+// 除外操作（ホストのみ）
 // ============================================================
 
-pub async fn create_race(
-    pool: &MySqlPool,
-    session_id: i64,
-    race_number: i8,
-    course_name: &str,
-) -> BridgeResult<i64> {
-    let result = sqlx::query(
-        "INSERT INTO lounge_race_results (session_id, race_number, course_name) VALUES (?, ?, ?)"
+/// player の excluded フラグをトグルする。
+pub async fn toggle_exclude_player(pool: &MySqlPool, session_id: i64, user_id: i64) -> BridgeResult<bool> {
+    sqlx::query(
+        r#"UPDATE lounge_session_members
+           SET excluded = NOT excluded
+           WHERE session_id = ? AND user_id = ?"#
     )
-    .bind(session_id).bind(race_number).bind(course_name)
+    .bind(session_id).bind(user_id)
     .execute(pool)
     .await?;
-    Ok(result.last_insert_id() as i64)
+
+    let excluded: bool = sqlx::query_scalar(
+        "SELECT excluded FROM lounge_session_members WHERE session_id = ? AND user_id = ?"
+    )
+    .bind(session_id).bind(user_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(excluded)
 }
 
-/// セッションの最新レース（未承認含む）を返す。ページリロード時の復元用。
-pub async fn get_active_race(pool: &MySqlPool, session_id: i64) -> BridgeResult<Option<serde_json::Value>> {
-    let row = sqlx::query(
-        r#"SELECT id, course_name, race_number
-           FROM lounge_race_results
-           WHERE session_id = ?
-           ORDER BY race_number DESC LIMIT 1"#
+// ============================================================
+// lounge_session_final_scores
+// ============================================================
+
+pub async fn report_final_score(
+    pool: &MySqlPool,
+    session_id: i64,
+    user_id: i64,
+    final_rank: i8,
+) -> BridgeResult<()> {
+    if final_rank < 1 || final_rank > 24 {
+        return Err(BridgeError::NotFound("final_rank は 1〜24 で指定してください".into()));
+    }
+    sqlx::query(
+        r#"INSERT INTO lounge_session_final_scores (session_id, user_id, final_rank)
+           VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE final_rank = VALUES(final_rank), submitted_at = NOW()"#
+    )
+    .bind(session_id).bind(user_id).bind(final_rank)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// 全メンバーの申告状況を返す（未申告者も含む）。
+pub async fn get_final_scores(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
+    let rows = sqlx::query(
+        r#"SELECT lsm.user_id, lsm.excluded, u.username,
+                  lsf.final_rank, lsf.mmr_delta,
+                  CASE WHEN lsf.user_id IS NOT NULL THEN TRUE ELSE FALSE END as submitted
+           FROM lounge_session_members lsm
+           LEFT JOIN user_networks u ON u.discord_id = lsm.user_id
+           LEFT JOIN lounge_session_final_scores lsf
+               ON lsf.session_id = lsm.session_id AND lsf.user_id = lsm.user_id
+           WHERE lsm.session_id = ?
+           ORDER BY COALESCE(lsf.final_rank, 999), lsm.joined_at"#
     )
     .bind(session_id)
-    .fetch_optional(pool)
-    .await?;
-
-    use sqlx::Row;
-    Ok(row.map(|r| serde_json::json!({
-        "race_id":      r.get::<i64, _>("id"),
-        "course_name":  r.get::<String, _>("course_name"),
-        "race_number":  r.get::<i8, _>("race_number"),
-    })))
-}
-
-/// スコア一覧にユーザー名を付加して返す。
-pub async fn list_race_scores_named(pool: &MySqlPool, race_result_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
-    let rows = sqlx::query(
-        r#"SELECT lrs.user_id, u.username, lrs.position, lrs.points,
-                  lrs.is_disconnect, lrs.status
-           FROM lounge_race_scores lrs
-           LEFT JOIN user_networks u ON u.discord_id = lrs.user_id
-           WHERE lrs.race_result_id = ?
-           ORDER BY lrs.position"#
-    )
-    .bind(race_result_id)
     .fetch_all(pool)
     .await?;
 
     use sqlx::Row;
     Ok(rows.iter().map(|r| {
         let uid: i64 = r.get("user_id");
+        let submitted: bool = r.get("submitted");
         serde_json::json!({
-            "user_id":       uid.to_string(),
-            "username":      r.get::<Option<String>, _>("username"),
-            "position":      r.get::<Option<i8>, _>("position"),
-            "points":        r.get::<Option<i32>, _>("points"),
-            "is_disconnect": r.get::<bool, _>("is_disconnect"),
-            "status":        r.get::<String, _>("status"),
+            "user_id":    uid.to_string(),
+            "username":   r.get::<Option<String>, _>("username"),
+            "excluded":   r.get::<bool, _>("excluded"),
+            "submitted":  submitted,
+            "final_rank": r.get::<Option<i8>, _>("final_rank"),
+            "mmr_delta":  r.get::<Option<i32>, _>("mmr_delta"),
         })
     }).collect())
 }
 
-pub async fn list_races(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<LoungeRaceResult>> {
-    sqlx::query_as::<_, LoungeRaceResult>(
-        r#"SELECT id, session_id, race_number, course_name, is_void,
-                  CAST(created_at AS CHAR) as created_at
-           FROM lounge_race_results WHERE session_id = ? ORDER BY race_number"#
+/// 申告済み・非除外プレイヤーの MMR を計算・更新し、結果を返す。
+/// トランザクションで一括処理する。
+pub async fn calc_and_apply_mmr(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
+    // 申告済み・非除外プレイヤーを取得
+    let rows = sqlx::query(
+        r#"SELECT lsf.user_id, lsf.final_rank
+           FROM lounge_session_final_scores lsf
+           JOIN lounge_session_members lsm
+               ON lsm.session_id = lsf.session_id AND lsm.user_id = lsf.user_id
+           WHERE lsf.session_id = ? AND lsm.excluded = FALSE
+           ORDER BY lsf.final_rank"#
     )
     .bind(session_id)
     .fetch_all(pool)
-    .await
-    .map_err(BridgeError::Sqlx)
-}
+    .await?;
 
-pub async fn void_race(pool: &MySqlPool, race_id: i64) -> BridgeResult<()> {
-    sqlx::query("UPDATE lounge_race_results SET is_void = TRUE WHERE id = ?")
-        .bind(race_id)
-        .execute(pool)
+    use sqlx::Row;
+    let mut results = vec![];
+
+    let mut tx = pool.begin().await?;
+
+    for row in &rows {
+        let user_id: i64 = row.get("user_id");
+        let final_rank: i8 = row.get("final_rank");
+        let rank_idx = final_rank.clamp(1, 24) as usize;
+        let delta = MMR_DELTA[rank_idx];
+
+        // MMR 更新
+        sqlx::query(
+            r#"UPDATE lounge_players
+               SET mmr = GREATEST(0, mmr + ?),
+                   peak_mmr = GREATEST(peak_mmr, GREATEST(0, mmr + ?))
+               WHERE user_id = ?"#
+        )
+        .bind(delta).bind(delta).bind(user_id)
+        .execute(&mut *tx)
         .await?;
-    Ok(())
-}
 
-// コース重複チェック：正規化キーで確認し、重複なければ登録
-pub async fn check_and_register_course(
-    pool: &MySqlPool,
-    session_id: i64,
-    course_key: &str,
-) -> BridgeResult<bool> {
-    let exists: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM lounge_course_history WHERE session_id = ? AND course_key = ?"
-    )
-    .bind(session_id).bind(course_key)
-    .fetch_one(pool)
-    .await?;
+        // final_scores に mmr_delta を記録
+        sqlx::query(
+            "UPDATE lounge_session_final_scores SET mmr_delta = ? WHERE session_id = ? AND user_id = ?"
+        )
+        .bind(delta).bind(session_id).bind(user_id)
+        .execute(&mut *tx)
+        .await?;
 
-    if exists > 0 {
-        return Ok(false); // 重複
+        results.push((user_id, final_rank, delta));
     }
-    sqlx::query(
-        "INSERT IGNORE INTO lounge_course_history (session_id, course_key) VALUES (?, ?)"
-    )
-    .bind(session_id).bind(course_key)
-    .execute(pool)
-    .await?;
-    Ok(true) // 登録成功
-}
 
-pub async fn get_course_history(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<String>> {
-    let keys: Vec<String> = sqlx::query_scalar(
-        "SELECT course_key FROM lounge_course_history WHERE session_id = ? ORDER BY course_key"
-    )
-    .bind(session_id)
-    .fetch_all(pool)
-    .await?;
-    Ok(keys)
-}
+    tx.commit().await?;
 
-// ============================================================
-// lounge_race_scores
-// ============================================================
+    // 新 MMR を取得して返却
+    let mut output = vec![];
+    for (user_id, final_rank, delta) in results {
+        let new_mmr: i32 = sqlx::query_scalar(
+            "SELECT mmr FROM lounge_players WHERE user_id = ?"
+        )
+        .bind(user_id)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(1000);
 
-pub async fn report_score(
-    pool: &MySqlPool,
-    race_result_id: i64,
-    user_id: i64,
-    position: i8,
-) -> BridgeResult<()> {
-    sqlx::query(
-        r#"INSERT INTO lounge_race_scores (race_result_id, user_id, position, status)
-           VALUES (?, ?, ?, 'pending')
-           ON DUPLICATE KEY UPDATE position = VALUES(position), status = 'pending'"#
-    )
-    .bind(race_result_id).bind(user_id).bind(position)
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
-pub async fn report_disconnect(
-    pool: &MySqlPool,
-    race_result_id: i64,
-    user_id: i64,
-) -> BridgeResult<()> {
-    sqlx::query(
-        r#"INSERT INTO lounge_race_scores
-               (race_result_id, user_id, position, is_disconnect, disconnect_reported_at, status)
-           VALUES (?, ?, NULL, TRUE, NOW(), 'pending')
-           ON DUPLICATE KEY UPDATE
-               is_disconnect = TRUE,
-               disconnect_reported_at = COALESCE(disconnect_reported_at, NOW()),
-               status = 'pending'"#
-    )
-    .bind(race_result_id).bind(user_id)
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
-pub async fn list_race_scores(pool: &MySqlPool, race_result_id: i64) -> BridgeResult<Vec<LoungeRaceScore>> {
-    sqlx::query_as::<_, LoungeRaceScore>(
-        r#"SELECT id, race_result_id, user_id, position, points, is_disconnect,
-                  CAST(disconnect_reported_at AS CHAR) as disconnect_reported_at, status
-           FROM lounge_race_scores WHERE race_result_id = ? ORDER BY position"#
-    )
-    .bind(race_result_id)
-    .fetch_all(pool)
-    .await
-    .map_err(BridgeError::Sqlx)
-}
-
-/// スコアを承認してポイントを確定する
-/// game_title_id=2（マリオカートワールド）の point_tables を参照
-pub async fn approve_race_scores(pool: &MySqlPool, race_result_id: i64) -> BridgeResult<()> {
-    // 回線落ちプレイヤーへのCPU点付与（同キャラ重複時は報告時刻が早い順に高い点）
-    // 簡略実装: 回線落ちは一律0点（CPUキャラ申告は別途report_disconnect_with_cpu_posで対応）
-    sqlx::query(
-        r#"UPDATE lounge_race_scores lrs
-           JOIN point_tables pt ON pt.game_title_id = 2 AND pt.position = lrs.position
-           SET lrs.points = pt.points, lrs.status = 'approved'
-           WHERE lrs.race_result_id = ? AND lrs.is_disconnect = FALSE"#
-    )
-    .bind(race_result_id)
-    .execute(pool)
-    .await?;
-
-    // 回線落ちは status だけ approved に（points は0のまま）
-    sqlx::query(
-        "UPDATE lounge_race_scores SET status = 'approved' WHERE race_result_id = ? AND is_disconnect = TRUE"
-    )
-    .bind(race_result_id)
-    .execute(pool)
-    .await?;
-
-    // 5人以上落ちたらレース無効
-    let dc_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM lounge_race_scores WHERE race_result_id = ? AND is_disconnect = TRUE"
-    )
-    .bind(race_result_id)
-    .fetch_one(pool)
-    .await?;
-
-    if dc_count >= 5 {
-        void_race(pool, race_result_id).await?;
+        output.push(serde_json::json!({
+            "user_id":    user_id.to_string(),
+            "final_rank": final_rank,
+            "mmr_delta":  delta,
+            "new_mmr":    new_mmr,
+        }));
     }
-    Ok(())
+    Ok(output)
 }
 
-// ============================================================
-// ランキング
-// ============================================================
-
+/// セッション最終順位一覧（result_modal / standings 表示用）。
 pub async fn get_session_standings(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
-    let rows = sqlx::query(
-        r#"SELECT lrs.user_id, u.username,
-                  CAST(COALESCE(SUM(lrs.points), 0) AS SIGNED) as total_points,
-                  CAST(COUNT(CASE WHEN lrs.position = 1 THEN 1 END) AS SIGNED) as first_place_count
-           FROM lounge_race_scores lrs
-           JOIN lounge_race_results lrr ON lrr.id = lrs.race_result_id
-           LEFT JOIN user_networks u ON u.discord_id = lrs.user_id
-           WHERE lrr.session_id = ? AND lrr.is_void = FALSE AND lrs.status = 'approved'
-           GROUP BY lrs.user_id, u.username
-           ORDER BY total_points DESC, first_place_count DESC"#
-    )
-    .bind(session_id)
-    .fetch_all(pool)
-    .await?;
-
-    use sqlx::Row;
-    Ok(rows.iter().map(|r| {
-        let uid: i64 = r.get("user_id");
-        serde_json::json!({
-            "user_id": uid.to_string(),
-            "username": r.get::<Option<String>, _>("username"),
-            "total_points": r.get::<Option<i64>, _>("total_points").unwrap_or(0),
-            "first_place_count": r.get::<Option<i64>, _>("first_place_count").unwrap_or(0),
-        })
-    }).collect())
-}
-
-pub async fn get_team_standings(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<serde_json::Value>> {
-    let rows = sqlx::query(
-        r#"SELECT lt.tag,
-                  CAST(COALESCE(SUM(lrs.points), 0) AS SIGNED) as team_points
-           FROM lounge_race_scores lrs
-           JOIN lounge_race_results lrr ON lrr.id = lrs.race_result_id
-           JOIN lounge_team_members ltm ON ltm.user_id = lrs.user_id
-           JOIN lounge_teams lt ON lt.id = ltm.team_id AND lt.session_id = ?
-           WHERE lrr.session_id = ? AND lrr.is_void = FALSE AND lrs.status = 'approved'
-           GROUP BY lt.id, lt.tag
-           ORDER BY team_points DESC"#
-    )
-    .bind(session_id).bind(session_id)
-    .fetch_all(pool)
-    .await?;
-
-    use sqlx::Row;
-    Ok(rows.iter().map(|r| serde_json::json!({
-        "tag": r.get::<String, _>("tag"),
-        "team_points": r.get::<Option<i64>, _>("team_points").unwrap_or(0),
-    })).collect())
+    get_final_scores(pool, session_id).await
 }
 
 // ============================================================
@@ -490,8 +376,8 @@ pub async fn list_teams(pool: &MySqlPool, session_id: i64) -> BridgeResult<Vec<s
         .await?;
 
         result.push(serde_json::json!({
-            "id": team.id,
-            "tag": team.tag,
+            "id":         team.id,
+            "tag":        team.tag,
             "member_ids": members,
         }));
     }
