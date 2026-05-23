@@ -130,9 +130,12 @@
         document.getElementById('modal-order').value = '0';
     }
 
-    document.getElementById('modal-cancel').addEventListener('click', hideModal);
+    const modalCancel = document.getElementById('modal-cancel');
+    const modalSave   = document.getElementById('modal-save');
 
-    document.getElementById('modal-save').addEventListener('click', async () => {
+    if (modalCancel) modalCancel.addEventListener('click', hideModal);
+
+    if (modalSave) modalSave.addEventListener('click', async () => {
         const id = document.getElementById('modal-title-id').value;
         if (!id) { alert('編集対象の称号が選択されていません'); return; }
         const name = document.getElementById('modal-name').value.trim();

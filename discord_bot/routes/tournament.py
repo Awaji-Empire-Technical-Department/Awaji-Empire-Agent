@@ -13,13 +13,13 @@ ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
 
 # ランク称号ごとのDiscordロール色（unlock_threshold → color int）
 _LOUNGE_RANK_COLORS = {
-    0:     0x95A5A6,  # 鉄: グレー
-    2000:  0xCD7F32,  # 銅: ブロンズ
-    4000:  0xBDC3C7,  # 銀: シルバー
-    6000:  0xF1C40F,  # 金: ゴールド
-    8000:  0x00BFFF,  # プラチナ: ライトブルー
-    10000: 0x1ABC9C,  # ダイヤ: シアン
-    13000: 0x9B59B6,  # マスター: パープル
+    0:     0x95A5A6,  # Iron: グレー
+    2000:  0xCD7F32,  # Bronze: ブロンズ
+    4000:  0xBDC3C7,  # Silver: シルバー
+    6000:  0xF1C40F,  # Gold: ゴールド
+    8000:  0x00BFFF,  # Platinum: ライトブルー
+    10000: 0xB9F2FF,  # Diamond: ダイヤブルー
+    13000: 0x9B59B6,  # Master: パープル
 }
 _TOURNAMENT_WIN_COLOR = 0xFFD700  # 大会優勝系: ゴールド
 

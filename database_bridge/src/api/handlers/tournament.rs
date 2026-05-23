@@ -180,11 +180,11 @@ pub async fn update_discord_role(
 }
 
 // ============================================================
-// 称号: POST /titles/player/{user_id}/grant-rank  (MMRベース自動付与)
+// 称号: POST /titles/player/{user_id}/grant-rank  (順位ベース自動付与)
 // ============================================================
 #[derive(Deserialize)]
 pub struct GrantRankRequest {
-    pub mmr: i32,
+    pub placement: i32,
 }
 
 pub async fn grant_rank_title(
@@ -192,7 +192,7 @@ pub async fn grant_rank_title(
     Path(user_id): Path<i64>,
     Json(payload): Json<GrantRankRequest>,
 ) -> (StatusCode, Json<Value>) {
-    match tournament_repo::auto_grant_lounge_rank_title(&pool, user_id, payload.mmr).await {
+    match tournament_repo::auto_grant_lounge_rank_title(&pool, user_id, payload.placement).await {
         Ok(newly_granted) => (StatusCode::OK, Json(json!({"status":"ok","newly_granted":newly_granted}))),
         Err(e) => map_err(e),
     }
