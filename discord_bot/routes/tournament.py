@@ -9,6 +9,7 @@ from services.bridge_client import BridgeUnavailableError
 tournament_bp = Blueprint("tournament", __name__, url_prefix="/tournament")
 
 GUILD_ID = os.getenv("DISCORD_GUILD_ID", "")
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
 
 # ランク称号ごとのDiscordロール色（unlock_threshold → color int）
 _LOUNGE_RANK_COLORS = {
@@ -40,6 +41,10 @@ def _require_login():
     if not user:
         return redirect(url_for("login"))
     return None
+
+
+def _is_admin(user: dict) -> bool:
+    return bool(ADMIN_USER_ID) and str(user.get("id")) == str(ADMIN_USER_ID)
 
 
 async def _sync_discord_title_role(user_id: str, new_title: dict, old_role_id: str | None):
@@ -239,6 +244,8 @@ async def api_save_title():
     user = _current_user()
     if not user:
         return jsonify({"status": "error"}), 401
+    if not _is_admin(user):
+        return jsonify({"status": "error", "message": "forbidden"}), 403
     data = await request.get_json()
     title_id = await TitleService.upsert(
         name=data.get("name", ""),
@@ -254,8 +261,11 @@ async def api_save_title():
 
 @tournament_bp.route("/api/titles/<int:title_id>", methods=["DELETE"])
 async def api_delete_title(title_id: int):
-    if not _current_user():
+    user = _current_user()
+    if not user:
         return jsonify({"status": "error"}), 401
+    if not _is_admin(user):
+        return jsonify({"status": "error", "message": "forbidden"}), 403
     ok = await TitleService.delete(title_id)
     return jsonify({"status": "ok" if ok else "error"})
 

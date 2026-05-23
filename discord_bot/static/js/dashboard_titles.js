@@ -25,12 +25,13 @@
                 <td><span class="badge badge-secondary">${UNLOCK_LABELS[t.unlock_type] || t.unlock_type}</span></td>
                 <td style="font-family:monospace;">${t.unlock_threshold ?? '-'}</td>
                 <td style="font-family:monospace;font-size:.8rem;color:var(--gray);">${t.discord_role_id || '-'}</td>
+                ${window.IS_ADMIN ? `
                 <td>
                     <div class="btn-toolbar">
                         <button class="btn btn-primary btn-icon" title="編集" onclick="editTitle(${t.id})"><i class="fas fa-pen"></i></button>
                         <button class="btn btn-danger btn-icon" title="削除" onclick="deleteTitle(${t.id}, '${t.name.replace(/'/g, "\\'")}')"><i class="fas fa-trash"></i></button>
                     </div>
-                </td>
+                </td>` : ''}
             </tr>
         `).join('');
     }

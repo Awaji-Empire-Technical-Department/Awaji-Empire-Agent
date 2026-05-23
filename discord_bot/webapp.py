@@ -19,6 +19,8 @@ from services.log_service import LogService
 
 load_dotenv()
 
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
+
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'default_insecure_key')
     CLIENT_ID = os.getenv('DISCORD_CLIENT_ID')
@@ -252,7 +254,8 @@ async def index():
         lounge_sessions = await LoungeService.list_active_sessions()
         lounge_player = await LoungeService.get_player(int(user['id']))
 
-        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies, games=games, lounge_sessions=lounge_sessions, lounge_player=lounge_player)
+        is_admin = bool(ADMIN_USER_ID) and str(user.get("id")) == str(ADMIN_USER_ID)
+        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies, games=games, lounge_sessions=lounge_sessions, lounge_player=lounge_player, is_admin=is_admin)
         
     except BridgeUnavailableError:
         current_app.logger.warning("Bridge unavailable on index: rendering maintenance page")

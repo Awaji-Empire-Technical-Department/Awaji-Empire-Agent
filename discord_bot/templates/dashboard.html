@@ -300,6 +300,28 @@
                 </div>
             </div>
 
+            {% if is_admin %}
+            <!-- Staff テスト: 称号付与 + ロール即時付与 -->
+            <div class="card-body" style="border-bottom:1px solid var(--border-color); padding-bottom:1.5rem;">
+                <h3 style="font-size:.9rem; font-weight:600; color:var(--gray); margin-bottom:.75rem;">🔧 Staff テスト: ロール付与確認</h3>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                    <div>
+                        <label style="font-size:.8rem; display:block; margin-bottom:4px;">対象DiscordユーザーID（省略で自分）</label>
+                        <input type="text" id="test-target-user" class="form-control" placeholder="例: 123456789012345678" style="width:220px;">
+                    </div>
+                    <div>
+                        <label style="font-size:.8rem; display:block; margin-bottom:4px;">称号</label>
+                        <select id="test-title-select" class="form-control" style="width:160px;">
+                            <option value="">読込中...</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-warning btn-sm" id="btn-staff-grant">
+                        <i class="fas fa-bolt"></i> 付与 + ロール作成
+                    </button>
+                </div>
+                <div id="staff-grant-result" style="margin-top:.75rem; font-size:.85rem; display:none;"></div>
+            </div>
+            {% endif %}
             <div class="table-responsive">
                 <table class="table" id="titles-table">
                     <thead>
@@ -309,16 +331,17 @@
                             <th width="110">解除条件</th>
                             <th width="80">閾値</th>
                             <th width="160">Discord ロールID</th>
-                            <th width="140">アクション</th>
+                            {% if is_admin %}<th width="140">アクション</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody id="titles-tbody">
-                        <tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--gray);">読込中...</td></tr>
+                        <tr><td colspan="{{ 6 if is_admin else 5 }}" style="text-align:center; padding:2rem; color:var(--gray);">読込中...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
+        {% if is_admin %}
         <!-- 称号編集モーダル -->
         <div id="title-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:center; justify-content:center;">
             <div style="background:#fff; border-radius:var(--radius); padding:2rem; width:480px; max-width:95vw; box-shadow:0 8px 32px rgba(0,0,0,.2);">
@@ -360,9 +383,11 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
     </div>
 
+    <script>window.IS_ADMIN = {{ 'true' if is_admin else 'false' }};</script>
     <script src="{{ url_for('static', filename='js/dashboard_titles.js') }}"></script>
 </body>
 
