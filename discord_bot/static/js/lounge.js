@@ -282,8 +282,10 @@
                     alert('終了処理に失敗しました');
                     btnModalFinish.disabled = false;
                     btnModalFinish.innerHTML = '<i class="fas fa-flag-checkered"></i> 終了確定・MMR反映';
+                    return;
                 }
-                // 成功時は WS の lounge.session_finished で result_modal を表示する
+                // API成功時点でホストはすぐに表示（WSを待たない）
+                showResultModal();
             } catch (err) {
                 console.error(err);
                 alert('通信エラーが発生しました');
@@ -433,4 +435,9 @@
     // 初期ロード
     loadFinalScores();
     connectWs();
+
+    // セッションが既に終了済みの状態でページを開いた場合はすぐ結果モーダルを表示
+    if (SESSION_FINISHED) {
+        showResultModal();
+    }
 })();

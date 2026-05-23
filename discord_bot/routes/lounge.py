@@ -61,6 +61,7 @@ async def session_view(session_id: int):
             members=members,
             view="session",
             is_host=is_host,
+            session_finished=(session_data.get("status") == "finished"),
         )
     except BridgeUnavailableError:
         return await render_template("maintenance.html"), 503

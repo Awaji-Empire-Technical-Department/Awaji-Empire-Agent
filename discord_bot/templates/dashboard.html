@@ -54,6 +54,27 @@
         </div>
         {% endfor %}
 
+        {% if lounge_player and lounge_player.get('total_sessions', 0) > 0 %}
+        <div style="background:#fff; border:1px solid var(--border-color); border-radius:var(--radius); padding:1rem 1.5rem; margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <span style="font-size:1.5rem;">🎮</span>
+                <div>
+                    <div style="font-size:.8rem; color:var(--gray); margin-bottom:2px;">ラウンジ MMR</div>
+                    <div style="display:flex; align-items:baseline; gap:6px;">
+                        <span style="font-size:1.6rem; font-weight:800; color:var(--accent); font-family:monospace; line-height:1;">{{ lounge_player.get('mmr', 1000) }}</span>
+                        <span style="font-size:.85rem; color:var(--gray);">/ 最高 {{ lounge_player.get('peak_mmr', 1000) }}</span>
+                    </div>
+                </div>
+                <div style="border-left:1px solid var(--border-color); padding-left:16px; color:var(--gray); font-size:.82rem; line-height:1.8;">
+                    <div>参加セッション: <strong>{{ lounge_player.get('total_sessions', 0) }}</strong> 回</div>
+                </div>
+            </div>
+            <a href="{{ url_for('lounge.index') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-flag-checkered"></i> ラウンジへ
+            </a>
+        </div>
+        {% endif %}
+
         {% for cat, msg in get_flashed_messages(with_categories=true) %}
         <div class="alert {% if cat == 'error' %}alert-danger{% endif %}">
             <i class="fas {% if cat == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"
