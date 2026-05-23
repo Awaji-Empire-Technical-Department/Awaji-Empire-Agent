@@ -311,6 +311,8 @@
     // セッション終了結果モーダル
     // ============================================================
     async function showResultModal() {
+        if (resultModalShown) return;
+        resultModalShown = true;
         closeFinalReportModal();
         const overlay = $id('result-modal-overlay');
         if (!overlay) { location.href = '/'; return; }
@@ -391,16 +393,31 @@
         }
     }
 
+    // 結果モーダルの二重表示防止フラグ
+    let resultModalShown = false;
+
     // WS切断中にポーリングで状態を補完するタイマー
     let pollTimer = null;
 
     function startPolling() {
         if (pollTimer) return;
-        pollTimer = setInterval(loadFinalScores, 10000);
+        pollTimer = setInterval(pollTick, 10000);
     }
 
     function stopPolling() {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    }
+
+    async function pollTick() {
+        await loadFinalScores();
+        // セッションが終了済みになっていたらモーダルを表示
+        if (!resultModalShown) {
+            try {
+                const res  = await fetch(`/lounge/api/sessions/${SESSION_ID}/status`);
+                const data = await res.json();
+                if (data.status === 'finished') showResultModal();
+            } catch (_) {}
+        }
     }
 
     function connectWs() {
@@ -411,7 +428,7 @@
             console.log('[Lounge WS] connected');
             stopPolling();
             // 切断中に発生した変化を再取得して画面を最新化
-            loadFinalScores();
+            pollTick();
         });
 
         ws.addEventListener('message', (e) => {
