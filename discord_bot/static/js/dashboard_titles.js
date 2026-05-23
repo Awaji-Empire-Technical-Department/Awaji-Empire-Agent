@@ -170,58 +170,7 @@
         }
     });
 
-    // Staffテスト: セレクトボックスに称号を populate
-    async function populateTestSelect() {
-        const res = await fetch('/tournament/api/titles');
-        const titles = await res.json();
-        const sel = document.getElementById('test-title-select');
-        if (!sel) return;
-        sel.innerHTML = titles.map(t =>
-            `<option value="${t.id}">${t.name}（${t.unlock_type}）</option>`
-        ).join('');
-    }
-
-    document.getElementById('btn-staff-grant')?.addEventListener('click', async () => {
-        const titleId = document.getElementById('test-title-select').value;
-        const targetUserId = document.getElementById('test-target-user').value.trim() || null;
-        if (!titleId) { alert('称号を選択してください'); return; }
-
-        const btn = document.getElementById('btn-staff-grant');
-        const result = document.getElementById('staff-grant-result');
-        btn.disabled = true;
-        btn.textContent = '処理中...';
-
-        const body = { title_id: parseInt(titleId) };
-        if (targetUserId) body.user_id = targetUserId;
-
-        try {
-            const res = await fetch('/tournament/api/titles/staff-grant', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            const data = await res.json();
-            result.style.display = 'block';
-            if (data.status === 'ok') {
-                result.style.color = 'var(--success)';
-                result.textContent = `✅ 「${data.title_name}」を付与しました。Discord ロールID: ${data.discord_role_id || '未設定（token/guild未設定）'}`;
-                loadTitles(); // discord_role_id が更新された可能性があるので再読込
-            } else {
-                result.style.color = 'var(--danger)';
-                result.textContent = `❌ エラー: ${data.message || '不明なエラー'}`;
-            }
-        } catch (e) {
-            result.style.display = 'block';
-            result.style.color = 'var(--danger)';
-            result.textContent = `❌ 通信エラー: ${e}`;
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-bolt"></i> 付与 + ロール作成';
-        }
-    });
-
     // 初期ロード
     loadTitles();
     loadActiveTitle();
-    populateTestSelect();
 })();
