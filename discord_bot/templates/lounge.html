@@ -302,6 +302,7 @@
     <script>
         const SESSION_ID = {{ lounge_session.id if lounge_session else 'null' }};
         const IS_HOST = {{ 'true' if is_host is defined and is_host else 'false' }};
+        const SESSION_FINISHED = {{ 'true' if session_finished is defined and session_finished else 'false' }};
         const MY_USER_ID = '{{ user["id"] }}';
         const MEMBERS = {
             {% if members is defined %}
