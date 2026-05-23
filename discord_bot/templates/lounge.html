@@ -26,7 +26,7 @@
                 <h2 style="margin:0;">ラウンジセッション #{{ lounge_session.id }}</h2>
                 <p style="color:var(--gray); margin:4px 0 0;">
                     モード: <strong>{{ lounge_session.mode.upper() }}</strong> &nbsp;|&nbsp;
-                    進行: <strong id="current-race">{{ lounge_session.current_race }}</strong> / {{ lounge_session.total_races }} レース
+                    {{ lounge_session.total_races }} レース制
                 </p>
             </div>
             <div style="display:flex; gap:8px; align-items:center;">
@@ -41,24 +41,26 @@
         </div>
 
         <div class="lounge-grid">
-            <!-- 左: Staff操作 -->
+            <!-- 左: 操作パネル・参加者一覧 -->
             <div>
-                {% if is_host %}
-                <div class="card" id="staff-panel">
-                    <div class="card-header"><h3 class="card-title">Staff操作</h3></div>
+                <div class="card" id="action-panel">
+                    <div class="card-header"><h3 class="card-title">操作</h3></div>
                     <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
-                        <button class="btn btn-primary" id="btn-new-race">
-                            <i class="fas fa-flag"></i> レース開始
+                        {% if lounge_session.status != 'finished' %}
+                        <button class="btn btn-success" id="btn-open-final-report">
+                            <i class="fas fa-paper-plane"></i> 最終順位を申告する
                         </button>
+                        {% endif %}
+                        {% if is_host and lounge_session.status != 'finished' %}
                         <button class="btn btn-danger" id="btn-finish-session">
-                            <i class="fas fa-stop"></i> セッション終了
+                            <i class="fas fa-stop"></i> セッション終了（確定）
                         </button>
+                        {% endif %}
                     </div>
                 </div>
-                {% endif %}
 
                 <!-- 参加者一覧 -->
-                <div class="card" style="margin-top:{% if is_host %}1rem{% else %}0{% endif %};">
+                <div class="card" style="margin-top:1rem;">
                     <div class="card-header"><h3 class="card-title">参加者</h3></div>
                     <div class="card-body" style="padding:0;">
                         <table class="table lounge-table" style="margin:0;">
@@ -78,43 +80,104 @@
                 </div>
             </div>
 
-            <!-- 右: ランキング / コース履歴 -->
+            <!-- 右: 最終順位申告状況 -->
             <div>
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">累計ランキング</h3>
+                        <h3 class="card-title">申告状況</h3>
                         <button class="btn btn-sm btn-outline" id="btn-refresh-standings"><i class="fas fa-sync"></i></button>
                     </div>
                     <div class="table-responsive">
                         <table class="table lounge-table">
-                            <thead><tr><th width="40">順位</th><th>プレイヤー</th><th width="70">合計pt</th><th width="55">1位数</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>プレイヤー</th>
+                                    <th width="70" style="text-align:center;">最終順位</th>
+                                    <th width="70" style="text-align:right;">MMR+</th>
+                                </tr>
+                            </thead>
                             <tbody id="standings-tbody">
-                                {% for s in standings %}
-                                <tr class="{{ 'standings-first' if loop.first else '' }}">
-                                    <td>{{ loop.index }}</td>
-                                    <td>{{ s.get('username') or s.get('user_id') }}</td>
-                                    <td><strong>{{ s.get('total_points', 0) }}</strong></td>
-                                    <td style="color:var(--gray);">{{ s.get('first_place_count', 0) }}</td>
+                                {% for s in final_scores %}
+                                <tr class="{{ 'standings-first' if s.get('final_rank') == 1 else '' }}"
+                                    {% if s.get('excluded') %}style="opacity:.45;"{% endif %}>
+                                    <td>
+                                        {{ s.get('username') or s.get('user_id') }}
+                                        {% if s.get('excluded') %}<span style="font-size:.75rem;color:var(--gray);"> (除外)</span>{% endif %}
+                                    </td>
+                                    <td style="text-align:center;">
+                                        {% if s.get('submitted') %}
+                                            <strong>{{ s.get('final_rank') }}位</strong>
+                                        {% else %}
+                                            <span style="color:var(--gray);">未申告</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align:right; font-family:monospace;">
+                                        {% if s.get('mmr_delta') %}+{{ s.get('mmr_delta') }}{% else %}—{% endif %}
+                                    </td>
                                 </tr>
                                 {% else %}
-                                <tr><td colspan="4" style="text-align:center;padding:2rem;color:var(--gray);">まだ結果がありません</td></tr>
+                                <tr><td colspan="3" style="text-align:center;padding:2rem;color:var(--gray);">12レース終了後に申告してください</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <div class="card" style="margin-top:1rem;">
-                    <div class="card-header"><h3 class="card-title">コース使用履歴</h3></div>
-                    <div class="card-body">
-                        <div id="course-history-list" style="display:flex; flex-wrap:wrap; gap:6px;">
-                            {% for c in course_history %}
-                            <span class="badge badge-secondary">{{ c }}</span>
-                            {% else %}
-                            <span style="color:var(--gray); font-size:.9rem;">なし</span>
-                            {% endfor %}
+        <!-- ============ 最終順位申告モーダル ============ -->
+        <div id="final-report-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:1000; align-items:center; justify-content:center; padding:1rem;">
+            <div style="background:#fff; border-radius:var(--radius); width:min(520px,95vw); max-height:92vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.3);">
+
+                <!-- ヘッダー -->
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); color:#fff; padding:1.25rem 1.5rem; border-radius:var(--radius) var(--radius) 0 0; display:flex; align-items:center; justify-content:space-between;">
+                    <div>
+                        <div style="font-size:.8rem; opacity:.7;">最終順位申告</div>
+                        <div style="font-size:1.1rem; font-weight:700;">セッション #{{ lounge_session.id }}</div>
+                    </div>
+                    <button id="final-modal-btn-close" style="background:none; border:none; color:rgba(255,255,255,.6); font-size:1.3rem; cursor:pointer;">&times;</button>
+                </div>
+
+                <div style="padding:1.25rem 1.5rem;">
+
+                    <!-- 自分の順位入力 -->
+                    <div id="final-report-input-section">
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:6px;">あなたの最終順位</label>
+                        <div class="final-rank-row">
+                            <select id="final-rank-select" class="form-control">
+                                {% for i in range(1, 25) %}
+                                <option value="{{ i }}">{{ i }}位</option>
+                                {% endfor %}
+                            </select>
+                            <button class="btn btn-success" id="btn-submit-final-rank">
+                                <i class="fas fa-paper-plane"></i> 申告する
+                            </button>
+                        </div>
+                        <div id="final-my-submitted" style="display:none; margin-top:8px; color:#28a745; font-size:.9rem; font-weight:600;">
+                            <i class="fas fa-check-circle"></i> 申告済みです
                         </div>
                     </div>
+
+                    <!-- 提出状況一覧 -->
+                    <div style="margin-top:1.25rem;">
+                        <div style="font-size:.85rem; font-weight:600; margin-bottom:6px; display:flex; justify-content:space-between;">
+                            <span>提出状況</span>
+                            <span id="final-submitted-count" style="color:var(--gray);"></span>
+                        </div>
+                        <div id="final-submission-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+                    </div>
+
+                    <!-- ホスト用: 終了確定 -->
+                    {% if is_host %}
+                    <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                        <p style="font-size:.82rem; color:var(--gray); margin-bottom:8px;">
+                            未申告者は MMR 対象外になります。除外したいプレイヤーは下の一覧から「除外」ボタンを押してください。
+                        </p>
+                        <button class="btn btn-danger" id="modal-btn-finish" style="width:100%;">
+                            <i class="fas fa-flag-checkered"></i> 終了確定・MMR反映
+                        </button>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -127,19 +190,19 @@
                     <div style="color:#fff; font-size:1.1rem; font-weight:700;">セッション終了！</div>
                 </div>
                 <div style="padding:1.5rem;">
-                    <!-- 順位 -->
+                    <!-- 最終順位 -->
                     <div style="display:flex; align-items:baseline; justify-content:center; gap:6px; margin-bottom:.25rem;">
                         <span id="result-rank-num" style="font-size:3rem; font-weight:800; color:var(--primary); line-height:1;">—</span>
                         <span style="font-size:1rem; color:var(--gray);">位</span>
                         <span id="result-total-players" style="font-size:.9rem; color:var(--gray);"></span>
                     </div>
-                    <div style="color:var(--gray); font-size:.85rem; margin-bottom:1.25rem;">セッション内最終順位</div>
+                    <div style="color:var(--gray); font-size:.85rem; margin-bottom:1.25rem;">セッション最終順位</div>
 
-                    <!-- ポイント / MMR / ランク -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:1rem;">
-                        <div style="background:#f8f9fa; border-radius:8px; padding:.85rem;">
-                            <div style="font-size:1.4rem; font-weight:700; color:var(--primary);" id="result-points">—</div>
-                            <div style="font-size:.8rem; color:var(--gray); margin-top:2px;">合計ポイント</div>
+                    <!-- MMR増加 / 現在のMMR / ランク -->
+                    <div class="grid-2col" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:1rem;">
+                        <div style="background:#f0fdf4; border-radius:8px; padding:.85rem;">
+                            <div style="font-size:1.4rem; font-weight:700; color:#28a745;" id="result-mmr-delta">—</div>
+                            <div style="font-size:.8rem; color:var(--gray); margin-top:2px;">MMR増加</div>
                         </div>
                         <div style="background:#f8f9fa; border-radius:8px; padding:.85rem;">
                             <div style="font-size:1.4rem; font-weight:700; color:var(--accent);" id="result-mmr">—</div>
@@ -151,7 +214,7 @@
                         <div style="font-size:.8rem; color:var(--gray); margin-top:2px;">現在のランク</div>
                     </div>
 
-                    <!-- 特別メッセージ（優勝など） -->
+                    <!-- 優勝演出 -->
                     <div id="result-special-msg" style="display:none; background:linear-gradient(135deg,#fff8e1,#fffde7); border:1px solid #ffc107; border-radius:8px; padding:.9rem; margin-bottom:1rem; font-size:.88rem; line-height:1.6;"></div>
 
                     <!-- カウントダウン -->
@@ -161,90 +224,6 @@
                     <button class="btn btn-primary" id="result-btn-dashboard" style="width:100%;">
                         <i class="fas fa-home"></i> ダッシュボードへ戻る
                     </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ============ 順位申告モーダル ============ -->
-        <div id="race-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:1000; align-items:center; justify-content:center; padding:1rem;">
-            <div style="background:#fff; border-radius:var(--radius); width:min(520px,95vw); max-height:92vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.3);">
-
-                <!-- ヘッダー -->
-                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); color:#fff; padding:1.25rem 1.5rem; border-radius:var(--radius) var(--radius) 0 0; display:flex; align-items:center; justify-content:space-between;">
-                    <div>
-                        <div style="font-size:.8rem; opacity:.7;" id="modal-header-label">レース設定</div>
-                        <div style="font-size:1.1rem; font-weight:700;" id="modal-course-name">—</div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <span style="font-size:.85rem; opacity:.7;" id="modal-race-num"></span>
-                        <button id="modal-btn-close" title="閉じる" style="background:none; border:none; color:rgba(255,255,255,.6); font-size:1.3rem; cursor:pointer; line-height:1; padding:2px 4px;">&times;</button>
-                    </div>
-                </div>
-
-                <div style="padding:1.25rem 1.5rem;">
-
-                    <!-- ① セットアップフェーズ（ホストのみ・レース開始前） -->
-                    {% if is_host %}
-                    <div id="modal-phase-setup">
-                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:6px;">コース名</label>
-                        <input type="text" id="modal-course-input" class="form-control" placeholder="例: レインボーロード" style="margin-bottom:10px;">
-                        <button class="btn btn-primary" id="modal-btn-start-race" style="width:100%;">
-                            <i class="fas fa-flag"></i> このコースでレースを開始する
-                        </button>
-                        <p style="font-size:.8rem; color:var(--gray); margin-top:8px; text-align:center;">開始すると全参加者に通知されます</p>
-                    </div>
-                    {% endif %}
-
-                    <!-- ② 申告フェーズ（全員・レース開始後） -->
-                    <div id="modal-phase-report" style="display:none;">
-
-                        <!-- 自分の順位入力 -->
-                        <div id="modal-report-section">
-                            <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:6px;">あなたの順位</label>
-                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                <select id="modal-report-position" class="form-control" style="width:110px; flex-shrink:0;">
-                                    {% for i in range(1, 25) %}
-                                    <option value="{{ i }}">{{ i }}位</option>
-                                    {% endfor %}
-                                </select>
-                                <button class="btn btn-success" id="modal-btn-report" style="flex:1; min-width:100px;">
-                                    <i class="fas fa-paper-plane"></i> 申告する
-                                </button>
-                                <button class="btn btn-warning" id="modal-btn-disconnect" style="flex:1; min-width:100px;">
-                                    <i class="fas fa-plug"></i> 回線落ち
-                                </button>
-                            </div>
-                            <div id="modal-my-submitted" style="display:none; margin-top:8px; color:#28a745; font-size:.9rem; font-weight:600;">
-                                <i class="fas fa-check-circle"></i> 申告済みです
-                            </div>
-                        </div>
-
-                        <!-- 提出状況 -->
-                        <div style="margin-top:1.25rem;">
-                            <div style="font-size:.85rem; font-weight:600; margin-bottom:6px; display:flex; justify-content:space-between;">
-                                <span>提出状況</span>
-                                <span id="modal-submitted-count" style="color:var(--gray);"></span>
-                            </div>
-                            <div id="modal-submission-list" style="display:flex; flex-direction:column; gap:4px;"></div>
-                        </div>
-
-                        <!-- 全員提出済み → 非ホスト向け承認待ちメッセージ -->
-                        {% if not is_host %}
-                        <div id="modal-waiting-host" style="display:none; margin-top:1rem; background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:.75rem; font-size:.88rem; text-align:center; color:#856404;">
-                            <i class="fas fa-hourglass-half"></i> ホストが結果を確認・承認するまでお待ちください
-                        </div>
-                        {% endif %}
-
-                        <!-- ホスト確定ボタン -->
-                        {% if is_host %}
-                        <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border-color);">
-                            <button class="btn btn-primary" id="modal-btn-finalize" style="width:100%;">
-                                <i class="fas fa-check-double"></i> 結果確定・次のレースへ
-                            </button>
-                        </div>
-                        {% endif %}
-                    </div>
-
                 </div>
             </div>
         </div>
@@ -286,7 +265,7 @@
                         <tr>
                             <th>ホスト</th>
                             <th width="80">モード</th>
-                            <th width="120">進行</th>
+                            <th width="100">レース数</th>
                             <th width="80">参加者</th>
                             <th width="80">状態</th>
                             <th width="90">アクション</th>
@@ -297,12 +276,10 @@
                         <tr>
                             <td><strong>{{ s.get('host_name') or s.get('host_id') }}</strong></td>
                             <td><span class="badge badge-secondary">{{ s.get('mode', 'FFA').upper() }}</span></td>
-                            <td style="font-family:monospace;">{{ s.get('current_race', 0) }} / {{ s.get('total_races', 12) }} レース</td>
+                            <td style="font-family:monospace;">{{ s.get('total_races', 12) }} レース</td>
                             <td style="text-align:center;">{{ s.get('member_count', 0) }}人</td>
                             <td>
-                                <span class="badge {{ 'badge-warning' if s.get('status') == 'waiting' else 'badge-success' }}">
-                                    {{ '待機中' if s.get('status') == 'waiting' else '進行中' }}
-                                </span>
+                                <span class="badge badge-success">進行中</span>
                             </td>
                             <td>
                                 <a href="{{ url_for('lounge.session_view', session_id=s.get('id')) }}" class="btn btn-primary btn-sm">入場</a>
@@ -326,7 +303,6 @@
         const SESSION_ID = {{ lounge_session.id if lounge_session else 'null' }};
         const IS_HOST = {{ 'true' if is_host is defined and is_host else 'false' }};
         const MY_USER_ID = '{{ user["id"] }}';
-        // メンバー一覧: user_id -> username のマップ
         const MEMBERS = {
             {% if members is defined %}
             {% for m in members %}
@@ -334,7 +310,6 @@
             {% endfor %}
             {% endif %}
         };
-        let currentRaceId = null;
     </script>
     <script src="{{ url_for('static', filename='js/lounge.js') }}?v={{ js_ver }}"></script>
 </body>

@@ -40,16 +40,37 @@
     align-items: flex-end;
 }
 
-/* ---- モーダルオーバーレイ共通 ---- */
-.lounge-modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, .65);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
+/* ---- アクションパネル内ボタン（PC） ---- */
+#action-panel .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ---- 最終順位入力行: select + button を横並び ---- */
+.final-rank-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.final-rank-row select {
+    width: 100px;
+    flex-shrink: 0;
+}
+
+.final-rank-row .btn {
+    flex: 1;
+}
+
+/* ---- 除外ボタン（申告状況リスト内） ---- */
+.exclude-btn {
+    min-width: 64px;
+    padding: 3px 10px;
+    font-size: .78rem;
+    white-space: nowrap;
+    /* タッチターゲット確保 */
+    min-height: 32px;
 }
 
 /* ============================================================
@@ -91,12 +112,12 @@
         font-size: 1.1rem;
     }
 
-    /* Staffパネルのボタン: フル幅 */
-    #staff-panel .btn {
+    /* アクションパネルのボタン: フル幅 */
+    #action-panel .btn {
         width: 100%;
-    }
-    #staff-panel .card-body {
-        gap: 10px;
+        /* タッチターゲット: 最低 48px */
+        min-height: 48px;
+        font-size: 1rem;
     }
 
     /* 一覧ビューの作成フォーム: 縦並び */
@@ -113,6 +134,7 @@
     }
     .lounge-create-form .btn {
         width: 100%;
+        min-height: 48px;
     }
 
     /* セッション一覧テーブル: 横スクロール許可 */
@@ -120,13 +142,10 @@
         min-width: 480px;
     }
 
-    /* 順位申告モーダル内のボタン行 */
-    #modal-report-section > div {
-        flex-wrap: wrap;
-    }
-    #modal-report-section .btn {
-        flex: 1;
-        min-width: 100px;
+    /* 注意バナー */
+    .lounge-warning {
+        font-size: .82rem;
+        padding: .75rem;
     }
 
     /* ランキングテーブル: コンパクト */
@@ -136,16 +155,55 @@
         font-size: .82rem;
     }
 
-    /* 注意バナー */
-    .lounge-warning {
-        font-size: .82rem;
-        padding: .75rem;
+    /* ---- 最終順位申告モーダル ---- */
+
+    /* モーダル自体のパディングを縮小 */
+    #final-report-modal-overlay > div > div:last-child,
+    #result-modal-overlay > div > div:last-child {
+        padding: 1rem;
     }
 
-    /* モーダルの申告ボタン */
-    #modal-btn-finalize {
-        font-size: .9rem;
-        padding: .65rem 1rem;
+    /* select + button を縦並びに */
+    .final-rank-row {
+        flex-direction: column;
+    }
+    .final-rank-row select {
+        width: 100%;
+    }
+    .final-rank-row .btn {
+        width: 100%;
+        min-height: 48px;
+        font-size: 1rem;
+    }
+
+    /* モーダル内の終了確定ボタン */
+    #modal-btn-finish {
+        min-height: 48px;
+        font-size: 1rem;
+    }
+
+    /* 申告状況リストの除外ボタン */
+    .exclude-btn {
+        min-height: 36px;
+        min-width: 60px;
+        font-size: .8rem;
+        padding: 4px 8px;
+    }
+
+    /* 申告状況アイテム: 長い名前でも折り返す */
+    #final-submission-list > div {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    /* 結果モーダルの順位数字 */
+    #result-rank-num {
+        font-size: 2.4rem !important;
+    }
+
+    /* 結果モーダルのグリッド: 縦並び */
+    #result-modal-overlay .grid-2col {
+        grid-template-columns: 1fr !important;
     }
 }
 

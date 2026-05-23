@@ -320,25 +320,13 @@ pub struct LoungeSession {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct LoungeRaceResult {
+pub struct LoungeSessionFinalScore {
     pub id: i64,
     pub session_id: i64,
-    pub race_number: i8,
-    pub course_name: String,
-    pub is_void: bool,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct LoungeRaceScore {
-    pub id: i64,
-    pub race_result_id: i64,
     pub user_id: i64,
-    pub position: Option<i8>,
-    pub points: i32,
-    pub is_disconnect: bool,
-    pub disconnect_reported_at: Option<String>,
-    pub status: String,
+    pub final_rank: i8,
+    pub mmr_delta: i32,
+    pub submitted_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

@@ -41,3 +41,106 @@
 - [ ] Discord Cog: 称号ロール自動付与のトリガー統合（Discord Bot側）
 - [ ] ラウンジMMR増減計算式の詳細設計（現在は単純スコア加算）
 - [ ] tournament.htmlへの Bracketry ブラケット図統合（1v1用）
+
+---
+
+## Phase 3: ラウンジ申告方式リファクタリング（仕様変更）
+
+### 背景・動機
+
+参加型配信という特性上、レースごとの順位申告はゲームの流れを止める。
+「セッション終了後に最終順位を1回だけ申告 → MMR・称号表示」方式に変更する。
+
+### 影響範囲の全体像
+
+| レイヤー | 変更の性質 | 主要ファイル |
+|---------|-----------|------------|
+| DB | テーブル追加・既存テーブルの役割変更 | `migrations/008_lounge_final_score.sql` |
+| Rust DB層 | 新関数追加・既存申告関数の削除/無効化 | `lounge_repo.rs` |
+| Rust API層 | エンドポイント追加・削除 | `handlers/lounge.rs` |
+| Python Service | ラッパー追加・削除 | `lounge_service.py` |
+| Python Route | ルート追加・削除 | `routes/lounge.py` |
+| JS/HTML | 申告UIを全面置換 | `lounge.js`, `lounge.html` |
+| ドキュメント | 仕様変更反映 | `FEATURE_LOUNGE.md`, ADR-018 |
+
+### 設計方針
+
+**残すもの:**
+- `lounge_sessions` — セッション管理は変わらない
+- `lounge_race_results` — コース管理（重複検知）のために存続。スコア管理責任は剥奪
+- `lounge_course_history` — コース重複検知は継続
+- `lounge_session_members` — 参加者管理は変わらない
+- `lounge_teams`, `lounge_team_members` — チーム戦は将来対応で保持
+
+**廃止するもの:**
+- `lounge_race_scores` — レースごとの個人スコア管理は不要になる
+- `report_score` / `report_disconnect` / `approve_race_scores` の申告フロー
+- per-race WebSocketイベント: `lounge.score_reported`, `lounge.disconnect_reported`, `lounge.race_approved`
+- フロントの申告フェーズモーダル（`#modal-phase-report`）
+
+**追加するもの:**
+- `lounge_session_final_scores` テーブル（session_id, user_id, final_rank）
+- 最終順位申告 API: `POST /lounge/sessions/{id}/final-scores/report`
+- セッション終了トリガー: 全員申告完了 or ホストが強制終了
+- MMR計算: 最終順位ベースの固定デルタテーブル
+- 結果表示: MMR増減 + 称号 をセッション終了時に一括表示
+
+### 実装ステップ（承認待ち）
+
+> **注意**: 各ステップは必ず順番通りに実施。後ろのステップは前の完了を前提とする。
+
+#### Step 1: DB設計（新テーブル追加）
+- [x] `migrations/008_lounge_final_score.sql` を作成
+  - `lounge_session_final_scores`, `excluded` カラム追加
+  - `lounge_race_scores`, `lounge_race_results`, `lounge_course_history` DROP
+- [x] MMRデルタを Rust 定数 `MMR_DELTA[25]` として定義
+
+#### Step 2: Rust DB層（lounge_repo.rs）
+- [x] `report_final_score()` 追加
+- [x] `get_final_scores()` 追加（全メンバー + 申告状況）
+- [x] `calc_and_apply_mmr()` — トランザクションで MMR 計算・更新・返却
+- [x] `toggle_exclude_player()` 追加
+- [x] 旧関数（create_race, report_score 等）削除
+
+#### Step 3: Rust API層（handlers/lounge.rs）
+- [x] `POST /lounge/sessions/{id}/final-scores/report` 追加
+- [x] `GET /lounge/sessions/{id}/final-scores` 追加
+- [x] `POST /lounge/sessions/{id}/exclude` 追加（除外トグル）
+- [x] `finish_session` を `calc_and_apply_mmr → finish → WS` フローに改修
+- [x] 旧ハンドラ（create_race, report_score 等）削除
+
+#### Step 4: Python Service / Route
+- [x] `lounge_service.py`: `report_final_score()`, `get_final_scores()`, `exclude_player()` 追加
+- [x] `routes/lounge.py`: 新ルート追加・旧ルート削除
+- [x] `_do_finish_session()` を Bridge の MMR 結果を使う形に改修
+
+#### Step 5: フロントエンド（lounge.js / lounge.html）
+- [x] per-race申告モーダル・ロジックを削除
+- [x] 最終順位申告モーダル実装（全員・リアルタイム状況表示）
+- [x] ホスト用: 除外ボタン・終了確定ボタン
+- [x] 結果モーダルを MMR増加・現在MMR・称号表示に変更
+- [x] WS イベント: `lounge.final_score_reported`, `lounge.member_excluded` 対応
+
+#### Step 6: ドキュメント・ADR
+- [x] `FEATURE_LOUNGE.md` 仕様変更反映
+- [x] `docs/adr/018-lounge-final-score-reporting.md` 作成
+- [x] `ADR-013` に「仕様変更: Phase 3 参照」旨を追記
+
+### 確定事項
+
+1. **MMRデルタ**: 全順位プラスのみ（1位+150〜24位+5）。詳細は `FEATURE_LOUNGE.md` §10 参照。
+2. **未申告者**: ホストが「除外」操作でMMR対象外にできる。最下位扱いはしない。
+3. **回線落ち**: 最終順位として申告するだけで良い。特別処理なし。
+4. **コース申告**: 廃止。`lounge_race_results` / `lounge_course_history` も削除対象。
+
+### 削除対象の整理（Step 1〜6 実施時に合わせて削除）
+
+| 削除対象 | 種別 | 理由 |
+|---------|------|------|
+| `lounge_race_results` テーブル | DB | コース管理不要になるため |
+| `lounge_race_scores` テーブル | DB | per-race スコア管理廃止 |
+| `lounge_course_history` テーブル | DB | コース重複検知廃止 |
+| `report_score()` / `report_disconnect()` / `approve_race_scores()` | Rust | 申告フロー廃止 |
+| `POST /lounge/races/{id}/scores/report` 等 3エンドポイント | API | 同上 |
+| `#modal-phase-report` / `#modal-phase-setup` | HTML/JS | UI全面置換 |
+| `lounge.score_reported` / `lounge.disconnect_reported` / `lounge.race_approved` | WS | イベント廃止 |

@@ -1,7 +1,7 @@
 # routes/lounge.py
 from quart import Blueprint, current_app, render_template, request, session, redirect, url_for, jsonify
 from services.lounge_service import LoungeService
-from services.tournament_service import TitleService, TournamentService
+from services.tournament_service import TitleService
 from services.bridge_client import BridgeUnavailableError
 from routes.tournament import _ensure_discord_role, _assign_title_role
 
@@ -17,6 +17,10 @@ def _require_login():
     if not user:
         return redirect(url_for("login"))
     return None
+
+
+def _is_host(user, session_data) -> bool:
+    return str(user["id"]) == str(session_data.get("host_id", ""))
 
 
 # ============================================================
@@ -46,17 +50,15 @@ async def session_view(session_id: int):
         session_data = await LoungeService.get_session(session_id)
         if not session_data:
             return redirect(url_for("lounge.index"))
-        standings = await LoungeService.get_standings(session_id)
+        final_scores = await LoungeService.get_final_scores(session_id)
         members = await LoungeService.list_members(session_id)
-        course_history = await LoungeService.get_course_history(session_id)
-        is_host = str(user["id"]) == str(session_data.get("host_id", ""))
+        is_host = _is_host(user, session_data)
         return await render_template(
             "lounge.html",
             user=user,
             lounge_session=session_data,
-            standings=standings,
+            final_scores=final_scores,
             members=members,
-            course_history=course_history,
             view="session",
             is_host=is_host,
         )
@@ -92,81 +94,58 @@ async def api_join_session(session_id: int):
     return jsonify({"status": "ok" if ok else "error"})
 
 
-@lounge_bp.route("/api/sessions/<int:session_id>/races", methods=["POST"])
-async def api_create_race(session_id: int):
-    user = _current_user()
-    if not user:
-        return jsonify({"status": "error"}), 401
-    session_data = await LoungeService.get_session(session_id)
-    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
-        return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
-    data = await request.get_json()
-    course_name = data.get("course_name", "")
-    result = await LoungeService.create_race(session_id, course_name)
-    if result:
-        return jsonify({"status": "ok", **result})
-    return jsonify({"status": "error"}), 500
-
-
-@lounge_bp.route("/api/races/<int:race_id>/report", methods=["POST"])
-async def api_report_score(race_id: int):
+@lounge_bp.route("/api/sessions/<int:session_id>/final-scores/report", methods=["POST"])
+async def api_report_final_score(session_id: int):
     user = _current_user()
     if not user:
         return jsonify({"status": "error"}), 401
     data = await request.get_json()
-    position = data.get("position")
-    if position is None:
-        return jsonify({"status": "error", "message": "position required"}), 400
-    ok = await LoungeService.report_score(race_id, int(user["id"]), int(position))
+    final_rank = data.get("final_rank")
+    if final_rank is None or not (1 <= int(final_rank) <= 24):
+        return jsonify({"status": "error", "message": "final_rank は 1〜24 で指定してください"}), 400
+    ok = await LoungeService.report_final_score(session_id, int(user["id"]), int(final_rank))
     return jsonify({"status": "ok" if ok else "error"})
 
 
-@lounge_bp.route("/api/races/<int:race_id>/disconnect", methods=["POST"])
-async def api_disconnect(race_id: int):
-    user = _current_user()
-    if not user:
-        return jsonify({"status": "error"}), 401
-    ok = await LoungeService.report_disconnect(race_id, int(user["id"]))
-    return jsonify({"status": "ok" if ok else "error"})
+@lounge_bp.route("/api/sessions/<int:session_id>/final-scores")
+async def api_get_final_scores(session_id: int):
+    if not _current_user():
+        return jsonify([]), 401
+    scores = await LoungeService.get_final_scores(session_id)
+    return jsonify(scores)
 
 
-@lounge_bp.route("/api/sessions/<int:session_id>/races/<int:race_id>/approve", methods=["POST"])
-async def api_approve_race(session_id: int, race_id: int):
-    user = _current_user()
-    if not user:
-        return jsonify({"status": "error"}), 401
-    session_data = await LoungeService.get_session(session_id)
-    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
-        return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
-    ok = await LoungeService.approve_race(race_id)
-    return jsonify({"status": "ok" if ok else "error"})
-
-
-@lounge_bp.route("/api/sessions/<int:session_id>/next-race", methods=["POST"])
-async def api_next_race(session_id: int):
+@lounge_bp.route("/api/sessions/<int:session_id>/exclude", methods=["POST"])
+async def api_exclude_player(session_id: int):
     user = _current_user()
     if not user:
         return jsonify({"status": "error"}), 401
     session_data = await LoungeService.get_session(session_id)
-    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
+    if not session_data or not _is_host(user, session_data):
         return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
-    ok = await LoungeService.next_race(session_id)
-    return jsonify({"status": "ok" if ok else "error"})
+    data = await request.get_json()
+    excluded = await LoungeService.exclude_player(session_id, int(data.get("user_id")))
+    if excluded is None:
+        return jsonify({"status": "error"}), 500
+    return jsonify({"status": "ok", "excluded": excluded})
 
 
 async def _do_finish_session(session_id: int):
-    """セッション終了フロー（Bridgeへのfinish通知 + 称号付与・Discordロール同期）。"""
-    ok = await LoungeService.finish_session(session_id)
-    if not ok:
+    """セッション終了フロー（MMR計算 + 称号付与 + Discordロール同期）。"""
+    res = await LoungeService.finish_session(session_id)
+    if not res or res.get("status") != "ok":
         return False
-    members = await LoungeService.list_members(session_id)
+
+    # Bridge が MMR 計算済みの結果を返す
+    results = res.get("results", [])
     all_titles = await TitleService.list_all()
-    for member in members:
-        uid = member.get("user_id")
-        mmr = member.get("mmr", 0)
+
+    for entry in results:
+        uid = entry.get("user_id")
+        new_mmr = entry.get("new_mmr", 0)
         if not uid:
             continue
-        newly_granted_ids = await TitleService.grant_rank(uid, mmr)
+        newly_granted_ids = await TitleService.grant_rank(uid, new_mmr)
         for title_id in newly_granted_ids:
             active = await TitleService.get_active(uid)
             granted_title = next((t for t in all_titles if t["id"] == title_id), None)
@@ -184,7 +163,7 @@ async def api_finish_session(session_id: int):
     if not user:
         return jsonify({"status": "error"}), 401
     session_data = await LoungeService.get_session(session_id)
-    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
+    if not session_data or not _is_host(user, session_data):
         return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
     ok = await _do_finish_session(session_id)
     return jsonify({"status": "ok" if ok else "error"})
@@ -192,23 +171,21 @@ async def api_finish_session(session_id: int):
 
 @lounge_bp.route("/api/sessions/<int:session_id>/my-result")
 async def api_my_result(session_id: int):
-    """セッション終了後の個人結果（順位・ポイント・MMR・優勝フラグ）を返す。"""
+    """セッション終了後の個人結果（最終順位・MMR増加・現在MMR・称号）を返す。"""
     user = _current_user()
     if not user:
         return jsonify({}), 401
     uid_str = str(user["id"])
 
-    standings = await LoungeService.get_standings(session_id)
-    my_rank = None
-    my_points = 0
-    for i, s in enumerate(standings):
-        if str(s.get("user_id")) == uid_str:
-            my_rank = i + 1
-            my_points = s.get("total_points", 0)
-            break
+    final_scores = await LoungeService.get_final_scores(session_id)
+    my_entry = next((s for s in final_scores if str(s.get("user_id")) == uid_str), None)
+
+    final_rank = my_entry.get("final_rank") if my_entry else None
+    mmr_delta = my_entry.get("mmr_delta", 0) if my_entry else 0
+    total_submitted = sum(1 for s in final_scores if s.get("submitted"))
 
     player = await LoungeService.get_player(int(user["id"]))
-    mmr = player.get("mmr", 1000) if player else 1000
+    current_mmr = player.get("mmr", 1000) if player else 1000
 
     all_titles = await TitleService.list_all()
     player_titles = await TitleService.get_player_titles(int(user["id"]))
@@ -220,12 +197,12 @@ async def api_my_result(session_id: int):
             break
 
     return jsonify({
-        "rank": my_rank,
-        "total_points": my_points,
-        "total_players": len(standings),
-        "mmr": mmr,
-        "rank_name": active_title_name or "—",
-        "is_winner": my_rank == 1,
+        "final_rank":      final_rank,
+        "total_players":   total_submitted,
+        "mmr_delta":       mmr_delta,
+        "mmr":             current_mmr,
+        "rank_name":       active_title_name or "—",
+        "is_winner":       final_rank == 1,
     })
 
 
@@ -239,14 +216,13 @@ async def api_standings(session_id: int):
 
 @lounge_bp.route("/api/me")
 async def api_me():
-    """ログインユーザーのMMRとランク称号を返す（セッション終了結果表示用）"""
+    """ログインユーザーの MMR とランク称号を返す。"""
     user = _current_user()
     if not user:
         return jsonify({}), 401
     uid = int(user["id"])
     player = await LoungeService.get_player(uid)
     titles = await TitleService.get_player_titles(uid)
-    # lounge_rank タイプの称号で最も閾値が高いものを現在ランクとする
     rank_title = None
     for t in sorted(titles, key=lambda x: x.get("unlock_threshold") or 0, reverse=True):
         if t.get("unlock_type") == "lounge_rank" and t.get("earned"):
@@ -254,48 +230,6 @@ async def api_me():
             break
     mmr = player.get("mmr", 1000) if player else 1000
     return jsonify({"mmr": mmr, "rank_name": rank_title or "—"})
-
-
-@lounge_bp.route("/api/sessions/<int:session_id>/active-race")
-async def api_active_race(session_id: int):
-    if not _current_user():
-        return jsonify({"status": "none"}), 401
-    race = await LoungeService.get_active_race(session_id)
-    if not race:
-        return jsonify({"status": "none"}), 404
-    return jsonify(race)
-
-
-@lounge_bp.route("/api/sessions/<int:session_id>/races/<int:race_id>/scores")
-async def api_race_scores(session_id: int, race_id: int):
-    if not _current_user():
-        return jsonify([]), 401
-    scores = await LoungeService.list_race_scores_named(race_id)
-    return jsonify(scores)
-
-
-@lounge_bp.route("/api/sessions/<int:session_id>/races/<int:race_id>/finalize", methods=["POST"])
-async def api_finalize_race(session_id: int, race_id: int):
-    """承認 + 次のレースへ を一括処理（ホストのみ）。レース上限到達時はセッション終了フローを自動実行。"""
-    user = _current_user()
-    if not user:
-        return jsonify({"status": "error"}), 401
-    session_data = await LoungeService.get_session(session_id)
-    if not session_data or str(user["id"]) != str(session_data.get("host_id", "")):
-        return jsonify({"status": "error", "message": "ホストのみ操作できます"}), 403
-    ok1 = await LoungeService.approve_race(race_id)
-    if not ok1:
-        return jsonify({"status": "error", "message": "承認に失敗しました"}), 500
-    ok2 = await LoungeService.next_race(session_id)
-    if not ok2:
-        return jsonify({"status": "error"}), 500
-
-    # レース上限到達でセッションがfinishedになった場合、自動でfinishフローを実行
-    updated = await LoungeService.get_session(session_id)
-    if updated and updated.get("status") == "finished":
-        await _do_finish_session(session_id)
-
-    return jsonify({"status": "ok"})
 
 
 @lounge_bp.route("/api/sessions/<int:session_id>/teams", methods=["GET", "POST"])

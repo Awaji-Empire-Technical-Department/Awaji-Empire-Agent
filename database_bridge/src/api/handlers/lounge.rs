@@ -1,5 +1,5 @@
 // api/handlers/lounge.rs
-// Why: ラウンジシステムのHTTPハンドラ。
+// Phase 3: セッション最終順位申告方式。
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -46,7 +46,7 @@ pub async fn create_session(
 }
 
 // ============================================================
-// GET /lounge/sessions  (アクティブセッション一覧)
+// GET /lounge/sessions
 // ============================================================
 pub async fn list_sessions(State(pool): State<MySqlPool>) -> (StatusCode, Json<Value>) {
     match lounge_repo::list_active_sessions(&pool).await {
@@ -64,25 +64,6 @@ pub async fn get_session(
 ) -> (StatusCode, Json<Value>) {
     match lounge_repo::get_session(&pool, session_id).await {
         Ok(session) => (StatusCode::OK, Json(json!(session))),
-        Err(e) => map_err(e),
-    }
-}
-
-// ============================================================
-// PATCH /lounge/sessions/{id}/next-race
-// ============================================================
-pub async fn next_race(
-    State(state): State<AppState>,
-    Path(session_id): Path<i64>,
-) -> (StatusCode, Json<Value>) {
-    match lounge_repo::advance_session_race(&state.pool, session_id).await {
-        Ok(_) => {
-            let _ = state.tx.send(json!({
-                "type": "lounge.race_advanced",
-                "session_id": session_id,
-            }).to_string());
-            (StatusCode::OK, Json(json!({"status":"ok"})))
-        },
         Err(e) => map_err(e),
     }
 }
@@ -120,90 +101,53 @@ pub async fn list_members(
 }
 
 // ============================================================
-// POST /lounge/sessions/{id}/races
+// POST /lounge/sessions/{id}/exclude
 // ============================================================
 #[derive(Deserialize)]
-pub struct CreateRaceRequest {
-    pub course_name: String,
+pub struct ExcludePlayerRequest {
+    pub user_id: i64,
 }
 
-/// コース正規化：レインボーロード系を統一キーに変換
-fn normalize_course_key(name: &str) -> String {
-    let lower = name.to_lowercase();
-    if lower.contains("rainbow road") || lower.contains("レインボーロード") {
-        return "rainbow_road".to_string();
-    }
-    lower.replace(' ', "_").replace('　', "_")
-}
-
-pub async fn create_race(
+pub async fn exclude_player(
     State(state): State<AppState>,
     Path(session_id): Path<i64>,
-    Json(payload): Json<CreateRaceRequest>,
+    Json(payload): Json<ExcludePlayerRequest>,
 ) -> (StatusCode, Json<Value>) {
-    let course_key = normalize_course_key(&payload.course_name);
-
-    let session = match lounge_repo::get_session(&state.pool, session_id).await {
-        Ok(s) => s,
-        Err(e) => return map_err(e),
-    };
-
-    // レース上限チェック
-    if session.current_race >= session.total_races {
-        return (StatusCode::FORBIDDEN, Json(json!({"status":"error","message":"レース上限に達しています"})));
-    }
-
-    // コース重複チェック
-    let is_new = match lounge_repo::check_and_register_course(&state.pool, session_id, &course_key).await {
-        Ok(v) => v,
-        Err(e) => return map_err(e),
-    };
-
-    let next_race_num = session.current_race + 1;
-
-    match lounge_repo::create_race(&state.pool, session_id, next_race_num, &payload.course_name).await {
-        Ok(race_id) => {
+    match lounge_repo::toggle_exclude_player(&state.pool, session_id, payload.user_id).await {
+        Ok(excluded) => {
             let _ = state.tx.send(json!({
-                "type": "lounge.race_created",
+                "type":       "lounge.member_excluded",
                 "session_id": session_id,
-                "race_id": race_id,
-                "race_number": next_race_num,
-                "course_name": payload.course_name,
-                "duplicate_course": !is_new,
+                "user_id":    payload.user_id.to_string(),
+                "excluded":   excluded,
             }).to_string());
-            (StatusCode::OK, Json(json!({
-                "status": "ok",
-                "race_id": race_id,
-                "race_number": next_race_num,
-                "duplicate_course": !is_new,
-            })))
+            (StatusCode::OK, Json(json!({"status":"ok","excluded":excluded})))
         },
         Err(e) => map_err(e),
     }
 }
 
 // ============================================================
-// POST /lounge/races/{race_id}/scores/report
+// POST /lounge/sessions/{id}/final-scores/report
 // ============================================================
 #[derive(Deserialize)]
-pub struct ReportScoreRequest {
+pub struct ReportFinalScoreRequest {
     pub user_id: i64,
-    pub position: i8,
+    pub final_rank: i8,
 }
 
-pub async fn report_score(
+pub async fn report_final_score(
     State(state): State<AppState>,
-    Path(race_id): Path<i64>,
-    Json(payload): Json<ReportScoreRequest>,
+    Path(session_id): Path<i64>,
+    Json(payload): Json<ReportFinalScoreRequest>,
 ) -> (StatusCode, Json<Value>) {
-    match lounge_repo::report_score(&state.pool, race_id, payload.user_id, payload.position).await {
+    match lounge_repo::report_final_score(&state.pool, session_id, payload.user_id, payload.final_rank).await {
         Ok(_) => {
             let _ = state.tx.send(json!({
-                "type": "lounge.score_reported",
-                "race_id": race_id,
-                "user_id": payload.user_id.to_string(),
-                "position": payload.position,
-                "is_disconnect": false,
+                "type":       "lounge.final_score_reported",
+                "session_id": session_id,
+                "user_id":    payload.user_id.to_string(),
+                "final_rank": payload.final_rank,
             }).to_string());
             (StatusCode::OK, Json(json!({"status":"ok"})))
         },
@@ -212,93 +156,13 @@ pub async fn report_score(
 }
 
 // ============================================================
-// POST /lounge/races/{race_id}/disconnect
+// GET /lounge/sessions/{id}/final-scores
 // ============================================================
-#[derive(Deserialize)]
-pub struct DisconnectRequest {
-    pub user_id: i64,
-}
-
-pub async fn report_disconnect(
-    State(state): State<AppState>,
-    Path(race_id): Path<i64>,
-    Json(payload): Json<DisconnectRequest>,
-) -> (StatusCode, Json<Value>) {
-    match lounge_repo::report_disconnect(&state.pool, race_id, payload.user_id).await {
-        Ok(_) => {
-            let _ = state.tx.send(json!({
-                "type": "lounge.disconnect_reported",
-                "race_id": race_id,
-                "user_id": payload.user_id.to_string(),
-                "position": null,
-                "is_disconnect": true,
-            }).to_string());
-            (StatusCode::OK, Json(json!({"status":"ok"})))
-        },
-        Err(e) => map_err(e),
-    }
-}
-
-// ============================================================
-// PATCH /lounge/races/{race_id}/approve
-// ============================================================
-pub async fn approve_race(
-    State(state): State<AppState>,
-    Path(race_id): Path<i64>,
-) -> (StatusCode, Json<Value>) {
-    match lounge_repo::approve_race_scores(&state.pool, race_id).await {
-        Ok(_) => {
-            let _ = state.tx.send(json!({
-                "type": "lounge.race_approved",
-                "race_id": race_id,
-            }).to_string());
-            (StatusCode::OK, Json(json!({"status":"ok"})))
-        },
-        Err(e) => map_err(e),
-    }
-}
-
-// ============================================================
-// GET /lounge/players/{user_id}
-// ============================================================
-pub async fn get_player(
-    State(pool): State<MySqlPool>,
-    Path(user_id): Path<i64>,
-) -> (StatusCode, Json<Value>) {
-    match lounge_repo::get_lounge_player(&pool, user_id).await {
-        Ok(p) => (StatusCode::OK, Json(json!({
-            "user_id": p.user_id,
-            "mmr": p.mmr,
-            "peak_mmr": p.peak_mmr,
-            "total_races": p.total_races,
-            "total_sessions": p.total_sessions,
-        }))),
-        Err(e) => map_err(e),
-    }
-}
-
-// ============================================================
-// GET /lounge/sessions/{id}/active-race
-// ============================================================
-pub async fn get_active_race(
+pub async fn get_final_scores(
     State(pool): State<MySqlPool>,
     Path(session_id): Path<i64>,
 ) -> (StatusCode, Json<Value>) {
-    match lounge_repo::get_active_race(&pool, session_id).await {
-        Ok(Some(race)) => (StatusCode::OK, Json(race)),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"status":"none"}))),
-        Err(e) => map_err(e),
-    }
-}
-
-// ============================================================
-// GET /lounge/races/{race_id}/scores/named
-// ============================================================
-pub async fn list_race_scores_named(
-    State(pool): State<MySqlPool>,
-    Path(race_id): Path<i64>,
-) -> (StatusCode, Json<Value>) {
-    match lounge_repo::list_race_scores_named(&pool, race_id).await {
+    match lounge_repo::get_final_scores(&pool, session_id).await {
         Ok(scores) => (StatusCode::OK, Json(json!(scores))),
         Err(e) => map_err(e),
     }
@@ -318,27 +182,48 @@ pub async fn get_standings(
 }
 
 // ============================================================
-// GET /lounge/sessions/{id}/team-standings
+// POST /lounge/sessions/{id}/finish
 // ============================================================
-pub async fn get_team_standings(
-    State(pool): State<MySqlPool>,
+pub async fn finish_session(
+    State(state): State<AppState>,
     Path(session_id): Path<i64>,
 ) -> (StatusCode, Json<Value>) {
-    match lounge_repo::get_team_standings(&pool, session_id).await {
-        Ok(standings) => (StatusCode::OK, Json(json!(standings))),
-        Err(e) => map_err(e),
+    // MMR 計算・更新（申告済み・非除外プレイヤーのみ）
+    let results = match lounge_repo::calc_and_apply_mmr(&state.pool, session_id).await {
+        Ok(r) => r,
+        Err(e) => return map_err(e),
+    };
+
+    // セッションを finished に更新し total_sessions をインクリメント
+    if let Err(e) = lounge_repo::finish_session(&state.pool, session_id).await {
+        return map_err(e);
     }
+
+    // 称号付与・Discordロール同期はPython側で行う
+    let _ = state.tx.send(json!({
+        "type":       "lounge.session_finished",
+        "session_id": session_id,
+        "results":    results,
+    }).to_string());
+
+    (StatusCode::OK, Json(json!({"status":"ok","results":results})))
 }
 
 // ============================================================
-// GET /lounge/sessions/{id}/course-history
+// GET /lounge/players/{user_id}
 // ============================================================
-pub async fn get_course_history(
+pub async fn get_player(
     State(pool): State<MySqlPool>,
-    Path(session_id): Path<i64>,
+    Path(user_id): Path<i64>,
 ) -> (StatusCode, Json<Value>) {
-    match lounge_repo::get_course_history(&pool, session_id).await {
-        Ok(history) => (StatusCode::OK, Json(json!(history))),
+    match lounge_repo::get_lounge_player(&pool, user_id).await {
+        Ok(p) => (StatusCode::OK, Json(json!({
+            "user_id":       p.user_id,
+            "mmr":           p.mmr,
+            "peak_mmr":      p.peak_mmr,
+            "total_races":   p.total_races,
+            "total_sessions": p.total_sessions,
+        }))),
         Err(e) => map_err(e),
     }
 }
@@ -380,35 +265,4 @@ pub async fn list_teams(
         Ok(teams) => (StatusCode::OK, Json(json!(teams))),
         Err(e) => map_err(e),
     }
-}
-
-// ============================================================
-// GET /lounge/races/{race_id}/scores
-// ============================================================
-pub async fn list_race_scores(
-    State(pool): State<MySqlPool>,
-    Path(race_id): Path<i64>,
-) -> (StatusCode, Json<Value>) {
-    match lounge_repo::list_race_scores(&pool, race_id).await {
-        Ok(scores) => (StatusCode::OK, Json(json!(scores))),
-        Err(e) => map_err(e),
-    }
-}
-
-// ============================================================
-// POST /lounge/sessions/{id}/finish
-// ============================================================
-pub async fn finish_session(
-    State(state): State<AppState>,
-    Path(session_id): Path<i64>,
-) -> (StatusCode, Json<Value>) {
-    if let Err(e) = lounge_repo::finish_session(&state.pool, session_id).await {
-        return map_err(e);
-    }
-    // 称号付与・Discordロール同期はPython側で行う（Discord API呼び出しを一箇所に集約するため）
-    let _ = state.tx.send(json!({
-        "type": "lounge.session_finished",
-        "session_id": session_id,
-    }).to_string());
-    (StatusCode::OK, Json(json!({"status":"ok"})))
 }
