@@ -321,6 +321,15 @@
                 </div>
                 <div id="staff-grant-result" style="margin-top:.75rem; font-size:.85rem; display:none;"></div>
             </div>
+            <!-- Discordロール名同期 -->
+            <div class="card-body" style="border-bottom:1px solid var(--border-color); padding-bottom:1.5rem;">
+                <h3 style="font-size:.9rem; font-weight:600; color:var(--gray); margin-bottom:.75rem;">🔄 Discordロール名を称号名に同期</h3>
+                <p style="font-size:.8rem; color:var(--gray); margin-bottom:.75rem;">称号名を変更した後にクリックすると、Discord上のロール名がDB上の称号名に更新されます。</p>
+                <button class="btn btn-outline btn-sm" id="btn-sync-roles">
+                    <i class="fas fa-sync"></i> ロール名を同期する
+                </button>
+                <div id="sync-roles-result" style="margin-top:.75rem; font-size:.85rem; display:none;"></div>
+            </div>
             {% endif %}
             <div class="table-responsive">
                 <table class="table" id="titles-table">

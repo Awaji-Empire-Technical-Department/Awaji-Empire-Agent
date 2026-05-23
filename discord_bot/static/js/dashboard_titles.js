@@ -174,6 +174,31 @@
         }
     });
 
+    const btnSync = document.getElementById('btn-sync-roles');
+    if (btnSync) {
+        btnSync.addEventListener('click', async () => {
+            const resultEl = document.getElementById('sync-roles-result');
+            btnSync.disabled = true;
+            btnSync.textContent = '同期中...';
+            resultEl.style.display = 'none';
+            try {
+                const res = await fetch('/tournament/api/titles/sync-discord-roles', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    const summary = data.results.map(r => `${r.name}: ${r.status}`).join('<br>');
+                    resultEl.innerHTML = `<span style="color:var(--success)">✓ 同期完了</span><br><small style="color:var(--gray)">${summary}</small>`;
+                } else {
+                    resultEl.innerHTML = `<span style="color:var(--danger)">エラー: ${data.message}</span>`;
+                }
+            } catch (e) {
+                resultEl.innerHTML = `<span style="color:var(--danger)">通信エラー</span>`;
+            }
+            resultEl.style.display = 'block';
+            btnSync.disabled = false;
+            btnSync.innerHTML = '<i class="fas fa-sync"></i> ロール名を同期する';
+        });
+    }
+
     // 初期ロード
     loadTitles();
     loadActiveTitle();

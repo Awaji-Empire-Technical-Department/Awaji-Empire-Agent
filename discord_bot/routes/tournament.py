@@ -387,3 +387,40 @@ async def api_staff_grant():
         "discord_role_id": role_id,
         "title_name": title["name"],
     })
+
+
+@tournament_bp.route("/api/titles/sync-discord-roles", methods=["POST"])
+async def api_sync_discord_roles():
+    """管理者用: 全称号のDiscordロール名をDB上の称号名に同期する。"""
+    user = _current_user()
+    if not user or not _is_admin(user):
+        return jsonify({"status": "error", "message": "forbidden"}), 403
+
+    token = _get_bot_token()
+    if not token or not GUILD_ID:
+        return jsonify({"status": "error", "message": "bot token or guild id not configured"}), 500
+
+    titles = await TitleService.list_all()
+    results = []
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for title in titles:
+            role_id = title.get("discord_role_id")
+            if not role_id:
+                results.append({"id": title["id"], "name": title["name"], "status": "skipped (no role_id)"})
+                continue
+            try:
+                res = await client.patch(
+                    f"https://discord.com/api/v10/guilds/{GUILD_ID}/roles/{role_id}",
+                    headers=headers,
+                    json={"name": title["name"]},
+                )
+                if res.status_code == 200:
+                    results.append({"id": title["id"], "name": title["name"], "status": "updated"})
+                else:
+                    results.append({"id": title["id"], "name": title["name"], "status": f"error {res.status_code}"})
+            except Exception as e:
+                results.append({"id": title["id"], "name": title["name"], "status": f"exception: {e}"})
+
+    return jsonify({"status": "ok", "results": results})
