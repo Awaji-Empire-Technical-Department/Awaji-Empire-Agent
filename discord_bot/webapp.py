@@ -1,12 +1,18 @@
 import os
+import asyncio
+import aiohttp
 import httpx
-from quart import Quart, render_template, request, redirect, url_for, session, current_app
+from quart import Quart, render_template, request, redirect, url_for, session, current_app, websocket
 from quart_cors import cors
 from dotenv import load_dotenv
 
 from routes.survey import survey_bp
 from routes.lobby import lobby_bp
+from routes.tournament import tournament_bp
+from routes.lounge import lounge_bp
 from services.lobby_service import LobbyService
+from services.tournament_service import TournamentService
+from services.lounge_service import LoungeService
 from services.bridge_client import BridgeUnavailableError
 from services.survey_service import SurveyService
 from services.log_service import LogService
@@ -29,6 +35,39 @@ app.secret_key = Config.SECRET_KEY
 # Blueprintの登録
 app.register_blueprint(survey_bp)
 app.register_blueprint(lobby_bp)
+app.register_blueprint(tournament_bp)
+app.register_blueprint(lounge_bp)
+
+# --- WebSocket プロキシ (Rust Bridge → ブラウザ) ---
+BRIDGE_WS_URL = "ws://127.0.0.1:7878/ws/hyouibana"
+
+@app.websocket('/ws/hyouibana')
+async def ws_proxy():
+    """ブラウザのWSリクエストをRust Bridgeへ中継する。"""
+    async with aiohttp.ClientSession() as sess:
+        try:
+            async with sess.ws_connect(BRIDGE_WS_URL) as bridge_ws:
+
+                async def bridge_to_client():
+                    async for msg in bridge_ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            await websocket.send(msg.data)
+                        elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            break
+
+                async def client_to_bridge():
+                    while True:
+                        try:
+                            data = await websocket.receive()
+                            await bridge_ws.send_str(data)
+                        except Exception:
+                            break
+
+                await asyncio.gather(bridge_to_client(), client_to_bridge())
+
+        except Exception as e:
+            current_app.logger.warning(f"WS proxy error: {e}")
+
 
 # --- ライフサイクル ---
 @app.before_serving
@@ -43,13 +82,17 @@ async def shutdown():
 
 # --- コンテキストプロセッサ ---
 @app.context_processor
-def inject_css_version():
-    try:
-        css_path = os.path.join(app.static_folder, 'style.css')
-        version = int(os.path.getmtime(css_path))
-    except:
-        version = 1
-    return dict(css_ver=version)
+def inject_static_versions():
+    """静的ファイルのmtimeをキャッシュバスターとして返す。"""
+    def _mtime(rel_path):
+        try:
+            return int(os.path.getmtime(os.path.join(app.static_folder, rel_path)))
+        except Exception:
+            return 1
+    return dict(
+        css_ver=_mtime('style.css'),
+        js_ver=_mtime('js/lounge.js'),
+    )
 
 # --- 認証ルート (Auth) ---
 # ... (login, callback, logout は変更なしのため省略。実際はそのまま残す)
@@ -204,10 +247,12 @@ async def index():
         # LogService 経由で取得 (Rust Bridge を利用)
         logs = await LogService.get_recent_logs(None, limit=30)
         
-        # LobbyService 経由でアクティブなロビーを取得
         lobbies = await LobbyService.get_active_rooms()
+        games = await TournamentService.list_game_titles()
+        lounge_sessions = await LoungeService.list_active_sessions()
+        lounge_player = await LoungeService.get_player(int(user['id']))
 
-        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies)
+        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies, games=games, lounge_sessions=lounge_sessions, lounge_player=lounge_player)
         
     except BridgeUnavailableError:
         current_app.logger.warning("Bridge unavailable on index: rendering maintenance page")

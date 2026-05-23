@@ -12,6 +12,14 @@
 <body>
     <nav class="navbar">
         <div class="navbar-brand"><i class="fas fa-robot"></i> Awaji Empire Agent</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-left:auto; margin-right:16px;">
+            <a href="{{ url_for('tournament.index') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,0.4); color:white;">
+                <i class="fas fa-trophy"></i> 大会
+            </a>
+            <a href="{{ url_for('lounge.index') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,0.4); color:white;">
+                <i class="fas fa-flag-checkered"></i> ラウンジ
+            </a>
+        </div>
         <div class="user-menu">
             <img src="{{ user['avatar_url'] }}" class="user-avatar" alt="Avatar">
             <span>{{ user['name'] }}</span>
@@ -21,6 +29,52 @@
     </nav>
 
     <div class="container">
+        {% for s in lounge_sessions %}
+        <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); color:#fff; border-radius:var(--radius); padding:1rem 1.5rem; margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span style="font-size:1.5rem;">🏎️</span>
+                <div>
+                    <strong style="font-size:1rem;">ラウンジ募集中！</strong>
+                    <div style="font-size:.85rem; opacity:.8; margin-top:2px;">
+                        ホスト: {{ s.get('host_name') or s.get('host_id') }}
+                        &nbsp;|&nbsp; {{ s.get('mode', 'FFA').upper() }}
+                        &nbsp;|&nbsp; {{ s.get('current_race', 0) }} / {{ s.get('total_races', 12) }} レース
+                        &nbsp;|&nbsp; {{ s.get('member_count', 0) }}人参加中
+                    </div>
+                    {% if s.get('room_id') %}
+                    <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:.8rem; opacity:.7;">ゲーム内ルームID:</span>
+                        <span style="font-family:monospace; font-size:1.1rem; font-weight:700; letter-spacing:.15em; background:rgba(255,255,255,.12); padding:2px 10px; border-radius:6px;">{{ s.get('room_id') }}</span>
+                        <span style="font-size:.75rem; opacity:.6;">← これをゲーム内で入力</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <a href="{{ url_for('lounge.session_view', session_id=s.get('id')) }}" class="btn btn-success btn-sm">参加する</a>
+        </div>
+        {% endfor %}
+
+        {% if lounge_player and lounge_player.get('total_sessions', 0) > 0 %}
+        <div style="background:#fff; border:1px solid var(--border-color); border-radius:var(--radius); padding:1rem 1.5rem; margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <span style="font-size:1.5rem;">🎮</span>
+                <div>
+                    <div style="font-size:.8rem; color:var(--gray); margin-bottom:2px;">ラウンジ MMR</div>
+                    <div style="display:flex; align-items:baseline; gap:6px;">
+                        <span style="font-size:1.6rem; font-weight:800; color:var(--accent); font-family:monospace; line-height:1;">{{ lounge_player.get('mmr', 1000) }}</span>
+                        <span style="font-size:.85rem; color:var(--gray);">/ 最高 {{ lounge_player.get('peak_mmr', 1000) }}</span>
+                    </div>
+                </div>
+                <div style="border-left:1px solid var(--border-color); padding-left:16px; color:var(--gray); font-size:.82rem; line-height:1.8;">
+                    <div>参加セッション: <strong>{{ lounge_player.get('total_sessions', 0) }}</strong> 回</div>
+                </div>
+            </div>
+            <a href="{{ url_for('lounge.index') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-flag-checkered"></i> ラウンジへ
+            </a>
+        </div>
+        {% endif %}
+
         {% for cat, msg in get_flashed_messages(with_categories=true) %}
         <div class="alert {% if cat == 'error' %}alert-danger{% endif %}">
             <i class="fas {% if cat == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"
@@ -132,14 +186,39 @@
                         <div style="display: flex; gap: 10px; margin-top: 5px;">
                             <label
                                 style="flex: 1; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; background-color: #fff; transition: all 0.2s;">
-                                <input type="radio" name="mode" value="free" checked style="margin-right: 8px;">
+                                <input type="radio" name="mode" value="free" id="mode-free" checked style="margin-right: 8px;">
                                 <strong>自由対戦モード</strong>
                             </label>
                             <label
                                 style="flex: 1; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; background-color: #fff; transition: all 0.2s;">
-                                <input type="radio" name="mode" value="tournament" style="margin-right: 8px;">
+                                <input type="radio" name="mode" value="tournament" id="mode-tournament" style="margin-right: 8px;">
                                 <strong style="color: #4a90e2;">大会モード</strong>
                             </label>
+                        </div>
+                    </div>
+                    <!-- 大会モード専用オプション -->
+                    <div id="tournament-options" style="width:100%; display:none; background:#f8f9ff; border:1px solid #d0d8ff; border-radius:6px; padding:1rem; margin-bottom:1rem;">
+                        <p style="font-size:.8rem; font-weight:600; color:#4a90e2; margin:0 0 .75rem;">大会オプション</p>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                            <div style="flex:2; min-width:160px;">
+                                <label class="lobby-form-label">ゲームタイトル</label>
+                                <select name="game_title_id" class="form-control" id="select-game-title">
+                                    {% for g in games %}
+                                    <option value="{{ g.id }}" data-match-type="{{ g.match_type }}">{{ g.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div style="flex:1; min-width:120px;" id="bracket-format-group">
+                                <label class="lobby-form-label">対戦形式</label>
+                                <select name="bracket_format" class="form-control">
+                                    <option value="single_elimination">シングルイリミネーション</option>
+                                    <option value="round_robin">総当たり</option>
+                                </select>
+                            </div>
+                            <div style="flex:1; min-width:100px;">
+                                <label class="lobby-form-label" id="wins-label">n本先取 / レース数</label>
+                                <input type="number" name="wins_required" class="form-control" value="1" min="1" max="24">
+                            </div>
                         </div>
                     </div>
                     <div style="width: 100%; margin-top: 1rem;">
@@ -151,6 +230,7 @@
                         作成</button>
                 </form>
             </div>
+            <script src="{{ url_for('static', filename='js/dashboard_lobby.js') }}"></script>
 
             <div class="table-responsive">
                 <table class="table">
@@ -200,7 +280,112 @@
             </div>
         </div>
 
+        <!-- 称号管理カード -->
+        <div class="card" id="title-management-card">
+            <div class="card-header">
+                <h2 class="card-title">🏅 称号管理</h2>
+            </div>
+
+            <!-- 自分の称号装備セクション -->
+            <div class="card-body" style="border-bottom: 1px solid var(--border-color); padding-bottom: 1.5rem;">
+                <h3 style="font-size:0.95rem; color:var(--gray); margin-bottom:1rem;">装備中の称号</h3>
+                <div id="active-title-display" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span id="active-title-badge" class="badge badge-secondary" style="font-size:1rem; padding:6px 14px;">読込中...</span>
+                    <button class="btn btn-outline btn-sm" id="btn-change-title">称号を変更する</button>
+                </div>
+                <!-- 獲得称号一覧（折りたたみ） -->
+                <div id="player-titles-panel" style="display:none; margin-top:1rem;">
+                    <p style="font-size:0.85rem; color:var(--gray); margin-bottom:0.5rem;">獲得済みの称号から選んで装備できます</p>
+                    <div id="player-titles-grid" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+                </div>
+            </div>
+
+            <!-- 称号マスタ一覧（Staff向け） -->
+            <!-- Staff テスト: 称号付与 + ロール即時付与 -->
+            <div class="card-body" style="border-bottom:1px solid var(--border-color); padding-bottom:1.5rem;">
+                <h3 style="font-size:.9rem; font-weight:600; color:var(--gray); margin-bottom:.75rem;">🔧 Staff テスト: ロール付与確認</h3>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                    <div>
+                        <label style="font-size:.8rem; display:block; margin-bottom:4px;">対象DiscordユーザーID（省略で自分）</label>
+                        <input type="text" id="test-target-user" class="form-control" placeholder="例: 123456789012345678" style="width:220px;">
+                    </div>
+                    <div>
+                        <label style="font-size:.8rem; display:block; margin-bottom:4px;">称号</label>
+                        <select id="test-title-select" class="form-control" style="width:160px;">
+                            <option value="">読込中...</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-warning btn-sm" id="btn-staff-grant">
+                        <i class="fas fa-bolt"></i> 付与 + ロール作成
+                    </button>
+                </div>
+                <div id="staff-grant-result" style="margin-top:.75rem; font-size:.85rem; display:none;"></div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table" id="titles-table">
+                    <thead>
+                        <tr>
+                            <th width="40">ID</th>
+                            <th>称号名</th>
+                            <th width="110">解除条件</th>
+                            <th width="80">閾値</th>
+                            <th width="160">Discord ロールID</th>
+                            <th width="140">アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody id="titles-tbody">
+                        <tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--gray);">読込中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 称号編集モーダル -->
+        <div id="title-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:#fff; border-radius:var(--radius); padding:2rem; width:480px; max-width:95vw; box-shadow:0 8px 32px rgba(0,0,0,.2);">
+                <h3 id="modal-title-heading" style="margin:0 0 1.5rem;">称号を編集</h3>
+                <input type="hidden" id="modal-title-id">
+                <div style="display:flex; flex-direction:column; gap:1rem;">
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">称号名 <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="modal-name" class="form-control" placeholder="例: 金">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">説明</label>
+                        <input type="text" id="modal-description" class="form-control" placeholder="例: ラウンジランク金 達成">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">解除条件</label>
+                        <select id="modal-unlock-type" class="form-control">
+                            <option value="manual">手動付与</option>
+                            <option value="lounge_rank">ラウンジMMR帯</option>
+                            <option value="tournament_win">大会優勝回数</option>
+                        </select>
+                    </div>
+                    <div id="modal-threshold-row">
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">閾値（MMR下限 / 優勝回数）</label>
+                        <input type="number" id="modal-threshold" class="form-control" placeholder="例: 6000">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">Discord ロールID（任意）</label>
+                        <input type="text" id="modal-role-id" class="form-control" placeholder="例: 1234567890123456789">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">表示順</label>
+                        <input type="number" id="modal-order" class="form-control" value="0">
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:1.5rem; justify-content:flex-end;">
+                    <button class="btn btn-outline" id="modal-cancel">キャンセル</button>
+                    <button class="btn btn-success" id="modal-save">保存</button>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard_titles.js') }}"></script>
 </body>
 
 </html>

@@ -216,6 +216,127 @@ pub struct AdminLog {
 }
 
 // ============================================================
+// 汎用大会システム (game_titles, match_scores, point_tables)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct GameTitle {
+    pub id: i32,
+    pub name: String,
+    pub match_type: String,
+    pub max_players: i8,
+    pub score_type: String,
+    pub is_active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct MatchScore {
+    pub id: i64,
+    pub match_id: i32,
+    pub user_id: i64,
+    pub position: i8,
+    pub points: i32,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PointTable {
+    pub game_title_id: i32,
+    pub position: i8,
+    pub points: i32,
+}
+
+// ============================================================
+// 称号システム (titles, player_titles, player_active_title)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Title {
+    pub id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub unlock_type: String,
+    pub unlock_threshold: Option<i32>,
+    pub discord_role_id: Option<String>,
+    pub is_active: bool,
+    pub display_order: i32,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PlayerTitle {
+    pub id: i64,
+    pub user_id: i64,
+    pub title_id: i32,
+    pub earned_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PlayerActiveTitle {
+    pub user_id: i64,
+    pub title_id: i32,
+    pub updated_at: String,
+}
+
+/// 称号一覧取得用（称号情報 + 獲得済みフラグ）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TitleWithStatus {
+    pub id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub unlock_type: String,
+    pub unlock_threshold: Option<i32>,
+    pub discord_role_id: Option<String>,
+    pub is_active: bool,
+    pub display_order: i32,
+    pub earned: bool,
+    pub is_active_title: bool,
+}
+
+// ============================================================
+// ラウンジシステム (lounge_*)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoungePlayer {
+    pub user_id: i64,
+    pub mmr: i32,
+    pub peak_mmr: i32,
+    pub total_races: i32,
+    pub total_sessions: i32,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoungeSession {
+    pub id: i64,
+    pub room_id: String,
+    pub mode: String,
+    pub total_races: i8,
+    pub current_race: i8,
+    pub status: String,
+    pub host_id: i64,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoungeSessionFinalScore {
+    pub id: i64,
+    pub session_id: i64,
+    pub user_id: i64,
+    pub final_rank: i8,
+    pub mmr_delta: i32,
+    pub submitted_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LoungeTeam {
+    pub id: i64,
+    pub session_id: i64,
+    pub tag: String,
+}
+
+// ============================================================
 // stream_comment_reset_log テーブル
 // ============================================================
 

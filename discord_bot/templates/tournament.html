@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大会 - Awaji Empire</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tournament.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><i class="fas fa-trophy"></i> 大会</div>
+        <div class="user-menu">
+            <img src="{{ user['avatar_url'] }}" class="user-avatar" alt="">
+            <span>{{ user['name'] }}</span>
+            <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,.3);color:white;">ダッシュボード</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% if view == 'room' and room %}
+        <!-- ============ ルーム詳細ビュー ============ -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🏆 {{ room.get('title', '大会') }}</h2>
+                <span class="badge badge-primary">{{ room.get('passcode') }}</span>
+            </div>
+
+            <div style="padding:1.5rem; border-bottom:1px solid var(--border-color);">
+                <p style="color:var(--gray); margin:0;">⚠️ <strong>結果画面のスクリーンショットを必ず保存してください。</strong> 申告内容に異議が生じた場合、証拠として提出を求めることがあります。</p>
+            </div>
+
+            <!-- ランキングテーブル -->
+            <div class="table-responsive">
+                <table class="table" id="standings-table">
+                    <thead>
+                        <tr><th width="50">順位</th><th>プレイヤー</th><th width="100">合計ポイント</th></tr>
+                    </thead>
+                    <tbody id="standings-tbody">
+                        {% for s in standings %}
+                        <tr class="{{ 'standings-first' if loop.first else '' }}">
+                            <td>{{ loop.index }}位</td>
+                            <td>{{ s.get('username') or s.get('user_id') }}</td>
+                            <td>{{ s.get('total_points', 0) }}pt</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" style="text-align:center;padding:2rem;color:var(--gray);">まだ結果がありません</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- スコア申告フォーム -->
+            <div class="card-body" id="report-panel" data-passcode="{{ room.get('passcode') }}">
+                <h3 style="font-size:1rem; margin-bottom:1rem;">自分の順位を申告</h3>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <select id="report-match-id" class="form-control" style="width:160px;">
+                        <option value="">試合を選択...</option>
+                    </select>
+                    <select id="report-position" class="form-control" style="width:100px;">
+                        {% for i in range(1, 25) %}<option value="{{ i }}">{{ i }}位</option>{% endfor %}
+                    </select>
+                    <button class="btn btn-success" id="btn-report-score"><i class="fas fa-paper-plane"></i> 申告</button>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- ============ 大会一覧ビュー ============ -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🏆 開催中の大会</h2>
+                <a href="{{ url_for('lobby.create_lobby') }}" class="btn btn-success btn-sm" style="display:none;" id="btn-create-tournament">
+                    <i class="fas fa-plus"></i> 大会を作成
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr><th>大会名</th><th width="120">ゲーム</th><th width="100">合言葉</th><th width="100">アクション</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for l in lobbies %}
+                        <tr>
+                            <td><strong>{{ l.get('title','無題') }}</strong></td>
+                            <td><span class="badge badge-secondary">-</span></td>
+                            <td style="font-family:monospace;color:var(--gray);">{{ l.get('passcode') }}</td>
+                            <td>
+                                <a href="{{ url_for('tournament.room_detail', passcode=l.get('passcode')) }}" class="btn btn-primary btn-sm">入場</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" style="text-align:center;padding:3rem;color:var(--gray);">開催中の大会はありません</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/tournament.js') }}"></script>
+</body>
+</html>

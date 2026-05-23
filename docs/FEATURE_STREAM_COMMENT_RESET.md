@@ -550,22 +550,22 @@ sequenceDiagram
        No  ↓
           ▼
   _execute_reset() → 共通リセットロジックへ ─────────────┐
-                                                         │
-[フォールバック cron: 毎月21日 06:00 JST 限定]            │
-          │  tasks.loop(hours=24)                        │
-          ▼                                              │
-  now.day == 21 かつ now.hour == 06 か？                 │
-       No  → 無視（毎月20日以外はリセット対象外）          │
-       Yes ↓                                             │
-          ▼                                              │
-  _try_monthly_reset("fallback_scheduler") 呼び出し       │
-          │                                              │
-          ▼                                              │
-  当月リセット済みか？                                     │
-       Yes → 何もしない                                   │
-       No  ↓                                             │
-          ▼                                              │
-  _execute_reset() ────────────────────────────────────  ┘
+                                                       │
+[フォールバック cron: 毎月21日 06:00 JST 限定]           │
+          │  tasks.loop(hours=24)                      │
+          ▼                                            │
+  now.day == 21 かつ now.hour == 06 か？                │
+       No  → 無視（毎月20日以外はリセット対象外）         │
+       Yes ↓                                           │
+          ▼                                            │
+  _try_monthly_reset("fallback_scheduler") 呼び出し     │
+          │                                            │
+          ▼                                            │
+  当月リセット済みか？                                   │
+       Yes → 何もしない                                 │
+       No  ↓                                           │
+          ▼                                            │
+  _execute_reset() ────────────────────────────────────┘
           │
           ▼  ＜共通リセットロジック＞
   #配信コメント チャンネル取得
@@ -629,10 +629,9 @@ sequenceDiagram
           │
           ▼
   dry_run == False かつ　`管理者`がVCに在籍している。 = 配信中
-       Yes → コメントリセット中止
-              エラー ephemeral を返信して終了
-       No  ↓
-          │
+       Yes → コメントリセットフラグを保存 → 配信が終了したら処理を再開
+       No  ↓                                      │
+          ├───────────────────────────────────────┘
           ▼
   dry_run == True か？
        Yes → 対象チャンネル・overwrite プレビューを

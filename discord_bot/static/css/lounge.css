@@ -1,0 +1,218 @@
+/* =========================================
+   LOUNGE: セッション・ランキング画面
+   ========================================= */
+
+/* ---- ヘッダー ---- */
+.lounge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* ---- 2カラムグリッド ---- */
+.lounge-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+/* ---- スタンディング 1位ハイライト ---- */
+.standings-first td {
+    background-color: #fffbea;
+    font-weight: 600;
+}
+
+/* ---- ラウンジ用テーブル（min-widthをリセットして小画面対応） ---- */
+.lounge-table {
+    min-width: unset;
+    width: 100%;
+}
+
+/* ---- 一覧ビュー セッション作成フォーム ---- */
+.lounge-create-form {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+/* ---- アクションパネル内ボタン（PC） ---- */
+#action-panel .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ---- 最終順位入力行: select + button を横並び ---- */
+.final-rank-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.final-rank-row select {
+    width: 100px;
+    flex-shrink: 0;
+}
+
+.final-rank-row .btn {
+    flex: 1;
+}
+
+/* ---- 除外ボタン（申告状況リスト内） ---- */
+.exclude-btn {
+    min-width: 64px;
+    padding: 3px 10px;
+    font-size: .78rem;
+    white-space: nowrap;
+    /* タッチターゲット確保 */
+    min-height: 32px;
+}
+
+/* ============================================================
+   モバイル対応 (max-width: 640px)
+   ============================================================ */
+@media (max-width: 640px) {
+
+    /* ナビバー：ユーザー名を非表示 */
+    .user-menu .user-name {
+        display: none;
+    }
+    .user-menu {
+        gap: 8px;
+    }
+
+    /* コンテナの余白を縮小 */
+    .container {
+        padding: 0 .75rem;
+        margin: 1rem auto;
+    }
+
+    /* カードのパディングを縮小 */
+    .card {
+        padding: 1rem;
+    }
+    .card-header {
+        margin: -1rem -1rem 1rem;
+        padding: .75rem 1rem;
+    }
+
+    /* ラウンジグリッド: 1カラム */
+    .lounge-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    /* ヘッダー */
+    .lounge-header h2 {
+        font-size: 1.1rem;
+    }
+
+    /* アクションパネルのボタン: フル幅 */
+    #action-panel .btn {
+        width: 100%;
+        /* タッチターゲット: 最低 48px */
+        min-height: 48px;
+        font-size: 1rem;
+    }
+
+    /* 一覧ビューの作成フォーム: 縦並び */
+    .lounge-create-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .lounge-create-form > div {
+        width: 100% !important;
+    }
+    .lounge-create-form input,
+    .lounge-create-form select {
+        width: 100% !important;
+    }
+    .lounge-create-form .btn {
+        width: 100%;
+        min-height: 48px;
+    }
+
+    /* セッション一覧テーブル: 横スクロール許可 */
+    .lounge-sessions-table {
+        min-width: 480px;
+    }
+
+    /* 注意バナー */
+    .lounge-warning {
+        font-size: .82rem;
+        padding: .75rem;
+    }
+
+    /* ランキングテーブル: コンパクト */
+    .lounge-table th,
+    .lounge-table td {
+        padding: 8px 6px;
+        font-size: .82rem;
+    }
+
+    /* ---- 最終順位申告モーダル ---- */
+
+    /* モーダル自体のパディングを縮小 */
+    #final-report-modal-overlay > div > div:last-child,
+    #result-modal-overlay > div > div:last-child {
+        padding: 1rem;
+    }
+
+    /* select + button を縦並びに */
+    .final-rank-row {
+        flex-direction: column;
+    }
+    .final-rank-row select {
+        width: 100%;
+    }
+    .final-rank-row .btn {
+        width: 100%;
+        min-height: 48px;
+        font-size: 1rem;
+    }
+
+    /* モーダル内の終了確定ボタン */
+    #modal-btn-finish {
+        min-height: 48px;
+        font-size: 1rem;
+    }
+
+    /* 申告状況リストの除外ボタン */
+    .exclude-btn {
+        min-height: 36px;
+        min-width: 60px;
+        font-size: .8rem;
+        padding: 4px 8px;
+    }
+
+    /* 申告状況アイテム: 長い名前でも折り返す */
+    #final-submission-list > div {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    /* 結果モーダルの順位数字 */
+    #result-rank-num {
+        font-size: 2.4rem !important;
+    }
+
+    /* 結果モーダルのグリッド: 縦並び */
+    #result-modal-overlay .grid-2col {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ============================================================
+   タブレット対応 (641px ~ 900px)
+   ============================================================ */
+@media (min-width: 641px) and (max-width: 900px) {
+    .lounge-grid {
+        grid-template-columns: 220px 1fr;
+        gap: 1rem;
+    }
+}

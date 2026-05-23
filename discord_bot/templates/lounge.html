@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ラウンジ - Awaji Empire</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lounge.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand"><i class="fas fa-flag-checkered"></i> ラウンジ</div>
+        <div class="user-menu">
+            <img src="{{ user['avatar_url'] }}" class="user-avatar" alt="">
+            <span class="user-name">{{ user['name'] }}</span>
+            <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,.3);color:white;">ダッシュボード</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% if view == 'session' and lounge_session %}
+        <!-- ============ セッション進行ビュー ============ -->
+        <div class="lounge-header">
+            <div>
+                <h2 style="margin:0;">ラウンジセッション #{{ lounge_session.id }}</h2>
+                <p style="color:var(--gray); margin:4px 0 0;">
+                    モード: <strong>{{ lounge_session.mode.upper() }}</strong> &nbsp;|&nbsp;
+                    {{ lounge_session.total_races }} レース制
+                </p>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span class="badge {{ 'badge-success' if lounge_session.status == 'in_progress' else ('badge-secondary' if lounge_session.status == 'finished' else 'badge-warning') }}" id="session-status-badge">
+                    {{ {'waiting':'待機中', 'in_progress':'進行中', 'finished':'終了'}[lounge_session.status] }}
+                </span>
+            </div>
+        </div>
+
+        <div class="lounge-warning" style="background:#fff3cd; border:1px solid #ffc107; border-radius:var(--radius); padding:1rem; margin-bottom:1.25rem;">
+            📸 <strong>結果画面のスクリーンショットを必ず保存してください。</strong> 申告内容に異議が生じた場合、証拠として提出を求めることがあります。
+        </div>
+
+        <div class="lounge-grid">
+            <!-- 左: 操作パネル・参加者一覧 -->
+            <div>
+                <div class="card" id="action-panel">
+                    <div class="card-header"><h3 class="card-title">操作</h3></div>
+                    <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
+                        {% if lounge_session.status != 'finished' %}
+                        <button class="btn btn-success" id="btn-open-final-report">
+                            <i class="fas fa-paper-plane"></i> 最終順位を申告する
+                        </button>
+                        {% endif %}
+                        {% if is_host and lounge_session.status != 'finished' %}
+                        <button class="btn btn-danger" id="btn-finish-session">
+                            <i class="fas fa-stop"></i> セッション終了（確定）
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 参加者一覧 -->
+                <div class="card" style="margin-top:1rem;">
+                    <div class="card-header"><h3 class="card-title">参加者</h3></div>
+                    <div class="card-body" style="padding:0;">
+                        <table class="table lounge-table" style="margin:0;">
+                            <thead><tr><th>プレイヤー</th><th width="70" style="text-align:right;">MMR</th></tr></thead>
+                            <tbody id="members-tbody">
+                                {% for m in members %}
+                                <tr>
+                                    <td>{{ m.get('username') or m.get('user_id') }}</td>
+                                    <td style="text-align:right; font-family:monospace; color:var(--gray);">{{ m.get('mmr', 1000) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="2" style="text-align:center;color:var(--gray);">—</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右: 最終順位申告状況 -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">申告状況</h3>
+                        <button class="btn btn-sm btn-outline" id="btn-refresh-standings"><i class="fas fa-sync"></i></button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table lounge-table">
+                            <thead>
+                                <tr>
+                                    <th>プレイヤー</th>
+                                    <th width="70" style="text-align:center;">最終順位</th>
+                                    <th width="70" style="text-align:right;">MMR+</th>
+                                </tr>
+                            </thead>
+                            <tbody id="standings-tbody">
+                                {% for s in final_scores %}
+                                <tr class="{{ 'standings-first' if s.get('final_rank') == 1 else '' }}"
+                                    {% if s.get('excluded') %}style="opacity:.45;"{% endif %}>
+                                    <td>
+                                        {{ s.get('username') or s.get('user_id') }}
+                                        {% if s.get('excluded') %}<span style="font-size:.75rem;color:var(--gray);"> (除外)</span>{% endif %}
+                                    </td>
+                                    <td style="text-align:center;">
+                                        {% if s.get('submitted') %}
+                                            <strong>{{ s.get('final_rank') }}位</strong>
+                                        {% else %}
+                                            <span style="color:var(--gray);">未申告</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align:right; font-family:monospace;">
+                                        {% if s.get('mmr_delta') %}+{{ s.get('mmr_delta') }}{% else %}—{% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="3" style="text-align:center;padding:2rem;color:var(--gray);">12レース終了後に申告してください</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ 最終順位申告モーダル ============ -->
+        <div id="final-report-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:1000; align-items:center; justify-content:center; padding:1rem;">
+            <div style="background:#fff; border-radius:var(--radius); width:min(520px,95vw); max-height:92vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.3);">
+
+                <!-- ヘッダー -->
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); color:#fff; padding:1.25rem 1.5rem; border-radius:var(--radius) var(--radius) 0 0; display:flex; align-items:center; justify-content:space-between;">
+                    <div>
+                        <div style="font-size:.8rem; opacity:.7;">最終順位申告</div>
+                        <div style="font-size:1.1rem; font-weight:700;">セッション #{{ lounge_session.id }}</div>
+                    </div>
+                    <button id="final-modal-btn-close" style="background:none; border:none; color:rgba(255,255,255,.6); font-size:1.3rem; cursor:pointer;">&times;</button>
+                </div>
+
+                <div style="padding:1.25rem 1.5rem;">
+
+                    <!-- 自分の順位入力 -->
+                    <div id="final-report-input-section">
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:6px;">あなたの最終順位</label>
+                        <div class="final-rank-row">
+                            <select id="final-rank-select" class="form-control">
+                                {% for i in range(1, 25) %}
+                                <option value="{{ i }}">{{ i }}位</option>
+                                {% endfor %}
+                            </select>
+                            <button class="btn btn-success" id="btn-submit-final-rank">
+                                <i class="fas fa-paper-plane"></i> 申告する
+                            </button>
+                        </div>
+                        <div id="final-my-submitted" style="display:none; margin-top:8px; color:#28a745; font-size:.9rem; font-weight:600;">
+                            <i class="fas fa-check-circle"></i> 申告済みです
+                        </div>
+                    </div>
+
+                    <!-- 提出状況一覧 -->
+                    <div style="margin-top:1.25rem;">
+                        <div style="font-size:.85rem; font-weight:600; margin-bottom:6px; display:flex; justify-content:space-between;">
+                            <span>提出状況</span>
+                            <span id="final-submitted-count" style="color:var(--gray);"></span>
+                        </div>
+                        <div id="final-submission-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+                    </div>
+
+                    <!-- ホスト用: 終了確定 -->
+                    {% if is_host %}
+                    <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                        <p style="font-size:.82rem; color:var(--gray); margin-bottom:8px;">
+                            未申告者は MMR 対象外になります。除外したいプレイヤーは下の一覧から「除外」ボタンを押してください。
+                        </p>
+                        <button class="btn btn-danger" id="modal-btn-finish" style="width:100%;">
+                            <i class="fas fa-flag-checkered"></i> 終了確定・MMR反映
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ セッション終了・結果モーダル ============ -->
+        <div id="result-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:2000; align-items:center; justify-content:center; padding:1rem;">
+            <div style="background:#fff; border-radius:var(--radius); width:min(460px,95vw); box-shadow:0 8px 32px rgba(0,0,0,.4); overflow:hidden; text-align:center;">
+                <div id="result-header" style="background:linear-gradient(135deg,#1a1a2e,#16213e); padding:2rem 1.5rem 1.5rem;">
+                    <div id="result-trophy" style="font-size:2.5rem; margin-bottom:.5rem;">🏁</div>
+                    <div style="color:#fff; font-size:1.1rem; font-weight:700;">セッション終了！</div>
+                </div>
+                <div style="padding:1.5rem;">
+                    <!-- 最終順位 -->
+                    <div style="display:flex; align-items:baseline; justify-content:center; gap:6px; margin-bottom:.25rem;">
+                        <span id="result-rank-num" style="font-size:3rem; font-weight:800; color:var(--primary); line-height:1;">—</span>
+                        <span style="font-size:1rem; color:var(--gray);">位</span>
+                        <span id="result-total-players" style="font-size:.9rem; color:var(--gray);"></span>
+                    </div>
+                    <div style="color:var(--gray); font-size:.85rem; margin-bottom:1.25rem;">セッション最終順位</div>
+
+                    <!-- MMR増加 / 現在のMMR / ランク -->
+                    <div class="grid-2col" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:1rem;">
+                        <div style="background:#f0fdf4; border-radius:8px; padding:.85rem;">
+                            <div style="font-size:1.4rem; font-weight:700; color:#28a745;" id="result-mmr-delta">—</div>
+                            <div style="font-size:.8rem; color:var(--gray); margin-top:2px;">MMR増加</div>
+                        </div>
+                        <div style="background:#f8f9fa; border-radius:8px; padding:.85rem;">
+                            <div style="font-size:1.4rem; font-weight:700; color:var(--accent);" id="result-mmr">—</div>
+                            <div style="font-size:.8rem; color:var(--gray); margin-top:2px;">現在のMMR</div>
+                        </div>
+                    </div>
+                    <div style="background:#f0f4ff; border-radius:8px; padding:.85rem; margin-bottom:1rem;">
+                        <div style="font-size:1rem; font-weight:700; color:#3b4cca;" id="result-rank-name">—</div>
+                        <div style="font-size:.8rem; color:var(--gray); margin-top:2px;">現在のランク</div>
+                    </div>
+
+                    <!-- 優勝演出 -->
+                    <div id="result-special-msg" style="display:none; background:linear-gradient(135deg,#fff8e1,#fffde7); border:1px solid #ffc107; border-radius:8px; padding:.9rem; margin-bottom:1rem; font-size:.88rem; line-height:1.6;"></div>
+
+                    <!-- カウントダウン -->
+                    <div style="font-size:.82rem; color:var(--gray); margin-bottom:.75rem;">
+                        <span id="result-countdown">10</span>秒後に自動でダッシュボードへ戻ります
+                    </div>
+                    <button class="btn btn-primary" id="result-btn-dashboard" style="width:100%;">
+                        <i class="fas fa-home"></i> ダッシュボードへ戻る
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- ============ ラウンジ一覧ビュー ============ -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🏎️ ラウンジセッション</h2>
+                <button class="btn btn-success btn-sm" id="btn-create-session">
+                    <i class="fas fa-plus"></i> セッション作成
+                </button>
+            </div>
+            <div class="card-body" id="create-session-form" style="display:none; border-bottom:1px solid var(--border-color); padding-bottom:1.5rem;">
+                <div class="lounge-create-form">
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">モード</label>
+                        <select id="new-session-mode" class="form-control" style="width:120px;">
+                            <option value="ffa">FFA</option>
+                            <option value="2v">2v</option>
+                            <option value="3v">3v</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">レース数</label>
+                        <input type="number" id="new-session-races" class="form-control" value="12" style="width:80px;" min="1" max="24">
+                    </div>
+                    <div>
+                        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:4px;">ルームID</label>
+                        <input type="text" id="new-session-room" class="form-control" placeholder="例: ABC123" maxlength="6" style="width:140px; font-family:monospace; text-transform:uppercase; letter-spacing:.1em;">
+                        <small style="color:var(--gray); display:block; margin-top:3px;">6桁の英数字（MKWルームID）</small>
+                    </div>
+                    <button class="btn btn-success" id="btn-submit-session"><i class="fas fa-check"></i> 作成</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table lounge-sessions-table">
+                    <thead>
+                        <tr>
+                            <th>ホスト</th>
+                            <th width="80">モード</th>
+                            <th width="100">レース数</th>
+                            <th width="80">参加者</th>
+                            <th width="80">状態</th>
+                            <th width="90">アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in active_sessions %}
+                        <tr>
+                            <td><strong>{{ s.get('host_name') or s.get('host_id') }}</strong></td>
+                            <td><span class="badge badge-secondary">{{ s.get('mode', 'FFA').upper() }}</span></td>
+                            <td style="font-family:monospace;">{{ s.get('total_races', 12) }} レース</td>
+                            <td style="text-align:center;">{{ s.get('member_count', 0) }}人</td>
+                            <td>
+                                <span class="badge badge-success">進行中</span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('lounge.session_view', session_id=s.get('id')) }}" class="btn btn-primary btn-sm">入場</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align:center; padding:2.5rem; color:var(--gray);">
+                                現在開催中のセッションはありません
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const SESSION_ID = {{ lounge_session.id if lounge_session else 'null' }};
+        const IS_HOST = {{ 'true' if is_host is defined and is_host else 'false' }};
+        const SESSION_FINISHED = {{ 'true' if session_finished is defined and session_finished else 'false' }};
+        const MY_USER_ID = '{{ user["id"] }}';
+        const MEMBERS = {
+            {% if members is defined %}
+            {% for m in members %}
+            '{{ m.get("user_id") }}': '{{ m.get("username") or m.get("user_id") }}',
+            {% endfor %}
+            {% endif %}
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/lounge.js') }}?v={{ js_ver }}"></script>
+</body>
+</html>
