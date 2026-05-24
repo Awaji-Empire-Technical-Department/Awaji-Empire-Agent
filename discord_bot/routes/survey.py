@@ -23,6 +23,7 @@ from quart import (
 
 from common.survey_utils import parse_questions
 from services.bridge_client import BridgeUnavailableError
+from services.event_service import EventService
 from services.log_service import LogService
 from services.notification_service import NotificationService
 from services.survey_service import SurveyService
@@ -167,8 +168,15 @@ async def view_form(survey_id):
 
     questions = parse_questions(survey['questions'])
     existing_answers = await SurveyService.get_existing_answers(None, survey_id, user['id'])
+    event_info = await EventService.get_event_by_survey(survey_id)
 
-    return await render_template('form.html', survey=survey, questions=questions, existing_answers=existing_answers)
+    return await render_template(
+        'form.html',
+        survey=survey,
+        questions=questions,
+        existing_answers=existing_answers,
+        is_event_form=event_info is not None,
+    )
 
 
 @survey_bp.route('/submit_response', methods=['POST'])

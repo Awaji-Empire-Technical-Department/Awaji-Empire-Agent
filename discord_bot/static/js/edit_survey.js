@@ -263,3 +263,81 @@ function updateHiddenJson() {
 document.getElementById('surveyForm').addEventListener('submit', () => {
     updateHiddenJson();
 });
+
+// ============================================================
+// イベント参加フォーム設定UI
+// ============================================================
+
+(function initEventSection() {
+    const checkbox   = document.getElementById('is-event-form');
+    const section    = document.getElementById('event-settings-section');
+    const sessionList = document.getElementById('event-session-list');
+    if (!checkbox || !section) return;
+
+    let sessions = [];
+
+    checkbox.addEventListener('change', () => {
+        section.style.display = checkbox.checked ? 'block' : 'none';
+        if (checkbox.checked && sessions.length === 0) addSession();
+    });
+
+    document.getElementById('btn-add-session')?.addEventListener('click', addSession);
+
+    function addSession() {
+        const idx = sessions.length;
+        sessions.push({ name: `${idx + 1}部`, event_date: '', end_date: '', location: '', capacity: '' });
+        renderSessions();
+    }
+
+    function renderSessions() {
+        sessionList.innerHTML = '';
+        sessions.forEach((s, i) => {
+            const div = document.createElement('div');
+            div.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:10px;background:#f8f9fa;border-radius:6px;';
+            div.innerHTML = `
+                <span style="font-weight:bold;min-width:40px;">${i + 1}部</span>
+                <input type="text" placeholder="部名 (例: 1部)" value="${s.name}" style="width:80px;padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'name',this.value)">
+                <input type="datetime-local" value="${s.event_date}" style="padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'event_date',this.value)" title="開始日時">
+                <input type="datetime-local" value="${s.end_date}" style="padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'end_date',this.value)" title="終了日時（省略=開始+2時間）">
+                <input type="text" placeholder="集合場所" value="${s.location}" style="width:150px;padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'location',this.value)">
+                <input type="number" placeholder="定員（空=無制限）" value="${s.capacity}" min="1" style="width:120px;padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'capacity',this.value)">
+                <button type="button" style="background:none;border:none;color:#999;cursor:pointer;" onclick="removeSession(${i})">
+                    <i class="fas fa-times"></i>
+                </button>`;
+            sessionList.appendChild(div);
+        });
+        syncEventJson();
+    }
+
+    window.updateSession = function (i, key, val) {
+        sessions[i][key] = val;
+        syncEventJson();
+    };
+
+    window.removeSession = function (i) {
+        sessions.splice(i, 1);
+        renderSessions();
+    };
+
+    function syncEventJson() {
+        const hiddenEl = document.getElementById('eventSettingsJson');
+        if (!hiddenEl) return;
+        hiddenEl.value = JSON.stringify({
+            is_event_form: checkbox.checked,
+            fee:                  document.getElementById('event-fee')?.value || null,
+            notes:                document.getElementById('event-notes')?.value || null,
+            event_date:           document.getElementById('event-date')?.value || null,
+            end_date:             document.getElementById('event-end-date')?.value || null,
+            application_deadline: document.getElementById('event-deadline')?.value || null,
+            sessions,
+        });
+    }
+
+    // フォーム送信時に最新JSONを反映
+    document.getElementById('surveyForm').addEventListener('submit', syncEventJson, { once: false });
+})();

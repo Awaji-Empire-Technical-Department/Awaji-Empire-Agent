@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>参加確認 - {{ event['title'] }}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/event.css') }}?v={{ css_ver }}">
+</head>
+<body style="background:#eef2f5;">
+<div class="container-sm">
+
+    <!-- ステータスカード -->
+    <div class="card event-status-card {{ participant['approval'] }}">
+        <div class="event-status-icon">
+            {% if participant['approval'] == 'accepted' %}✅
+            {% elif participant['approval'] == 'rejected' %}❌
+            {% elif participant['approval'] == 'waitlist' %}⏳
+            {% else %}🔍{% endif %}
+        </div>
+        <h1 style="font-size:1.4rem; margin-bottom:.3rem;">{{ event['title'] }}</h1>
+        <p class="event-status-label {{ participant['approval'] }}">
+            {% if participant['approval'] == 'accepted' %}参加確定
+            {% elif participant['approval'] == 'rejected' %}今回はご参加いただけません
+            {% elif participant['approval'] == 'waitlist' %}補欠登録中
+            {% else %}確認中{% endif %}
+        </p>
+    </div>
+
+    <!-- 参加詳細（承認時） -->
+    {% if participant['approval'] == 'accepted' %}
+    <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-info-circle"></i> 参加詳細</h3></div>
+        <div style="padding:1rem;">
+
+            {% if assigned_session %}
+            <div class="event-detail-row">
+                <div class="event-detail-label">部</div>
+                <div style="font-weight:bold; font-size:1.05rem;">{{ assigned_session['name'] }}</div>
+            </div>
+            {% if assigned_session['event_date'] %}
+            <div class="event-detail-row">
+                <div class="event-detail-label">日時</div>
+                <div><i class="fas fa-calendar"></i> {{ assigned_session['event_date'] }}
+                    {% if assigned_session['end_date'] %} 〜 {{ assigned_session['end_date'] }}{% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% if assigned_session['location'] %}
+            <div class="event-detail-row">
+                <div class="event-detail-label">集合場所</div>
+                <div><i class="fas fa-map-marker-alt"></i> {{ assigned_session['location'] }}</div>
+            </div>
+            {% endif %}
+            {% else %}
+            {% if event['event_date'] %}
+            <div class="event-detail-row">
+                <div class="event-detail-label">日時</div>
+                <div><i class="fas fa-calendar"></i> {{ event['event_date'] }}
+                    {% if event['end_date'] %} 〜 {{ event['end_date'] }}{% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+
+            {% if event['fee'] %}
+            <div class="event-detail-row">
+                <div class="event-detail-label">参加費</div>
+                <div><i class="fas fa-yen-sign"></i> {{ event['fee'] }}円</div>
+            </div>
+            {% endif %}
+
+            {% if participant['personal_note'] %}
+            <div class="event-personal-note">
+                <i class="fas fa-comment"></i> {{ participant['personal_note'] }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- カレンダー登録 -->
+    {% if cal_urls %}
+    <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-calendar-plus"></i> カレンダーに追加</h3></div>
+        <div class="calendar-btn-group">
+            <a href="{{ cal_urls['google'] }}" target="_blank" rel="noopener"
+               class="btn btn-outline calendar-btn">
+                <i class="fab fa-google"></i> Google カレンダー
+            </a>
+            <a href="{{ cal_urls['outlook'] }}" target="_blank" rel="noopener"
+               class="btn btn-outline calendar-btn">
+                <i class="fas fa-calendar-alt"></i> Outlook
+            </a>
+            <a href="{{ url_for('event.download_ics', token=participant['access_token']) }}"
+               class="btn btn-outline calendar-btn">
+                <i class="fas fa-download"></i> .ics ダウンロード
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    {% elif participant['approval'] == 'waitlist' %}
+    <div class="card">
+        <div style="padding:1.2rem; color:var(--gray); font-size:.95rem; line-height:1.7;">
+            <p>現在補欠となっています。キャンセルが出た場合、Discord DMにてご連絡します。</p>
+            {% if event['notes'] %}<p>{{ event['notes'] }}</p>{% endif %}
+        </div>
+    </div>
+
+    {% elif participant['approval'] == 'rejected' %}
+    <div class="card">
+        <div style="padding:1.2rem; color:var(--gray); font-size:.95rem; line-height:1.7;">
+            <p>今回はご参加いただけませんでした。またの機会にぜひご参加ください。</p>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="card">
+        <div style="padding:1.2rem; color:var(--gray); font-size:.95rem;">
+            <p>主催者が参加可否を確認中です。決定次第Discord DMでお知らせします。</p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+</body>
+</html>

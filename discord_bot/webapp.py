@@ -10,6 +10,7 @@ from routes.survey import survey_bp
 from routes.lobby import lobby_bp
 from routes.tournament import tournament_bp
 from routes.lounge import lounge_bp
+from routes.event import event_bp
 from services.lobby_service import LobbyService
 from services.tournament_service import TournamentService
 from services.lounge_service import LoungeService
@@ -39,6 +40,7 @@ app.register_blueprint(survey_bp)
 app.register_blueprint(lobby_bp)
 app.register_blueprint(tournament_bp)
 app.register_blueprint(lounge_bp)
+app.register_blueprint(event_bp)
 
 # --- WebSocket プロキシ (Rust Bridge → ブラウザ) ---
 BRIDGE_WS_URL = "ws://127.0.0.1:7878/ws/hyouibana"

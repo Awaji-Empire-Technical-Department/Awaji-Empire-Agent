@@ -14,6 +14,16 @@
         <form action="{{ url_for('survey.submit_response') }}" method="POST">
             <input type="hidden" name="survey_id" value="{{ survey['id'] }}">
 
+            {% if is_event_form %}
+            <div class="card" style="border-left:4px solid #5865F2; background:#f0f1ff;">
+                <div style="padding:.8rem 1rem; display:flex; align-items:center; gap:.6rem; font-size:.9rem;">
+                    <i class="fab fa-discord" style="color:#5865F2; font-size:1.2rem;"></i>
+                    <span><strong>このフォームへの応募にはDiscordアカウントが必要です。</strong>
+                    未ログインの場合は送信できません。</span>
+                </div>
+            </div>
+            {% endif %}
+
             <div class="card" style="border-top: 6px solid var(--success); text-align:center;">
                 <h1 style="font-size:1.5rem; margin-bottom:0.5rem;">{{ survey['title'] }}</h1>
                 <p style="color:var(--gray); margin:0;">以下の質問にお答えください</p>
