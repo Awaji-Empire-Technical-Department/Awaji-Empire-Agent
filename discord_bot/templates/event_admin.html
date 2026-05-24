@@ -96,7 +96,13 @@
                 <tr id="row-{{ p['id'] }}">
                     <td style="font-weight:bold;">{{ p['username'] }}</td>
                     <td style="color:var(--gray); font-size:.85rem;">
-                        {{ p['preferred_session_ids'] or '不参加' }}
+                        {% if p['preferred_session_ids'] is none %}
+                            不参加
+                        {% elif p['preferred_session_ids'] == '[]' %}
+                            —
+                        {% else %}
+                            {{ p['preferred_session_ids'] }}
+                        {% endif %}
                     </td>
                     <td>
                         <select class="form-control select-session" style="width:auto; min-width:90px;"

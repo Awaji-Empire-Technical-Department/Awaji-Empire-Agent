@@ -314,16 +314,16 @@ pub async fn auto_assign(pool: &MySqlPool, event_id: i32) -> BridgeResult<()> {
             continue;
         }
 
+        // NULL = 不参加、"[]" = 参加(部なし)、"[1,2]" = 希望部あり
+        if p.preferred_session_ids.is_none() {
+            continue;
+        }
+
         let preferred: Vec<i32> = p
             .preferred_session_ids
             .as_deref()
             .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or_default();
-
-        // 不参加（希望なし）
-        if preferred.is_empty() {
-            continue;
-        }
 
         let mut assigned: Option<i32> = None;
 

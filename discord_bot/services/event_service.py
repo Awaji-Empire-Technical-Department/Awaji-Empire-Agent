@@ -107,7 +107,8 @@ class EventService:
         """参加者を登録し、個人確認ページ用 access_token を返す。"""
         import json as _json
         token = secrets.token_urlsafe(32)
-        preferred_json = _json.dumps(preferred_session_ids) if preferred_session_ids else None
+        # None=不参加、[]=参加(部なし)、[1,2,...]=希望部あり — None のみ NULL に変換
+        preferred_json = _json.dumps(preferred_session_ids) if preferred_session_ids is not None else None
         res = await bridge_client.request(
             "POST",
             f"/events/{event_id}/participants",
