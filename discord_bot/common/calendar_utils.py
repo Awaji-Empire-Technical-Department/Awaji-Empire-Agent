@@ -12,7 +12,7 @@ _DT_FMT_GCL = "%Y%m%dT%H%M%SZ"     # Google Calendar 形式
 def _parse_dt(dt_str: str | None) -> datetime | None:
     if not dt_str:
         return None
-    for fmt in (_DT_FMT_IN, "%Y-%m-%dT%H:%M:%S"):
+    for fmt in (_DT_FMT_IN, "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M"):
         try:
             return datetime.strptime(dt_str, fmt)
         except ValueError:

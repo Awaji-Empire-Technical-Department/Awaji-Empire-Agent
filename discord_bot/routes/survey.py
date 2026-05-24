@@ -126,12 +126,17 @@ async def save_survey():
             current_app.logger.info(f"[save_survey] existing_event={'あり' if existing_event else 'なし'}")
 
             if es.get('is_event_form'):
-                # 空文字を None に正規化（JS から "" で来る場合があるため）
+                # datetime-local 形式 "YYYY-MM-DDTHH:MM" を MySQL DATETIME 互換 "YYYY-MM-DDTHH:MM:SS" に正規化
+                def _norm_dt(v):
+                    if v and 'T' in v and v.count(':') == 1:
+                        return v + ':00'
+                    return v or None
+
                 def _clean_session(s):
                     return {
-                        'name':       s.get('name') or f"部",
-                        'event_date': s.get('event_date') or None,
-                        'end_date':   s.get('end_date') or None,
+                        'name':       s.get('name') or '部',
+                        'event_date': _norm_dt(s.get('event_date')),
+                        'end_date':   _norm_dt(s.get('end_date')),
                         'location':   s.get('location') or None,
                         'capacity':   int(s['capacity']) if s.get('capacity') not in (None, '') else None,
                     }
@@ -145,9 +150,9 @@ async def save_survey():
                         fee=fee,
                         notes=es.get('notes') or None,
                         location=es.get('location') or None,
-                        event_date=es.get('event_date') or None,
-                        end_date=es.get('end_date') or None,
-                        application_deadline=es.get('application_deadline') or None,
+                        event_date=_norm_dt(es.get('event_date')),
+                        end_date=_norm_dt(es.get('end_date')),
+                        application_deadline=_norm_dt(es.get('application_deadline')),
                         sessions=sessions,
                     )
                     current_app.logger.info(f"[save_survey] create_event result: event_id={event_id}")
@@ -161,9 +166,9 @@ async def save_survey():
                         fee=fee,
                         notes=es.get('notes') or None,
                         location=es.get('location') or None,
-                        event_date=es.get('event_date') or None,
-                        end_date=es.get('end_date') or None,
-                        application_deadline=es.get('application_deadline') or None,
+                        event_date=_norm_dt(es.get('event_date')),
+                        end_date=_norm_dt(es.get('end_date')),
+                        application_deadline=_norm_dt(es.get('application_deadline')),
                         sessions=sessions,
                     )
                     current_app.logger.info(f"[save_survey] update_event result: ok={ok}")
@@ -290,38 +295,50 @@ async def submit_response():
     response_id = await SurveyService.save_response(None, int(survey_id), u_id, u_name, answers)
 
     if response_id is not None:
-        # アンケートタイトル取得
         survey = await SurveyService.get_survey(None, int(survey_id))
         survey_title = survey['title'] if survey else "アンケート"
 
-        # DM送信
-        is_sent = await NotificationService.send_dm(
-            bot_token=DISCORD_BOT_TOKEN,
-            user_id=u_id,
-            survey_title=survey_title,
-            survey_id=int(survey_id),
-            dashboard_base_url=DASHBOARD_URL,
-        )
-        if is_sent:
-            await SurveyService.mark_dm_sent(None, response_id)
-
-        # イベントフォームの場合は参加者登録
         event_info = await EventService.get_event_by_survey(int(survey_id))
+
         if event_info:
+            # イベントフォーム: 参加者登録 → 確認URL付きDMを送信
             event = event_info.get('event', {})
-            attending = form.get('event_attending')  # "yes" or "no"
+            attending = form.get('event_attending')
             if attending == 'yes':
                 raw = form.getlist('event_preferred_sessions[]')
-                # 空リスト [] = 参加・部なし。None = 不参加。両者を区別する
                 preferred_ids = [int(v) for v in raw if v.isdigit()]
             else:
-                preferred_ids = None  # 明示的な不参加
-            await EventService.register_participant(
+                preferred_ids = None
+            token = await EventService.register_participant(
                 event_id=event['id'],
                 user_id=int(u_id),
                 response_id=response_id,
-                preferred_session_ids=preferred_ids,  # [] = 参加(部なし), None = 不参加
+                preferred_session_ids=preferred_ids,
             )
+            if token:
+                confirm_url = f"{DASHBOARD_URL}/event/confirm/{token}"
+                msg = (
+                    f"【{survey_title}】への応募を受け付けました。\n"
+                    f"応募内容の確認はこちらから:\n{confirm_url}"
+                )
+                is_sent = await NotificationService.send_dm_raw(
+                    bot_token=DISCORD_BOT_TOKEN,
+                    user_id=u_id,
+                    message=msg,
+                )
+                if is_sent:
+                    await SurveyService.mark_dm_sent(None, response_id)
+        else:
+            # 通常アンケート: 従来のDM
+            is_sent = await NotificationService.send_dm(
+                bot_token=DISCORD_BOT_TOKEN,
+                user_id=u_id,
+                survey_title=survey_title,
+                survey_id=int(survey_id),
+                dashboard_base_url=DASHBOARD_URL,
+            )
+            if is_sent:
+                await SurveyService.mark_dm_sent(None, response_id)
 
     return await render_template('submitted.html')
 
