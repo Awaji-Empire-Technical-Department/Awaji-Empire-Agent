@@ -314,6 +314,20 @@ pub async fn mark_participant_notified(
 }
 
 // ============================================================
+// 締切済みイベント一覧（スケジューラー用）
+// ============================================================
+
+/// GET /events/pending-deadline
+pub async fn list_events_past_deadline(
+    State(pool): State<MySqlPool>,
+) -> (StatusCode, Json<Value>) {
+    match event_repo::find_events_past_deadline(&pool).await {
+        Ok(events) => (StatusCode::OK, Json(json!(events))),
+        Err(e) => internal_error(e),
+    }
+}
+
+// ============================================================
 // 自動割り当て
 // ============================================================
 

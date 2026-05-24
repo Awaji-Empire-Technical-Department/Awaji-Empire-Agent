@@ -58,32 +58,45 @@
                             </div>
                         </div>
 
-                        <div style="display:flex; gap:1rem; flex-wrap:wrap;">
-                            <div class="form-group" style="flex:1; min-width:200px;">
-                                <label>開始日時 <span style="font-size:.8rem; color:var(--gray);">（部なしの場合）</span></label>
-                                <input type="datetime-local" id="event-date" class="form-control">
-                            </div>
-                            <div class="form-group" style="flex:1; min-width:200px;">
-                                <label>終了日時 <span style="font-size:.8rem; color:var(--gray);">（省略=開始+2時間）</span></label>
-                                <input type="datetime-local" id="event-end-date" class="form-control">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>集合場所 <span style="font-size:.8rem; color:var(--gray);">（部なしの場合・住所または場所名）</span></label>
-                            <input type="text" id="event-location" class="form-control" placeholder="例: ○○市民会館 大ホール / 東京都千代田区…">
-                        </div>
-
                         <div class="form-group">
                             <label>全体備考</label>
                             <textarea id="event-notes" class="form-control" rows="2" placeholder="参加者全員への共通メモ"></textarea>
                         </div>
 
-                        <div>
-                            <label style="font-weight:bold;"><i class="fas fa-layer-group"></i> 部の設定</label>
-                            <p style="font-size:.82rem; color:var(--gray); margin:.2rem 0 .6rem;">
-                                部を追加しない場合は部制なし（全員共通の日時）になります。
-                            </p>
+                        <div class="form-group">
+                            <label style="font-weight:bold;"><i class="fas fa-layer-group"></i> 部制</label>
+                            <div style="display:flex; gap:1.5rem; margin:.5rem 0;">
+                                <label style="cursor:pointer; display:flex; align-items:center; gap:.4rem;">
+                                    <input type="radio" name="session-mode" id="session-mode-none" value="none">
+                                    部制なし（全員共通）
+                                </label>
+                                <label style="cursor:pointer; display:flex; align-items:center; gap:.4rem;">
+                                    <input type="radio" name="session-mode" id="session-mode-sessions" value="sessions">
+                                    n部制
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 部制なし用: 日時・場所 -->
+                        <div id="no-session-fields" style="display:flex; flex-direction:column; gap:1rem;">
+                            <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+                                <div class="form-group" style="flex:1; min-width:200px;">
+                                    <label>開始日時</label>
+                                    <input type="datetime-local" id="event-date" class="form-control">
+                                </div>
+                                <div class="form-group" style="flex:1; min-width:200px;">
+                                    <label>終了日時 <span style="font-size:.8rem; color:var(--gray);">（省略=開始+2時間）</span></label>
+                                    <input type="datetime-local" id="event-end-date" class="form-control">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>集合場所 <span style="font-size:.8rem; color:var(--gray);">（住所または場所名）</span></label>
+                                <input type="text" id="event-location" class="form-control" placeholder="例: ○○市民会館 大ホール / 東京都千代田区…">
+                            </div>
+                        </div>
+
+                        <!-- n部制用: 部リスト -->
+                        <div id="session-fields" style="display:none;">
                             <div id="event-session-list"></div>
                             <button type="button" id="btn-add-session" class="btn btn-outline btn-sm">
                                 <i class="fas fa-plus"></i> 部を追加

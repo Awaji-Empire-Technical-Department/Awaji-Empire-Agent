@@ -5,6 +5,8 @@ import os
 import mysql.connector
 from dotenv import load_dotenv
 
+DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
+
 # .envファイルを読み込む
 load_dotenv()
 
@@ -131,6 +133,112 @@ async def on_ready():
         mass_mute_cog = bot.get_cog("MassMuteCog")
         if mass_mute_cog:
             asyncio.create_task(mass_mute_cog.execute_mute_logic("Startup/Reconnected"))
+
+    # --- 3. イベント締切スケジューラー起動 ---
+    asyncio.create_task(_event_deadline_scheduler())
+
+
+async def _event_deadline_scheduler():
+    """1分毎に締切済みイベントを処理する: auto_assign → closed → DM一斉送信。"""
+    await bot.wait_until_ready()
+    from services.event_service import EventService
+    from services.notification_service import NotificationService
+    from common.calendar_utils import build_calendar_urls
+
+    try:
+        with open('token.txt', 'r', encoding='utf-8') as f:
+            bot_token = f.read().strip()
+    except FileNotFoundError:
+        bot_token = None
+
+    while not bot.is_closed():
+        try:
+            events = await EventService.get_events_past_deadline()
+            for ev in events:
+                event_id = ev['id']
+                print(f"[deadline_scheduler] Processing event_id={event_id} title={ev['title']}")
+
+                await EventService.auto_assign(event_id)
+                await EventService.update_status(event_id, 'closed')
+
+                result   = await EventService.get_event(event_id)
+                sessions = {s['id']: s for s in result['sessions']} if result else {}
+                participants = await EventService.list_participants(event_id)
+
+                for p in participants:
+                    if p.get('notified_at'):
+                        continue
+
+                    sess = sessions.get(p.get('session_id'))
+                    confirm_url = f"{DASHBOARD_URL}/event/confirm/{p['access_token']}"
+
+                    if p['approval'] == 'accepted':
+                        if sess:
+                            cal = build_calendar_urls(
+                                title=f"{ev['title']} {sess['name']}",
+                                start_str=sess.get('event_date'),
+                                end_str=sess.get('end_date'),
+                                location=sess.get('location'),
+                            )
+                            lines = [
+                                f"【{ev['title']}】参加確定のお知らせ",
+                                '━━━━━━━━━━━━━━━',
+                                f"✅ {sess['name']} 参加確定",
+                            ]
+                            if sess.get('event_date'):
+                                lines.append(f"📅 {sess['event_date']}")
+                            if sess.get('location'):
+                                lines.append(f"📍 {sess['location']}")
+                        else:
+                            cal = build_calendar_urls(
+                                title=ev['title'],
+                                start_str=ev.get('event_date'),
+                                end_str=ev.get('end_date'),
+                                location=ev.get('location'),
+                            )
+                            lines = [
+                                f"【{ev['title']}】参加確定のお知らせ",
+                                '━━━━━━━━━━━━━━━',
+                                '✅ 参加確定',
+                            ]
+                            if ev.get('event_date'):
+                                lines.append(f"📅 {ev['event_date']}")
+                            if ev.get('location'):
+                                lines.append(f"📍 {ev['location']}")
+                        if ev.get('fee'):
+                            lines.append(f"💴 参加費: {ev['fee']}円")
+                        lines += [
+                            '',
+                            '📆 カレンダーに追加:',
+                            f"・Google: {cal['google']}",
+                            f"・Outlook: {cal['outlook']}",
+                            '━━━━━━━━━━━━━━━',
+                            f'詳細確認: {confirm_url}',
+                        ]
+                        message = '\n'.join(lines)
+
+                    elif p['approval'] in ('rejected', 'waitlist'):
+                        message = (
+                            f"【{ev['title']}】参加について\n"
+                            "申し訳ございませんが、今回は参加をお断りさせていただきます。\n"
+                            "またの機会にぜひご参加ください。"
+                        )
+                    else:
+                        continue
+
+                    if bot_token:
+                        ok = await NotificationService.send_dm_raw(
+                            bot_token=bot_token,
+                            user_id=str(p['user_id']),
+                            message=message,
+                        )
+                        if ok:
+                            await EventService.mark_notified(p['id'])
+
+        except Exception as e:
+            print(f"[deadline_scheduler] error: {e}")
+
+        await asyncio.sleep(60)
 
 
 if __name__ == '__main__':
