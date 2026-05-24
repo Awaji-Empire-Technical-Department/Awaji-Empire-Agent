@@ -316,6 +316,11 @@ async def view_results(survey_id):
         if not survey or str(survey['owner_id']) != str(user['id']):
             return "Forbidden", 403
 
+        # イベントフォームの場合はイベント管理画面へリダイレクト
+        event_info = await EventService.get_event_by_survey(survey_id)
+        if event_info:
+            return redirect(url_for('event.admin', event_id=event_info['event']['id']))
+
         responses = await SurveyService.get_responses(None, survey_id)
     except BridgeUnavailableError:
         return await render_template('maintenance.html'), 503
