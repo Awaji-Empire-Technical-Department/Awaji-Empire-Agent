@@ -20,6 +20,9 @@ class EventService:
         fee: Optional[int] = None,
         notes: Optional[str] = None,
         location: Optional[str] = None,
+        event_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        application_deadline: Optional[str] = None,
         sessions: Optional[List[Dict[str, Any]]] = None,
     ) -> Optional[int]:
         """イベントを作成し、event_id を返す。"""
@@ -32,6 +35,9 @@ class EventService:
                 "fee": fee,
                 "notes": notes,
                 "location": location,
+                "event_date": event_date,
+                "end_date": end_date,
+                "application_deadline": application_deadline,
                 "sessions": sessions or [],
             },
         )
