@@ -126,7 +126,16 @@ async def save_survey():
             current_app.logger.info(f"[save_survey] existing_event={'あり' if existing_event else 'なし'}")
 
             if es.get('is_event_form'):
-                sessions = es.get('sessions') or []
+                # 空文字を None に正規化（JS から "" で来る場合があるため）
+                def _clean_session(s):
+                    return {
+                        'name':       s.get('name') or f"部",
+                        'event_date': s.get('event_date') or None,
+                        'end_date':   s.get('end_date') or None,
+                        'location':   s.get('location') or None,
+                        'capacity':   int(s['capacity']) if s.get('capacity') not in (None, '') else None,
+                    }
+                sessions = [_clean_session(s) for s in (es.get('sessions') or [])]
                 fee_raw = es.get('fee')
                 fee = int(fee_raw) if fee_raw else None
                 if existing_event is None:
