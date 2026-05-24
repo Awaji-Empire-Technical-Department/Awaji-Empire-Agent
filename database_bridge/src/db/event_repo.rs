@@ -215,6 +215,23 @@ pub async fn upsert_participant(
     Ok(result.last_insert_id() as i32)
 }
 
+pub async fn find_participant_by_user(
+    pool: &MySqlPool,
+    event_id: i32,
+    user_id: i64,
+) -> BridgeResult<Option<EventParticipant>> {
+    Ok(sqlx::query_as::<_, EventParticipant>(
+        "SELECT id, event_id, user_id, response_id, session_id, \
+         preferred_session_ids, approval, personal_note, access_token, \
+         CAST(notified_at AS CHAR) as notified_at \
+         FROM event_participants WHERE event_id = ? AND user_id = ?",
+    )
+    .bind(event_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
 pub async fn find_participants_by_event(
     pool: &MySqlPool,
     event_id: i32,

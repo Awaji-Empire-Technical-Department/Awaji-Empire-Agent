@@ -230,12 +230,32 @@ async def view_form(survey_id):
     existing_answers = await SurveyService.get_existing_answers(None, survey_id, user['id'])
     event_info = await EventService.get_event_by_survey(survey_id)
 
+    prev_attending = ''
+    prev_preferred = []
+    if event_info:
+        my_participation = await EventService.get_my_participation(
+            event_id=event_info['event']['id'],
+            user_id=int(user['id']),
+        )
+        if my_participation:
+            raw_pref = my_participation.get('preferred_session_ids')
+            if raw_pref is not None:
+                prev_attending = 'yes'
+                try:
+                    prev_preferred = json.loads(raw_pref) if isinstance(raw_pref, str) else raw_pref
+                except (json.JSONDecodeError, TypeError):
+                    prev_preferred = []
+            else:
+                prev_attending = 'no'
+
     return await render_template(
         'form.html',
         survey=survey,
         questions=questions,
         existing_answers=existing_answers,
         event_info=event_info,
+        prev_attending=prev_attending,
+        prev_preferred=prev_preferred,
     )
 
 
