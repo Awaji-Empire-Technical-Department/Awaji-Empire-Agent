@@ -325,6 +325,12 @@ pub async fn auto_assign(pool: &MySqlPool, event_id: i32) -> BridgeResult<()> {
             .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or_default();
 
+        // 部なしイベント: 参加意思あり(preferred_session_ids not null)なら即 accepted
+        if sessions.is_empty() {
+            update_participant_approval(pool, p.id, "accepted", None, None).await?;
+            continue;
+        }
+
         let mut assigned: Option<i32> = None;
 
         // 希望順に空き確認
@@ -340,8 +346,8 @@ pub async fn auto_assign(pool: &MySqlPool, event_id: i32) -> BridgeResult<()> {
             }
         }
 
-        // 希望部が全滅なら空き部を探す（部制あり）
-        if assigned.is_none() && !sessions.is_empty() {
+        // 希望部が全滅なら空き部を探す
+        if assigned.is_none() {
             for sess in &sessions {
                 let used = *counts.get(&sess.id).unwrap_or(&0);
                 let has_space = sess.capacity.map_or(true, |cap| used < cap);
