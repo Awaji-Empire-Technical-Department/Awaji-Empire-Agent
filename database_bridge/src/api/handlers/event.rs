@@ -125,6 +125,69 @@ pub async fn get_event_by_survey(
 }
 
 // ============================================================
+// イベント更新 (PUT /events/:id)
+// ============================================================
+
+#[derive(Deserialize)]
+pub struct UpdateEventRequest {
+    pub title: String,
+    pub fee: Option<i32>,
+    pub notes: Option<String>,
+    pub location: Option<String>,
+    pub event_date: Option<String>,
+    pub end_date: Option<String>,
+    pub application_deadline: Option<String>,
+    pub sessions: Option<Vec<CreateSessionRequest>>,
+}
+
+/// PUT /events/:id
+pub async fn update_event(
+    State(pool): State<MySqlPool>,
+    Path(event_id): Path<i32>,
+    Json(payload): Json<UpdateEventRequest>,
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = event_repo::update_event(
+        &pool,
+        event_id,
+        &payload.title,
+        payload.fee,
+        payload.notes.as_deref(),
+        payload.location.as_deref(),
+        payload.event_date.as_deref(),
+        payload.end_date.as_deref(),
+        payload.application_deadline.as_deref(),
+    )
+    .await
+    {
+        return internal_error(e);
+    }
+
+    // 部を全削除して再挿入
+    if let Err(e) = event_repo::delete_sessions_by_event(&pool, event_id).await {
+        return internal_error(e);
+    }
+    if let Some(sessions) = payload.sessions {
+        for s in sessions {
+            if let Err(e) = event_repo::insert_session(
+                &pool,
+                event_id,
+                &s.name,
+                s.event_date.as_deref(),
+                s.end_date.as_deref(),
+                s.location.as_deref(),
+                s.capacity,
+            )
+            .await
+            {
+                return internal_error(e);
+            }
+        }
+    }
+
+    (StatusCode::OK, Json(json!({"status": "ok"})))
+}
+
+// ============================================================
 // イベントステータス更新
 // ============================================================
 

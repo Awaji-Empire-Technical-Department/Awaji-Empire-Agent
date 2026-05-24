@@ -84,7 +84,8 @@ async def edit_survey(survey_id):
         return "Forbidden", 403
 
     questions = parse_questions(survey['questions'])
-    return await render_template('edit.html', user=user, survey=survey, questions=questions)
+    event_info = await EventService.get_event_by_survey(survey_id)
+    return await render_template('edit.html', user=user, survey=survey, questions=questions, event_info=event_info)
 
 
 @survey_bp.route('/save_survey', methods=['POST'])
@@ -97,6 +98,7 @@ async def save_survey():
     sid = form.get('survey_id')
     title = form.get('title')
     q_json = form.get('questions_json')
+    event_settings_raw = form.get('event_settings_json', '')
 
     try:
         # オーナーチェック
@@ -108,6 +110,45 @@ async def save_survey():
         if not success:
             return "Error", 500
         await LogService.log_operation(None, user['id'], user['name'], "UPDATE", f"ID:{sid} を更新")
+
+        # イベント設定の保存
+        if event_settings_raw:
+            try:
+                es = json.loads(event_settings_raw)
+            except (json.JSONDecodeError, ValueError):
+                es = {}
+
+            existing_event = await EventService.get_event_by_survey(int(sid))
+
+            if es.get('is_event_form'):
+                sessions = es.get('sessions') or []
+                fee_raw = es.get('fee')
+                fee = int(fee_raw) if fee_raw else None
+                if existing_event is None:
+                    await EventService.create_event(
+                        survey_id=int(sid),
+                        title=title,
+                        fee=fee,
+                        notes=es.get('notes') or None,
+                        location=es.get('location') or None,
+                        event_date=es.get('event_date') or None,
+                        end_date=es.get('end_date') or None,
+                        application_deadline=es.get('application_deadline') or None,
+                        sessions=sessions,
+                    )
+                else:
+                    await EventService.update_event(
+                        event_id=existing_event['event']['id'],
+                        title=title,
+                        fee=fee,
+                        notes=es.get('notes') or None,
+                        location=es.get('location') or None,
+                        event_date=es.get('event_date') or None,
+                        end_date=es.get('end_date') or None,
+                        application_deadline=es.get('application_deadline') or None,
+                        sessions=sessions,
+                    )
+
     except Exception as e:
         return f"Error: {e}", 500
 

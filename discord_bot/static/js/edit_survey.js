@@ -276,9 +276,39 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
 
     let sessions = [];
 
+    // 既存のイベント設定を復元
+    const existingJson = checkbox.dataset.eventInfo;
+    if (existingJson) {
+        try {
+            const existing = JSON.parse(existingJson);
+            const ev = existing.event || {};
+            const evSessions = existing.sessions || [];
+
+            if (document.getElementById('event-fee'))      document.getElementById('event-fee').value      = ev.fee ?? '';
+            if (document.getElementById('event-deadline')) document.getElementById('event-deadline').value = ev.application_deadline ?? '';
+            if (document.getElementById('event-date'))     document.getElementById('event-date').value     = ev.event_date ?? '';
+            if (document.getElementById('event-end-date')) document.getElementById('event-end-date').value = ev.end_date ?? '';
+            if (document.getElementById('event-location')) document.getElementById('event-location').value = ev.location ?? '';
+            if (document.getElementById('event-notes'))    document.getElementById('event-notes').value    = ev.notes ?? '';
+
+            sessions = evSessions.map(s => ({
+                name: s.name || '',
+                event_date: s.event_date || '',
+                end_date: s.end_date || '',
+                location: s.location || '',
+                capacity: s.capacity ?? '',
+            }));
+
+            section.style.display = 'block';
+            renderSessions();
+            syncEventJson();
+        } catch (_) {}
+    }
+
     checkbox.addEventListener('change', () => {
         section.style.display = checkbox.checked ? 'block' : 'none';
         if (checkbox.checked && sessions.length === 0) addSession();
+        syncEventJson();
     });
 
     document.getElementById('btn-add-session')?.addEventListener('click', addSession);

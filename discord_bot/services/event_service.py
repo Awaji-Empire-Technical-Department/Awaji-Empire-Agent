@@ -51,6 +51,35 @@ class EventService:
         return res
 
     @staticmethod
+    async def update_event(
+        event_id: int,
+        title: str,
+        fee: Optional[int] = None,
+        notes: Optional[str] = None,
+        location: Optional[str] = None,
+        event_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        application_deadline: Optional[str] = None,
+        sessions: Optional[List[Dict[str, Any]]] = None,
+    ) -> bool:
+        """イベント情報（部含む）を上書き更新する。"""
+        res = await bridge_client.request(
+            "PUT",
+            f"/events/{event_id}",
+            json={
+                "title": title,
+                "fee": fee,
+                "notes": notes,
+                "location": location,
+                "event_date": event_date,
+                "end_date": end_date,
+                "application_deadline": application_deadline,
+                "sessions": sessions or [],
+            },
+        )
+        return res is not None and res.get("status") == "ok"
+
+    @staticmethod
     async def update_status(event_id: int, status: str) -> bool:
         """イベントステータスを更新する。status: draft|open|closed"""
         res = await bridge_client.request(

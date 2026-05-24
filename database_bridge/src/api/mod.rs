@@ -105,7 +105,7 @@ fn lounge_routes() -> Router<AppState> {
 fn event_routes() -> Router<AppState> {
     Router::new()
         .route("/", post(handlers::event::create_event))
-        .route("/{id}", get(handlers::event::get_event))
+        .route("/{id}", get(handlers::event::get_event).put(handlers::event::update_event))
         .route("/{id}/status", patch(handlers::event::update_event_status))
         .route("/{id}/participants", post(handlers::event::upsert_participant).get(handlers::event::list_participants))
         .route("/{id}/auto-assign", post(handlers::event::auto_assign))
