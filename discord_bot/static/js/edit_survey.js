@@ -269,12 +269,27 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
 // ============================================================
 
 (function initEventSection() {
-    const checkbox   = document.getElementById('is-event-form');
-    const section    = document.getElementById('event-settings-section');
+    const checkbox    = document.getElementById('is-event-form');
+    const section     = document.getElementById('event-settings-section');
     const sessionList = document.getElementById('event-session-list');
     if (!checkbox || !section) return;
 
+    // 'none' = 部制なし, 'sessions' = n部制
+    let sessionMode = 'none';
     let sessions = [];
+
+    function applySessionMode(mode) {
+        sessionMode = mode;
+        const radioNone     = document.getElementById('session-mode-none');
+        const radioSessions = document.getElementById('session-mode-sessions');
+        if (radioNone)     radioNone.checked     = (mode === 'none');
+        if (radioSessions) radioSessions.checked = (mode === 'sessions');
+        const noFields  = document.getElementById('no-session-fields');
+        const sesFields = document.getElementById('session-fields');
+        if (noFields)  noFields.style.display  = (mode === 'none')     ? '' : 'none';
+        if (sesFields) sesFields.style.display = (mode === 'sessions') ? '' : 'none';
+        syncEventJson();
+    }
 
     // 既存のイベント設定を復元
     const existingJson = checkbox.dataset.eventInfo;
@@ -300,14 +315,24 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
             }));
 
             section.style.display = 'block';
+            applySessionMode(sessions.length > 0 ? 'sessions' : 'none');
             renderSessions();
-            syncEventJson();
         } catch (_) {}
+    } else {
+        applySessionMode('none');
     }
+
+    // 部制ラジオ切り替え
+    document.querySelectorAll('input[name="session-mode"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.value === 'sessions' && sessions.length === 0) addSession();
+            applySessionMode(radio.value);
+            renderSessions();
+        });
+    });
 
     checkbox.addEventListener('change', () => {
         section.style.display = checkbox.checked ? 'block' : 'none';
-        if (checkbox.checked && sessions.length === 0) addSession();
         syncEventJson();
     });
 
@@ -320,6 +345,7 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
     }
 
     function renderSessions() {
+        if (!sessionList) return;
         sessionList.innerHTML = '';
         sessions.forEach((s, i) => {
             const div = document.createElement('div');
@@ -360,12 +386,12 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
         hiddenEl.value = JSON.stringify({
             is_event_form: checkbox.checked,
             fee:                  document.getElementById('event-fee')?.value || null,
-            location:             document.getElementById('event-location')?.value || null,
+            location:             sessionMode === 'none' ? (document.getElementById('event-location')?.value || null) : null,
             notes:                document.getElementById('event-notes')?.value || null,
-            event_date:           document.getElementById('event-date')?.value || null,
-            end_date:             document.getElementById('event-end-date')?.value || null,
+            event_date:           sessionMode === 'none' ? (document.getElementById('event-date')?.value || null) : null,
+            end_date:             sessionMode === 'none' ? (document.getElementById('event-end-date')?.value || null) : null,
             application_deadline: document.getElementById('event-deadline')?.value || null,
-            sessions,
+            sessions: sessionMode === 'sessions' ? sessions : [],
         });
     }
 

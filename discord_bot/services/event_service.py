@@ -179,3 +179,9 @@ class EventService:
         """希望部優先の自動割り当てを実行する。"""
         res = await bridge_client.request("POST", f"/events/{event_id}/auto-assign")
         return res is not None and res.get("status") == "ok"
+
+    @staticmethod
+    async def get_events_past_deadline() -> List[Dict[str, Any]]:
+        """締切を過ぎた draft/open イベントの一覧を返す（スケジューラー用）。"""
+        res = await bridge_client.request("GET", "/events/pending-deadline")
+        return res if isinstance(res, list) else []

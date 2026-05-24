@@ -111,6 +111,7 @@ fn event_routes() -> Router<AppState> {
         .route("/{id}/participants/by-user/{user_id}", get(handlers::event::get_participant_by_user))
         .route("/{id}/auto-assign", post(handlers::event::auto_assign))
         .route("/by-survey/{survey_id}", get(handlers::event::get_event_by_survey))
+        .route("/pending-deadline", get(handlers::event::list_events_past_deadline))
         .route("/participant/{participant_id}", patch(handlers::event::update_participant))
         .route("/participant/{participant_id}/notified", patch(handlers::event::mark_participant_notified))
         .route("/participant/by-token/{token}", get(handlers::event::get_participant_by_token))

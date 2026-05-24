@@ -107,6 +107,15 @@ pub async fn update_event_status(pool: &MySqlPool, event_id: i32, status: &str) 
     Ok(())
 }
 
+/// 締切を過ぎた draft/open イベントを返す（スケジューラー用）。
+pub async fn find_events_past_deadline(pool: &MySqlPool) -> BridgeResult<Vec<Event>> {
+    Ok(sqlx::query_as::<_, Event>(&format!(
+        "{EVENT_SELECT} WHERE status IN ('draft','open') AND application_deadline IS NOT NULL AND application_deadline <= NOW()"
+    ))
+    .fetch_all(pool)
+    .await?)
+}
+
 // ============================================================
 // event_sessions
 // ============================================================
