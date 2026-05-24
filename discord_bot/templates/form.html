@@ -75,6 +75,8 @@
             {% if event_info %}
             {% set ev_sessions = event_info.sessions %}
 
+            <!-- 既存参加情報から復元 (prev_attending/prev_preferred はルートで設定) -->
+
             <!-- 固定質問: 参加しますか？ -->
             <div class="card q-panel" id="p_event_attend">
                 <label style="margin-bottom:1rem; font-size:1.05rem;">
@@ -82,25 +84,28 @@
                     <span class="badge badge-danger" style="background:var(--danger); font-size:0.6rem; vertical-align:middle; margin-left:5px;">必須</span>
                 </label>
                 <label class="option-item">
-                    <input type="radio" name="event_attending" value="yes" required onchange="toggleSessionSelect()">
+                    <input type="radio" name="event_attending" value="yes" required onchange="toggleSessionSelect()"
+                        {% if prev_attending == 'yes' %}checked{% endif %}>
                     <span>はい</span>
                 </label>
                 <label class="option-item">
-                    <input type="radio" name="event_attending" value="no" required onchange="toggleSessionSelect()">
+                    <input type="radio" name="event_attending" value="no" required onchange="toggleSessionSelect()"
+                        {% if prev_attending == 'no' %}checked{% endif %}>
                     <span>いいえ</span>
                 </label>
             </div>
 
             <!-- 固定質問: 希望部（部制ありの場合のみ表示） -->
             {% if ev_sessions %}
-            <div class="card q-panel hidden" id="p_event_sessions">
+            <div class="card q-panel {% if prev_attending != 'yes' %}hidden{% endif %}" id="p_event_sessions">
                 <label style="margin-bottom:1rem; font-size:1.05rem;">
                     <span style="color:var(--success);">Q.</span> 希望する部を選んでください（複数選択可・上から優先順）
                     <span class="badge badge-danger" style="background:var(--danger); font-size:0.6rem; vertical-align:middle; margin-left:5px;">必須</span>
                 </label>
                 {% for s in ev_sessions %}
                 <label class="option-item">
-                    <input type="checkbox" name="event_preferred_sessions[]" value="{{ s.id }}" class="event-session-chk">
+                    <input type="checkbox" name="event_preferred_sessions[]" value="{{ s.id }}" class="event-session-chk"
+                        {% if s.id in prev_preferred %}checked{% endif %}>
                     <span>{{ s.name }}{% if s.event_date %} ({{ s.event_date }}){% endif %}{% if s.capacity %} ／ 定員{{ s.capacity }}名{% endif %}</span>
                 </label>
                 {% endfor %}

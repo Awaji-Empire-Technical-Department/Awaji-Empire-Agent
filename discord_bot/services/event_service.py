@@ -121,6 +121,14 @@ class EventService:
         return token if res and res.get("status") == "ok" else None
 
     @staticmethod
+    async def get_my_participation(event_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+        """ユーザー自身の参加レコードを取得する。未登録なら None。"""
+        res = await bridge_client.request("GET", f"/events/{event_id}/participants/by-user/{user_id}")
+        if res and res.get("status") == "not_found":
+            return None
+        return res
+
+    @staticmethod
     async def list_participants(event_id: int) -> List[Dict[str, Any]]:
         """イベントの参加者一覧を取得する。"""
         res = await bridge_client.request("GET", f"/events/{event_id}/participants")

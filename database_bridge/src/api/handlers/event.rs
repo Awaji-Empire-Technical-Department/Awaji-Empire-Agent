@@ -241,6 +241,18 @@ pub async fn upsert_participant(
     }
 }
 
+/// GET /events/:id/participants/by-user/:user_id
+pub async fn get_participant_by_user(
+    State(pool): State<MySqlPool>,
+    Path((event_id, user_id)): Path<(i32, i64)>,
+) -> (StatusCode, Json<Value>) {
+    match event_repo::find_participant_by_user(&pool, event_id, user_id).await {
+        Ok(Some(p)) => (StatusCode::OK, Json(json!(p))),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"status": "not_found"}))),
+        Err(e) => internal_error(e),
+    }
+}
+
 /// GET /events/:id/participants
 pub async fn list_participants(
     State(pool): State<MySqlPool>,
