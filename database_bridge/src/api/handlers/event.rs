@@ -21,6 +21,8 @@ pub struct CreateEventRequest {
     pub title: String,
     pub fee: Option<i32>,
     pub notes: Option<String>,
+    /// 部制なし用の集合場所（住所・場所名）
+    pub location: Option<String>,
     /// 部制なし用の開始日時
     pub event_date: Option<String>,
     /// 部制なし用の終了日時（None → event_date + 2時間でカレンダーURL生成）
@@ -51,6 +53,7 @@ pub async fn create_event(
         &payload.title,
         payload.fee,
         payload.notes.as_deref(),
+        payload.location.as_deref(),
         payload.event_date.as_deref(),
         payload.end_date.as_deref(),
         payload.application_deadline.as_deref(),

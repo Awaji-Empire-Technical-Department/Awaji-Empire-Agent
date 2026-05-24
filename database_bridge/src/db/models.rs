@@ -363,6 +363,8 @@ pub struct Event {
     pub title: String,
     pub fee: Option<i32>,
     pub notes: Option<String>,
+    /// 部制なし用の集合場所（住所・場所名）
+    pub location: Option<String>,
     pub status: String,
     /// 部制なし用の開始日時
     pub event_date: Option<String>,

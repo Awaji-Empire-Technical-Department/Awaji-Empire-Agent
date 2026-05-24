@@ -330,6 +330,7 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
         hiddenEl.value = JSON.stringify({
             is_event_form: checkbox.checked,
             fee:                  document.getElementById('event-fee')?.value || null,
+            location:             document.getElementById('event-location')?.value || null,
             notes:                document.getElementById('event-notes')?.value || null,
             event_date:           document.getElementById('event-date')?.value || null,
             end_date:             document.getElementById('event-end-date')?.value || null,

@@ -17,19 +17,21 @@ pub async fn insert_event(
     title: &str,
     fee: Option<i32>,
     notes: Option<&str>,
+    location: Option<&str>,
     event_date: Option<&str>,
     end_date: Option<&str>,
     application_deadline: Option<&str>,
 ) -> BridgeResult<i32> {
     let result = sqlx::query(
         "INSERT INTO events \
-         (survey_id, title, fee, notes, status, event_date, end_date, application_deadline, created_at) \
-         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, NOW())",
+         (survey_id, title, fee, notes, location, status, event_date, end_date, application_deadline, created_at) \
+         VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, NOW())",
     )
     .bind(survey_id)
     .bind(title)
     .bind(fee)
     .bind(notes)
+    .bind(location)
     .bind(event_date)
     .bind(end_date)
     .bind(application_deadline)
@@ -44,7 +46,7 @@ pub async fn insert_event(
 }
 
 const EVENT_SELECT: &str =
-    "SELECT id, survey_id, title, fee, notes, status, \
+    "SELECT id, survey_id, title, fee, notes, location, status, \
      CAST(event_date AS CHAR) as event_date, \
      CAST(end_date AS CHAR) as end_date, \
      CAST(application_deadline AS CHAR) as application_deadline, \

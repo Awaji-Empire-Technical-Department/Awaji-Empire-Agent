@@ -42,6 +42,7 @@ async def api_create_event():
     title     = data.get('title', '無題のイベント')
     fee       = data.get('fee')
     notes     = data.get('notes')
+    location  = data.get('location')
     sessions  = data.get('sessions', [])
 
     # オーナー確認
@@ -54,6 +55,7 @@ async def api_create_event():
         title=title,
         fee=int(fee) if fee is not None else None,
         notes=notes,
+        location=location or None,
         sessions=sessions,
     )
     if not event_id:
@@ -233,7 +235,7 @@ async def api_notify(event_id: int):
                     title=event['title'],
                     start_str=event.get('event_date'),
                     end_str=event.get('end_date'),
-                    location=None,
+                    location=event.get('location'),
                 )
             if event.get('fee'):
                 lines.append(f"💴 参加費: {event['fee']}円")
@@ -308,6 +310,7 @@ async def confirm(token: str):
                 title=event['title'],
                 start_str=event.get('event_date'),
                 end_str=event.get('end_date'),
+                location=event.get('location'),
             )
 
     return await render_template(
@@ -345,6 +348,7 @@ async def download_ics(token: str):
             title=event['title'],
             start_str=event.get('event_date'),
             end_str=event.get('end_date'),
+            location=event.get('location'),
         )
 
     return Response(

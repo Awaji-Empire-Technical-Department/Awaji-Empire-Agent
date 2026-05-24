@@ -62,6 +62,12 @@
                 </div>
             </div>
             {% endif %}
+            {% if event['location'] %}
+            <div class="event-detail-row">
+                <div class="event-detail-label">集合場所</div>
+                <div><i class="fas fa-map-marker-alt"></i> {{ event['location'] }}</div>
+            </div>
+            {% endif %}
             {% endif %}
 
             {% if event['fee'] %}
