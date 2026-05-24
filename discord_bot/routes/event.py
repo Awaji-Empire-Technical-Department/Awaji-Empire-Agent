@@ -116,12 +116,20 @@ async def admin(event_id: int):
 
         participants = await EventService.list_participants(event_id)
 
-        # survey responses から username を補完
-        responses = await SurveyService.get_responses(None, event['survey_id'])
-        resp_map  = {str(r['id']): r.get('user_name', '') for r in responses}
+        # survey responses から username と回答内容を補完
+        survey      = await SurveyService.get_survey(None, event['survey_id'])
+        responses   = await SurveyService.get_responses(None, event['survey_id'])
+        resp_map    = {str(r['id']): r for r in responses}
         for p in participants:
+            resp = resp_map.get(str(p.get('response_id', '')), {})
             if not p.get('username'):
-                p['username'] = resp_map.get(str(p.get('response_id', '')), f"ID:{p['user_id']}")
+                p['username'] = resp.get('user_name', f"ID:{p['user_id']}")
+            import json as _json
+            raw_answers = resp.get('answers', '{}')
+            p['answers'] = _json.loads(raw_answers) if isinstance(raw_answers, str) else (raw_answers or {})
+
+        from common.survey_utils import parse_questions
+        survey_questions = parse_questions(survey['questions']) if survey else []
 
         # 部ごとの残席計算
         session_stats = {}
@@ -143,6 +151,7 @@ async def admin(event_id: int):
         sessions=sessions,
         participants=participants,
         session_stats=session_stats,
+        survey_questions=survey_questions,
     )
 
 

@@ -320,7 +320,7 @@ async def submit_response():
                 event_id=event['id'],
                 user_id=int(u_id),
                 response_id=response_id,
-                preferred_session_ids=preferred_ids if preferred_ids else None,
+                preferred_session_ids=preferred_ids,  # [] = 参加(部なし), None = 不参加
             )
 
     return await render_template('submitted.html')

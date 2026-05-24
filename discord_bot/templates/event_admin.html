@@ -86,6 +86,7 @@
                         <th>希望</th>
                         <th>割り当て部</th>
                         <th>状態</th>
+                        {% for q in survey_questions %}<th style="font-size:.8rem; white-space:nowrap;">{{ q.text }}</th>{% endfor %}
                         <th>個人メモ</th>
                         <th>通知</th>
                         <th></th>
@@ -122,6 +123,12 @@
                             <option value="waitlist" {% if p['approval']=='waitlist' %}selected{% endif %}>補欠</option>
                         </select>
                     </td>
+                    {% for q in survey_questions %}
+                    {% set ans = p['answers'].get(loop.index0 | string, '') %}
+                    <td style="font-size:.85rem; color:var(--gray);">
+                        {% if ans is iterable and ans is not string %}{{ ans | join(', ') }}{% else %}{{ ans }}{% endif %}
+                    </td>
+                    {% endfor %}
                     <td>
                         <input type="text" class="form-control" style="min-width:120px; width:160px; font-size:.85rem;"
                                value="{{ p['personal_note'] or '' }}"
@@ -142,7 +149,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--gray);">応募者はいません</td></tr>
+                <tr><td colspan="{{ 7 + survey_questions | length }}" style="text-align:center; padding:2rem; color:var(--gray);">応募者はいません</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
