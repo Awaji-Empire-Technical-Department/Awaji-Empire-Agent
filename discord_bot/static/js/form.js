@@ -77,5 +77,30 @@ function toggleReq(panel, req) {
     });
 }
 
+/**
+ * 「参加しますか？」の選択に応じて希望部パネルの表示/required を切り替える。
+ */
+function toggleSessionSelect() {
+    const attending = document.querySelector('input[name="event_attending"]:checked')?.value;
+    const panel = document.getElementById('p_event_sessions');
+    if (!panel) return;
+
+    if (attending === 'yes') {
+        panel.classList.remove('hidden');
+        panel.classList.add('fade-in');
+        panel.querySelectorAll('input[type="checkbox"]').forEach(c => c.required = false); // checkboxはrequired不要
+    } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('fade-in');
+        panel.querySelectorAll('input[type="checkbox"]').forEach(c => {
+            c.checked = false;
+            c.required = false;
+        });
+    }
+}
+
 // ページロード時に初期状態を評価（既存回答の復元後に条件分岐を適用）
-window.addEventListener('DOMContentLoaded', checkLogic);
+window.addEventListener('DOMContentLoaded', () => {
+    checkLogic();
+    toggleSessionSelect();
+});

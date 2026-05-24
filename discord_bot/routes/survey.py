@@ -175,7 +175,7 @@ async def view_form(survey_id):
         survey=survey,
         questions=questions,
         existing_answers=existing_answers,
-        is_event_form=event_info is not None,
+        event_info=event_info,
     )
 
 
@@ -224,6 +224,23 @@ async def submit_response():
         )
         if is_sent:
             await SurveyService.mark_dm_sent(None, response_id)
+
+        # イベントフォームの場合は参加者登録
+        event_info = await EventService.get_event_by_survey(int(survey_id))
+        if event_info:
+            event = event_info.get('event', {})
+            attending = form.get('event_attending')  # "yes" or "no"
+            if attending == 'yes':
+                raw = form.getlist('event_preferred_sessions[]')
+                preferred_ids = [int(v) for v in raw if v.isdigit()]
+            else:
+                preferred_ids = None
+            await EventService.register_participant(
+                event_id=event['id'],
+                user_id=int(u_id),
+                response_id=response_id,
+                preferred_session_ids=preferred_ids if preferred_ids else None,
+            )
 
     return await render_template('submitted.html')
 
