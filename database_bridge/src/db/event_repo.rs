@@ -70,6 +70,34 @@ pub async fn find_event_by_survey(pool: &MySqlPool, survey_id: i32) -> BridgeRes
     )
 }
 
+pub async fn update_event(
+    pool: &MySqlPool,
+    event_id: i32,
+    title: &str,
+    fee: Option<i32>,
+    notes: Option<&str>,
+    location: Option<&str>,
+    event_date: Option<&str>,
+    end_date: Option<&str>,
+    application_deadline: Option<&str>,
+) -> BridgeResult<()> {
+    sqlx::query(
+        "UPDATE events SET title=?, fee=?, notes=?, location=?, event_date=?, end_date=?, application_deadline=? \
+         WHERE id=?",
+    )
+    .bind(title)
+    .bind(fee)
+    .bind(notes)
+    .bind(location)
+    .bind(event_date)
+    .bind(end_date)
+    .bind(application_deadline)
+    .bind(event_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn update_event_status(pool: &MySqlPool, event_id: i32, status: &str) -> BridgeResult<()> {
     sqlx::query("UPDATE events SET status = ? WHERE id = ?")
         .bind(status)

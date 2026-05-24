@@ -28,7 +28,9 @@
                 </div>
                 <div class="form-group" style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border-color);">
                     <label class="event-checkbox-label">
-                        <input type="checkbox" id="is-event-form">
+                        <input type="checkbox" id="is-event-form"
+                            {% if event_info %}checked{% endif %}
+                            data-event-info="{{ event_info | tojson | e if event_info else '' }}">
                         <i class="fas fa-calendar-check" style="color:var(--accent-blue);"></i>
                         イベント参加フォームとして作成する
                     </label>
