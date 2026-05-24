@@ -98,8 +98,8 @@ Rust側 (`db/event_repo.rs`) に実装し、以下の優先順位で割り当て
 導入時は収益が発生するため、**法人格の有無・確定申告の要否**を事前に確認すること。
 
 参考
-[Stripe 公式ドキュメント](https://stripe.com/docs)
-[【売上の取りこぼしを防げ】利益率を左右するのは「決済」だった／決済成功率90％／売上の機会損失をゼロにする「次世代金融インフラ」の全貌／LGがStripeを選んだ理由は](https://www.youtube.com/watch?v=irldrMeA5FM)
+- [Stripe 公式ドキュメント](https://stripe.com/docs)
+- [【売上の取りこぼしを防げ】利益率を左右するのは「決済」だった／決済成功率90％／売上の機会損失をゼロにする「次世代金融インフラ」の全貌／LGがStripeを選んだ理由は](https://www.youtube.com/watch?v=irldrMeA5FM)
 
 ---
 
