@@ -278,6 +278,12 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
     let sessionMode = 'none';
     let sessions = [];
 
+    // DB形式 "YYYY-MM-DD HH:MM:SS" または "YYYY-MM-DDTHH:MM:SS" → datetime-local用 "YYYY-MM-DDTHH:MM"
+    function toDatetimeLocal(dt) {
+        if (!dt) return '';
+        return dt.replace(' ', 'T').slice(0, 16);
+    }
+
     function applySessionMode(mode) {
         sessionMode = mode;
         const radioNone     = document.getElementById('session-mode-none');
@@ -286,8 +292,8 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
         if (radioSessions) radioSessions.checked = (mode === 'sessions');
         const noFields  = document.getElementById('no-session-fields');
         const sesFields = document.getElementById('session-fields');
-        if (noFields)  noFields.style.display  = (mode === 'none')     ? '' : 'none';
-        if (sesFields) sesFields.style.display = (mode === 'sessions') ? '' : 'none';
+        if (noFields)  noFields.style.display  = (mode === 'none')     ? 'flex' : 'none';
+        if (sesFields) sesFields.style.display = (mode === 'sessions') ? 'block' : 'none';
         syncEventJson();
     }
 
@@ -299,25 +305,34 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
             const ev = existing.event || {};
             const evSessions = existing.sessions || [];
 
-            if (document.getElementById('event-fee'))      document.getElementById('event-fee').value      = ev.fee ?? '';
-            if (document.getElementById('event-deadline')) document.getElementById('event-deadline').value = ev.application_deadline ?? '';
-            if (document.getElementById('event-date'))     document.getElementById('event-date').value     = ev.event_date ?? '';
-            if (document.getElementById('event-end-date')) document.getElementById('event-end-date').value = ev.end_date ?? '';
-            if (document.getElementById('event-location')) document.getElementById('event-location').value = ev.location ?? '';
-            if (document.getElementById('event-notes'))    document.getElementById('event-notes').value    = ev.notes ?? '';
+            const feeEl      = document.getElementById('event-fee');
+            const deadlineEl = document.getElementById('event-deadline');
+            const dateEl     = document.getElementById('event-date');
+            const endDateEl  = document.getElementById('event-end-date');
+            const locationEl = document.getElementById('event-location');
+            const notesEl    = document.getElementById('event-notes');
+
+            if (feeEl)      feeEl.value      = ev.fee ?? '';
+            if (deadlineEl) deadlineEl.value = toDatetimeLocal(ev.application_deadline);
+            if (dateEl)     dateEl.value     = toDatetimeLocal(ev.event_date);
+            if (endDateEl)  endDateEl.value  = toDatetimeLocal(ev.end_date);
+            if (locationEl) locationEl.value = ev.location ?? '';
+            if (notesEl)    notesEl.value    = ev.notes ?? '';
 
             sessions = evSessions.map(s => ({
-                name: s.name || '',
-                event_date: s.event_date || '',
-                end_date: s.end_date || '',
-                location: s.location || '',
-                capacity: s.capacity ?? '',
+                name:       s.name || '',
+                event_date: toDatetimeLocal(s.event_date),
+                end_date:   toDatetimeLocal(s.end_date),
+                location:   s.location || '',
+                capacity:   s.capacity ?? '',
             }));
 
             section.style.display = 'block';
             applySessionMode(sessions.length > 0 ? 'sessions' : 'none');
             renderSessions();
-        } catch (_) {}
+        } catch (e) {
+            console.error('[event-form] restore failed:', e);
+        }
     } else {
         applySessionMode('none');
     }
@@ -345,8 +360,10 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
     }
 
     function renderSessions() {
-        if (!sessionList) return;
-        sessionList.innerHTML = '';
+        const sl = document.getElementById('event-session-list');
+        if (!sl) return;
+        sl.innerHTML = '';
+        console.log('[event-form] renderSessions count=', sessions.length);
         sessions.forEach((s, i) => {
             const div = document.createElement('div');
             div.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:10px;background:#f8f9fa;border-radius:6px;';
@@ -365,7 +382,7 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
                 <button type="button" style="background:none;border:none;color:#999;cursor:pointer;" onclick="removeSession(${i})">
                     <i class="fas fa-times"></i>
                 </button>`;
-            sessionList.appendChild(div);
+            sl.appendChild(div);
         });
         syncEventJson();
     }
