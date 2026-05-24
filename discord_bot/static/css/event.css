@@ -148,3 +148,75 @@
     font-weight: bold;
     min-width: 40px;
 }
+
+/* ============================================================
+   レスポンシブ（モバイル対応）
+   ============================================================ */
+
+/* 管理画面: テーブルを横スクロール可能にする */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* スマホで非表示にするユーティリティ */
+@media (max-width: 480px) {
+    .d-none-sm { display: none; }
+}
+
+/* 管理画面: スマホではアクション・ボタンを縦積み */
+@media (max-width: 600px) {
+    .event-actions {
+        flex-direction: column;
+    }
+
+    .event-actions .btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* 部ごとの状況カードを横いっぱいに */
+    .event-session-stat {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* 管理テーブル内の入力欄を詰めすぎない最小幅を確保 */
+    .table td, .table th {
+        white-space: nowrap;
+    }
+}
+
+/* 確認ページ: カレンダーボタンをスマホで縦積み */
+@media (max-width: 480px) {
+    .calendar-btn-group {
+        flex-direction: column;
+    }
+
+    .calendar-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* ステータスカードのタイトルを小さめに */
+    .event-status-card h1 {
+        font-size: 1.2rem;
+    }
+
+    .event-status-icon {
+        font-size: 2.4rem;
+    }
+}
+
+/* 編集画面: 部の設定行をスマホで縦積み */
+@media (max-width: 600px) {
+    .event-session-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .event-session-row input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
