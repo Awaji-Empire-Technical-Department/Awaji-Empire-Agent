@@ -87,6 +87,33 @@ DBから返る日時は `"YYYY-MM-DD HH:MM:SS"` 形式だが、HTML `datetime-lo
 
 ---
 
+## 将来的な改善候補（未実装）
+
+### 部制なし時の定員設定
+
+現在、`events` テーブルには `capacity` カラムが存在しないため、部制なしイベントでは定員を設定できない。参加者が一定数を超える場合に waitlist を発生させたいケースがあるため、以下の対応が必要。
+
+- DB: `events` テーブルに `capacity INT NULL` カラムを追加（migration）
+- Rust: `insert_event` / `update_event` / `auto_assign` に capacity を組み込む（部制なし時に accepted 数が capacity を超えたら waitlist へ）
+- Python: `EventService` の create/update に `capacity` パラメータを追加
+- UI: edit.html の「部制なし」モードに定員フィールドを追加
+
+### 回答フォームでの部ごとの集合場所表示
+
+現在、フォーム回答画面（`form.html`）のイベント詳細カードには部ごとの日時は表示しているが、集合場所（`location`）が表示されていない。参加者が部を選ぶ際の重要情報であるため表示すべき。
+
+- `form.html` の部選択セクション（`event_session` ループ）に `{% if s.location %}📍 {{ s.location }}{% endif %}` を追加
+
+### 回答フォームでの定員・残席表示
+
+現在、フォームには定員・残席数が表示されておらず、満席の部を選択できてしまう。以下の対応が必要。
+
+- `view_form` ルートで `EventService.get_session_stats(event_id)` を追加し、部ごとの残席数を取得してテンプレートに渡す
+- `form.html` で残席数を表示し、残席 0 の部のチェックボックスを disabled にする
+- 残席数は `event_participants` の `approval = 'accepted'` の件数と `capacity` の差分で算出する（既存の `session_stats` ロジックを `event_admin.html` から流用）
+
+---
+
 ## 影響範囲
 
 | レイヤー | 変更内容 |
