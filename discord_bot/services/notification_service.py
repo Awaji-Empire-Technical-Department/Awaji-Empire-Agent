@@ -87,3 +87,48 @@ class NotificationService:
             except Exception as e:
                 logger.error("Exception in send_dm: %s", e)
                 return False
+
+    @staticmethod
+    async def send_dm_raw(
+        bot_token: str,
+        user_id: str,
+        message: str,
+    ) -> bool:
+        """任意テキストをDMで送信する。イベント通知など汎用用途向け。"""
+        if not bot_token:
+            logger.warning("Bot token missing, cannot send DM.")
+            return False
+
+        headers = {
+            "Authorization": f"Bot {bot_token}",
+            "Content-Type": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            try:
+                r = await client.post(
+                    "https://discord.com/api/v10/users/@me/channels",
+                    json={"recipient_id": user_id},
+                    headers=headers,
+                )
+                if r.status_code not in (200, 201):
+                    logger.warning("Failed to create DM channel: %s", r.text)
+                    return False
+
+                channel_id = r.json().get("id")
+                r_msg = await client.post(
+                    f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                    json={"content": message},
+                    headers=headers,
+                )
+                if r_msg.status_code in (200, 201):
+                    return True
+                logger.warning("Failed to send DM: %s", r_msg.text)
+                return False
+
+            except httpx.TimeoutException:
+                logger.error("DM send timed out for user %s", user_id)
+                return False
+            except Exception as e:
+                logger.error("Exception in send_dm_raw: %s", e)
+                return False

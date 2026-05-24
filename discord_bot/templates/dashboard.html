@@ -300,7 +300,7 @@
                 </div>
             </div>
 
-            <!-- 称号マスタ一覧（Staff向け） -->
+            {% if is_admin %}
             <!-- Staff テスト: 称号付与 + ロール即時付与 -->
             <div class="card-body" style="border-bottom:1px solid var(--border-color); padding-bottom:1.5rem;">
                 <h3 style="font-size:.9rem; font-weight:600; color:var(--gray); margin-bottom:.75rem;">🔧 Staff テスト: ロール付与確認</h3>
@@ -321,7 +321,16 @@
                 </div>
                 <div id="staff-grant-result" style="margin-top:.75rem; font-size:.85rem; display:none;"></div>
             </div>
-
+            <!-- Discordロール名同期 -->
+            <div class="card-body" style="border-bottom:1px solid var(--border-color); padding-bottom:1.5rem;">
+                <h3 style="font-size:.9rem; font-weight:600; color:var(--gray); margin-bottom:.75rem;">🔄 Discordロール名を称号名に同期</h3>
+                <p style="font-size:.8rem; color:var(--gray); margin-bottom:.75rem;">称号名を変更した後にクリックすると、Discord上のロール名がDB上の称号名に更新されます。</p>
+                <button class="btn btn-outline btn-sm" id="btn-sync-roles">
+                    <i class="fas fa-sync"></i> ロール名を同期する
+                </button>
+                <div id="sync-roles-result" style="margin-top:.75rem; font-size:.85rem; display:none;"></div>
+            </div>
+            {% endif %}
             <div class="table-responsive">
                 <table class="table" id="titles-table">
                     <thead>
@@ -331,16 +340,17 @@
                             <th width="110">解除条件</th>
                             <th width="80">閾値</th>
                             <th width="160">Discord ロールID</th>
-                            <th width="140">アクション</th>
+                            {% if is_admin %}<th width="140">アクション</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody id="titles-tbody">
-                        <tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--gray);">読込中...</td></tr>
+                        <tr><td colspan="{{ 6 if is_admin else 5 }}" style="text-align:center; padding:2rem; color:var(--gray);">読込中...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
+        {% if is_admin %}
         <!-- 称号編集モーダル -->
         <div id="title-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:center; justify-content:center;">
             <div style="background:#fff; border-radius:var(--radius); padding:2rem; width:480px; max-width:95vw; box-shadow:0 8px 32px rgba(0,0,0,.2);">
@@ -382,10 +392,12 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
     </div>
 
-    <script src="{{ url_for('static', filename='js/dashboard_titles.js') }}"></script>
+    <script>window.IS_ADMIN = {{ 'true' if is_admin else 'false' }};</script>
+    <script src="{{ url_for('static', filename='js/dashboard_titles.js', v='20260523') }}"></script>
 </body>
 
 </html>

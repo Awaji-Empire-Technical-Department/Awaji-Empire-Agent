@@ -11,3 +11,4 @@ pub mod lobby_repo;
 pub mod reset_log_repo;
 pub mod tournament_repo;
 pub mod lounge_repo;
+pub mod event_repo;

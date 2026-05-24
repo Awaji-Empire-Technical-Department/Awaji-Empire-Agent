@@ -25,12 +25,13 @@
                 <td><span class="badge badge-secondary">${UNLOCK_LABELS[t.unlock_type] || t.unlock_type}</span></td>
                 <td style="font-family:monospace;">${t.unlock_threshold ?? '-'}</td>
                 <td style="font-family:monospace;font-size:.8rem;color:var(--gray);">${t.discord_role_id || '-'}</td>
+                ${window.IS_ADMIN ? `
                 <td>
                     <div class="btn-toolbar">
                         <button class="btn btn-primary btn-icon" title="編集" onclick="editTitle(${t.id})"><i class="fas fa-pen"></i></button>
                         <button class="btn btn-danger btn-icon" title="削除" onclick="deleteTitle(${t.id}, '${t.name.replace(/'/g, "\\'")}')"><i class="fas fa-trash"></i></button>
                     </div>
-                </td>
+                </td>` : ''}
             </tr>
         `).join('');
     }
@@ -129,9 +130,12 @@
         document.getElementById('modal-order').value = '0';
     }
 
-    document.getElementById('modal-cancel').addEventListener('click', hideModal);
+    const modalCancel = document.getElementById('modal-cancel');
+    const modalSave   = document.getElementById('modal-save');
 
-    document.getElementById('modal-save').addEventListener('click', async () => {
+    if (modalCancel) modalCancel.addEventListener('click', hideModal);
+
+    if (modalSave) modalSave.addEventListener('click', async () => {
         const id = document.getElementById('modal-title-id').value;
         if (!id) { alert('編集対象の称号が選択されていません'); return; }
         const name = document.getElementById('modal-name').value.trim();
@@ -170,58 +174,32 @@
         }
     });
 
-    // Staffテスト: セレクトボックスに称号を populate
-    async function populateTestSelect() {
-        const res = await fetch('/tournament/api/titles');
-        const titles = await res.json();
-        const sel = document.getElementById('test-title-select');
-        if (!sel) return;
-        sel.innerHTML = titles.map(t =>
-            `<option value="${t.id}">${t.name}（${t.unlock_type}）</option>`
-        ).join('');
-    }
-
-    document.getElementById('btn-staff-grant')?.addEventListener('click', async () => {
-        const titleId = document.getElementById('test-title-select').value;
-        const targetUserId = document.getElementById('test-target-user').value.trim() || null;
-        if (!titleId) { alert('称号を選択してください'); return; }
-
-        const btn = document.getElementById('btn-staff-grant');
-        const result = document.getElementById('staff-grant-result');
-        btn.disabled = true;
-        btn.textContent = '処理中...';
-
-        const body = { title_id: parseInt(titleId) };
-        if (targetUserId) body.user_id = targetUserId;
-
-        try {
-            const res = await fetch('/tournament/api/titles/staff-grant', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            const data = await res.json();
-            result.style.display = 'block';
-            if (data.status === 'ok') {
-                result.style.color = 'var(--success)';
-                result.textContent = `✅ 「${data.title_name}」を付与しました。Discord ロールID: ${data.discord_role_id || '未設定（token/guild未設定）'}`;
-                loadTitles(); // discord_role_id が更新された可能性があるので再読込
-            } else {
-                result.style.color = 'var(--danger)';
-                result.textContent = `❌ エラー: ${data.message || '不明なエラー'}`;
+    const btnSync = document.getElementById('btn-sync-roles');
+    if (btnSync) {
+        btnSync.addEventListener('click', async () => {
+            const resultEl = document.getElementById('sync-roles-result');
+            btnSync.disabled = true;
+            btnSync.textContent = '同期中...';
+            resultEl.style.display = 'none';
+            try {
+                const res = await fetch('/tournament/api/titles/sync-discord-roles', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    const summary = data.results.map(r => `${r.name}: ${r.status}`).join('<br>');
+                    resultEl.innerHTML = `<span style="color:var(--success)">✓ 同期完了</span><br><small style="color:var(--gray)">${summary}</small>`;
+                } else {
+                    resultEl.innerHTML = `<span style="color:var(--danger)">エラー: ${data.message}</span>`;
+                }
+            } catch (e) {
+                resultEl.innerHTML = `<span style="color:var(--danger)">通信エラー</span>`;
             }
-        } catch (e) {
-            result.style.display = 'block';
-            result.style.color = 'var(--danger)';
-            result.textContent = `❌ 通信エラー: ${e}`;
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-bolt"></i> 付与 + ロール作成';
-        }
-    });
+            resultEl.style.display = 'block';
+            btnSync.disabled = false;
+            btnSync.innerHTML = '<i class="fas fa-sync"></i> ロール名を同期する';
+        });
+    }
 
     // 初期ロード
     loadTitles();
     loadActiveTitle();
-    populateTestSelect();
 })();

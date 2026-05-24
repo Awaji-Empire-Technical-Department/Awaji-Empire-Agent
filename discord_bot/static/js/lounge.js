@@ -396,12 +396,12 @@
     // 結果モーダルの二重表示防止フラグ
     let resultModalShown = false;
 
-    // WS切断中にポーリングで状態を補完するタイマー
+    // 常時ポーリング（WS並走）: スコア・順位・終了状態を定期同期
     let pollTimer = null;
 
     function startPolling() {
         if (pollTimer) return;
-        pollTimer = setInterval(pollTick, 10000);
+        pollTimer = setInterval(pollTick, 5000);
     }
 
     function stopPolling() {
@@ -426,7 +426,6 @@
 
         ws.addEventListener('open', () => {
             console.log('[Lounge WS] connected');
-            stopPolling();
             // 切断中に発生した変化を再取得して画面を最新化
             pollTick();
         });
@@ -449,8 +448,9 @@
         });
     }
 
-    // 初期ロード
+    // 初期ロード・常時ポーリング開始
     loadFinalScores();
+    startPolling();
     connectWs();
 
     // セッションが既に終了済みの状態でページを開いた場合はすぐ結果モーダルを表示

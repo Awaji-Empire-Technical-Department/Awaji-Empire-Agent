@@ -10,6 +10,7 @@ from routes.survey import survey_bp
 from routes.lobby import lobby_bp
 from routes.tournament import tournament_bp
 from routes.lounge import lounge_bp
+from routes.event import event_bp
 from services.lobby_service import LobbyService
 from services.tournament_service import TournamentService
 from services.lounge_service import LoungeService
@@ -18,6 +19,8 @@ from services.survey_service import SurveyService
 from services.log_service import LogService
 
 load_dotenv()
+
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
 
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'default_insecure_key')
@@ -37,6 +40,7 @@ app.register_blueprint(survey_bp)
 app.register_blueprint(lobby_bp)
 app.register_blueprint(tournament_bp)
 app.register_blueprint(lounge_bp)
+app.register_blueprint(event_bp)
 
 # --- WebSocket プロキシ (Rust Bridge → ブラウザ) ---
 BRIDGE_WS_URL = "ws://127.0.0.1:7878/ws/hyouibana"
@@ -252,7 +256,8 @@ async def index():
         lounge_sessions = await LoungeService.list_active_sessions()
         lounge_player = await LoungeService.get_player(int(user['id']))
 
-        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies, games=games, lounge_sessions=lounge_sessions, lounge_player=lounge_player)
+        is_admin = bool(ADMIN_USER_ID) and str(user.get("id")) == str(ADMIN_USER_ID)
+        return await render_template('dashboard.html', user=user, surveys=surveys, logs=logs, lobbies=lobbies, games=games, lounge_sessions=lounge_sessions, lounge_player=lounge_player, is_admin=is_admin)
         
     except BridgeUnavailableError:
         current_app.logger.warning("Bridge unavailable on index: rendering maintenance page")

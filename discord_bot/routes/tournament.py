@@ -9,16 +9,17 @@ from services.bridge_client import BridgeUnavailableError
 tournament_bp = Blueprint("tournament", __name__, url_prefix="/tournament")
 
 GUILD_ID = os.getenv("DISCORD_GUILD_ID", "")
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
 
 # ランク称号ごとのDiscordロール色（unlock_threshold → color int）
 _LOUNGE_RANK_COLORS = {
-    0:     0x95A5A6,  # 鉄: グレー
-    2000:  0xCD7F32,  # 銅: ブロンズ
-    4000:  0xBDC3C7,  # 銀: シルバー
-    6000:  0xF1C40F,  # 金: ゴールド
-    8000:  0x00BFFF,  # プラチナ: ライトブルー
-    10000: 0x1ABC9C,  # ダイヤ: シアン
-    13000: 0x9B59B6,  # マスター: パープル
+    0:     0x95A5A6,  # Iron: グレー
+    2000:  0xCD7F32,  # Bronze: ブロンズ
+    4000:  0xBDC3C7,  # Silver: シルバー
+    6000:  0xF1C40F,  # Gold: ゴールド
+    8000:  0x00BFFF,  # Platinum: ライトブルー
+    10000: 0xB9F2FF,  # Diamond: ダイヤブルー
+    13000: 0x9B59B6,  # Master: パープル
 }
 _TOURNAMENT_WIN_COLOR = 0xFFD700  # 大会優勝系: ゴールド
 
@@ -40,6 +41,10 @@ def _require_login():
     if not user:
         return redirect(url_for("login"))
     return None
+
+
+def _is_admin(user: dict) -> bool:
+    return bool(ADMIN_USER_ID) and str(user.get("id")) == str(ADMIN_USER_ID)
 
 
 async def _sync_discord_title_role(user_id: str, new_title: dict, old_role_id: str | None):
@@ -178,6 +183,18 @@ async def room_detail(passcode: str):
 
 
 # ============================================================
+# 順位表 API（Ajax用）
+# ============================================================
+
+@tournament_bp.route("/api/rooms/<passcode>/standings")
+async def api_room_standings(passcode: str):
+    if not _current_user():
+        return jsonify([])
+    standings = await TournamentService.get_standings(passcode)
+    return jsonify(standings)
+
+
+# ============================================================
 # スコア申告 API（Ajax用）
 # ============================================================
 
@@ -239,6 +256,8 @@ async def api_save_title():
     user = _current_user()
     if not user:
         return jsonify({"status": "error"}), 401
+    if not _is_admin(user):
+        return jsonify({"status": "error", "message": "forbidden"}), 403
     data = await request.get_json()
     title_id = await TitleService.upsert(
         name=data.get("name", ""),
@@ -254,8 +273,11 @@ async def api_save_title():
 
 @tournament_bp.route("/api/titles/<int:title_id>", methods=["DELETE"])
 async def api_delete_title(title_id: int):
-    if not _current_user():
+    user = _current_user()
+    if not user:
         return jsonify({"status": "error"}), 401
+    if not _is_admin(user):
+        return jsonify({"status": "error", "message": "forbidden"}), 403
     ok = await TitleService.delete(title_id)
     return jsonify({"status": "ok" if ok else "error"})
 
@@ -377,3 +399,40 @@ async def api_staff_grant():
         "discord_role_id": role_id,
         "title_name": title["name"],
     })
+
+
+@tournament_bp.route("/api/titles/sync-discord-roles", methods=["POST"])
+async def api_sync_discord_roles():
+    """管理者用: 全称号のDiscordロール名をDB上の称号名に同期する。"""
+    user = _current_user()
+    if not user or not _is_admin(user):
+        return jsonify({"status": "error", "message": "forbidden"}), 403
+
+    token = _get_bot_token()
+    if not token or not GUILD_ID:
+        return jsonify({"status": "error", "message": "bot token or guild id not configured"}), 500
+
+    titles = await TitleService.list_all()
+    results = []
+    headers = {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for title in titles:
+            role_id = title.get("discord_role_id")
+            if not role_id:
+                results.append({"id": title["id"], "name": title["name"], "status": "skipped (no role_id)"})
+                continue
+            try:
+                res = await client.patch(
+                    f"https://discord.com/api/v10/guilds/{GUILD_ID}/roles/{role_id}",
+                    headers=headers,
+                    json={"name": title["name"]},
+                )
+                if res.status_code == 200:
+                    results.append({"id": title["id"], "name": title["name"], "status": "updated"})
+                else:
+                    results.append({"id": title["id"], "name": title["name"], "status": f"error {res.status_code}"})
+            except Exception as e:
+                results.append({"id": title["id"], "name": title["name"], "status": f"exception: {e}"})
+
+    return jsonify({"status": "ok", "results": results})
