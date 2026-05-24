@@ -112,20 +112,25 @@ async def save_survey():
         await LogService.log_operation(None, user['id'], user['name'], "UPDATE", f"ID:{sid} を更新")
 
         # イベント設定の保存
+        current_app.logger.info(f"[save_survey] sid={sid} event_settings_raw={event_settings_raw!r}")
+
         if event_settings_raw:
             try:
                 es = json.loads(event_settings_raw)
             except (json.JSONDecodeError, ValueError):
+                current_app.logger.warning(f"[save_survey] event_settings_json parse failed: {event_settings_raw!r}")
                 es = {}
 
+            current_app.logger.info(f"[save_survey] is_event_form={es.get('is_event_form')} sessions={es.get('sessions')}")
             existing_event = await EventService.get_event_by_survey(int(sid))
+            current_app.logger.info(f"[save_survey] existing_event={'あり' if existing_event else 'なし'}")
 
             if es.get('is_event_form'):
                 sessions = es.get('sessions') or []
                 fee_raw = es.get('fee')
                 fee = int(fee_raw) if fee_raw else None
                 if existing_event is None:
-                    await EventService.create_event(
+                    event_id = await EventService.create_event(
                         survey_id=int(sid),
                         title=title,
                         fee=fee,
@@ -136,8 +141,12 @@ async def save_survey():
                         application_deadline=es.get('application_deadline') or None,
                         sessions=sessions,
                     )
+                    current_app.logger.info(f"[save_survey] create_event result: event_id={event_id}")
+                    if not event_id:
+                        current_app.logger.error(f"[save_survey] create_event failed for survey_id={sid}")
+                        await flash("イベント設定の保存に失敗しました（bridge接続を確認してください）", "error")
                 else:
-                    await EventService.update_event(
+                    ok = await EventService.update_event(
                         event_id=existing_event['event']['id'],
                         title=title,
                         fee=fee,
@@ -148,6 +157,7 @@ async def save_survey():
                         application_deadline=es.get('application_deadline') or None,
                         sessions=sessions,
                     )
+                    current_app.logger.info(f"[save_survey] update_event result: ok={ok}")
 
     except Exception as e:
         return f"Error: {e}", 500
