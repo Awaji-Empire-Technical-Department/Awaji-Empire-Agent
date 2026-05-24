@@ -190,6 +190,7 @@ async def api_auto_assign(event_id: int):
         return jsonify({'status': 'error'}), 401
 
     ok = await EventService.auto_assign(event_id)
+    current_app.logger.info(f"[auto_assign] event_id={event_id} result={ok}")
     return jsonify({'status': 'ok' if ok else 'error'})
 
 
