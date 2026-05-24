@@ -312,9 +312,10 @@ async def submit_response():
             attending = form.get('event_attending')  # "yes" or "no"
             if attending == 'yes':
                 raw = form.getlist('event_preferred_sessions[]')
+                # 空リスト [] = 参加・部なし。None = 不参加。両者を区別する
                 preferred_ids = [int(v) for v in raw if v.isdigit()]
             else:
-                preferred_ids = None
+                preferred_ids = None  # 明示的な不参加
             await EventService.register_participant(
                 event_id=event['id'],
                 user_id=int(u_id),
