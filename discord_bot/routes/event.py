@@ -252,8 +252,8 @@ async def api_notify(event_id: int):
             lines += [
                 '',
                 '📆 カレンダーに追加:',
-                f"・Google: {cal['google']}",
-                f"・Outlook: {cal['outlook']}",
+                f"・Google: <{cal['google']}>",
+                f"・Outlook: <{cal['outlook']}>",
                 '━━━━━━━━━━━━━━━',
                 f'詳細確認: {confirm_url}',
             ]

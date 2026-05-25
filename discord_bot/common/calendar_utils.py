@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 
 _DT_FMT_IN  = "%Y-%m-%d %H:%M:%S"  # DB から来る形式
-_DT_FMT_GCL = "%Y%m%dT%H%M%SZ"     # Google Calendar 形式
+_DT_FMT_GCL = "%Y%m%dT%H%M%S"      # Google Calendar 形式（ローカル時刻、Z なし）
 
 
 def _parse_dt(dt_str: str | None) -> datetime | None:
