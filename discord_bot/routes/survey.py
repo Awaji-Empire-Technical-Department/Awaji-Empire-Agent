@@ -143,12 +143,15 @@ async def save_survey():
                 sessions = [_clean_session(s) for s in (es.get('sessions') or [])]
                 fee_raw = es.get('fee')
                 fee = int(fee_raw) if fee_raw else None
+                capacity_raw = es.get('capacity')
+                capacity = int(capacity_raw) if capacity_raw else None
                 if existing_event is None:
                     event_id = await EventService.create_event(
                         survey_id=int(sid),
                         title=title,
                         fee=fee,
                         notes=es.get('notes') or None,
+                        capacity=capacity,
                         location=es.get('location') or None,
                         event_date=_norm_dt(es.get('event_date')),
                         end_date=_norm_dt(es.get('end_date')),
@@ -165,6 +168,7 @@ async def save_survey():
                         title=title,
                         fee=fee,
                         notes=es.get('notes') or None,
+                        capacity=capacity,
                         location=es.get('location') or None,
                         event_date=_norm_dt(es.get('event_date')),
                         end_date=_norm_dt(es.get('end_date')),
@@ -237,9 +241,11 @@ async def view_form(survey_id):
 
     prev_attending = ''
     prev_preferred = []
+    session_stats = None
     if event_info:
+        event_id = event_info['event']['id']
         my_participation = await EventService.get_my_participation(
-            event_id=event_info['event']['id'],
+            event_id=event_id,
             user_id=int(user['id']),
         )
         if my_participation:
@@ -252,6 +258,7 @@ async def view_form(survey_id):
                     prev_preferred = []
             else:
                 prev_attending = 'no'
+        session_stats = await EventService.get_session_stats(event_id)
 
     return await render_template(
         'form.html',
@@ -261,6 +268,7 @@ async def view_form(survey_id):
         event_info=event_info,
         prev_attending=prev_attending,
         prev_preferred=prev_preferred,
+        session_stats=session_stats,
     )
 
 

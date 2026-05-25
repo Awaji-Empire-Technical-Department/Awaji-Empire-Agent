@@ -19,6 +19,7 @@ class EventService:
         title: str,
         fee: Optional[int] = None,
         notes: Optional[str] = None,
+        capacity: Optional[int] = None,
         location: Optional[str] = None,
         event_date: Optional[str] = None,
         end_date: Optional[str] = None,
@@ -34,6 +35,7 @@ class EventService:
                 "title": title,
                 "fee": fee,
                 "notes": notes,
+                "capacity": capacity,
                 "location": location,
                 "event_date": event_date,
                 "end_date": end_date,
@@ -62,6 +64,7 @@ class EventService:
         title: str,
         fee: Optional[int] = None,
         notes: Optional[str] = None,
+        capacity: Optional[int] = None,
         location: Optional[str] = None,
         event_date: Optional[str] = None,
         end_date: Optional[str] = None,
@@ -76,6 +79,7 @@ class EventService:
                 "title": title,
                 "fee": fee,
                 "notes": notes,
+                "capacity": capacity,
                 "location": location,
                 "event_date": event_date,
                 "end_date": end_date,
@@ -179,6 +183,11 @@ class EventService:
         """希望部優先の自動割り当てを実行する。"""
         res = await bridge_client.request("POST", f"/events/{event_id}/auto-assign")
         return res is not None and res.get("status") == "ok"
+
+    @staticmethod
+    async def get_session_stats(event_id: int) -> Optional[Dict[str, Any]]:
+        """部ごとの承認済み参加者数・残席数を返す。"""
+        return await bridge_client.request("GET", f"/events/{event_id}/session-stats")
 
     @staticmethod
     async def get_events_past_deadline() -> List[Dict[str, Any]]:

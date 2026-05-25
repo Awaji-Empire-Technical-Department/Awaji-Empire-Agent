@@ -14,6 +14,12 @@
         <form action="{{ url_for('survey.submit_response') }}" method="POST">
             <input type="hidden" name="survey_id" value="{{ survey['id'] }}">
 
+            <!-- タイトル（最上部） -->
+            <div class="card" style="border-top: 6px solid var(--success); text-align:center;">
+                <h1 style="font-size:1.5rem; margin-bottom:0.5rem;">{{ survey['title'] }}</h1>
+                <p style="color:var(--gray); margin:0;">以下の質問にお答えください</p>
+            </div>
+
             {% if event_info %}
             {% set ev = event_info.event %}
             {% set ev_sessions = event_info.sessions %}
@@ -60,17 +66,25 @@
                     {% if ev.notes %}
                     <div style="margin-top:.6rem; font-size:.9rem; color:#555; white-space:pre-wrap;">{{ ev.notes }}</div>
                     {% endif %}
+                    {% if not ev_sessions and session_stats and session_stats.capacity %}
+                    {% set remaining = session_stats.remaining %}
+                    <div style="margin-top:.5rem; font-size:.85rem;">
+                        <i class="fas fa-users"></i> 定員: {{ session_stats.capacity }}名
+                        {% if remaining is not none %}
+                            {% if remaining <= 0 %}
+                            <span style="color:var(--danger); font-weight:bold;"> — 満席</span>
+                            {% else %}
+                            <span style="color:#555;"> （残{{ remaining }}名）</span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     {% if ev.application_deadline %}
                     <div style="margin-top:.5rem; font-size:.85rem; color:var(--danger);"><i class="fas fa-hourglass-half"></i> 応募締切: {{ ev.application_deadline }}</div>
                     {% endif %}
                 </div>
             </div>
             {% endif %}
-
-            <div class="card" style="border-top: 6px solid var(--success); text-align:center;">
-                <h1 style="font-size:1.5rem; margin-bottom:0.5rem;">{{ survey['title'] }}</h1>
-                <p style="color:var(--gray); margin:0;">以下の質問にお答えください</p>
-            </div>
 
             {% if event_info %}
             {% set ev_sessions = event_info.sessions %}
@@ -103,10 +117,34 @@
                     <span class="badge badge-danger" style="background:var(--danger); font-size:0.6rem; vertical-align:middle; margin-left:5px;">必須</span>
                 </label>
                 {% for s in ev_sessions %}
-                <label class="option-item">
+                {# 部ごとの残席をセッション統計から検索 #}
+                {% set st = namespace(found=none) %}
+                {% if session_stats and session_stats.sessions %}
+                    {% for item in session_stats.sessions %}
+                        {% if item.id == s.id %}{% set st.found = item %}{% endif %}
+                    {% endfor %}
+                {% endif %}
+                {% set is_full = st.found and s.capacity and st.found.remaining is not none and st.found.remaining <= 0 %}
+                <label class="option-item {% if is_full %}session-full{% endif %}">
                     <input type="checkbox" name="event_preferred_sessions[]" value="{{ s.id }}" class="event-session-chk"
-                        {% if s.id in prev_preferred %}checked{% endif %}>
-                    <span>{{ s.name }}{% if s.event_date %} ({{ s.event_date }}){% endif %}{% if s.capacity %} ／ 定員{{ s.capacity }}名{% endif %}</span>
+                        {% if s.id in prev_preferred %}checked{% endif %}
+                        {% if is_full %}disabled{% endif %}>
+                    <span>
+                        {{ s.name }}
+                        {% if s.event_date %} ({{ s.event_date }}){% endif %}
+                        {% if s.location %} <span style="color:#666;"> — {{ s.location }}</span>{% endif %}
+                        {% if s.capacity %}
+                            {% if st.found and st.found.remaining is not none %}
+                                {% if is_full %}
+                                 <span style="color:var(--danger); font-size:.85rem;">満席</span>
+                                {% else %}
+                                 <span style="color:#666; font-size:.85rem;">残{{ st.found.remaining }}名</span>
+                                {% endif %}
+                            {% else %}
+                             <span style="color:#888; font-size:.85rem;">定員{{ s.capacity }}名</span>
+                            {% endif %}
+                        {% endif %}
+                    </span>
                 </label>
                 {% endfor %}
             </div>

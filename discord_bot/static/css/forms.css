@@ -54,3 +54,12 @@ textarea.form-control {
     margin-right: 10px;
     transform: scale(1.1);
 }
+
+.option-item.session-full {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.option-item.session-full input {
+    cursor: not-allowed;
+}
