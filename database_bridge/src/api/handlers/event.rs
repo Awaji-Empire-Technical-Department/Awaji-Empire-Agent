@@ -341,12 +341,19 @@ pub async fn auto_assign(
     State(pool): State<MySqlPool>,
     Path(event_id): Path<i32>,
 ) -> (StatusCode, Json<Value>) {
-    let event_capacity = match event_repo::find_event_by_id(&pool, event_id).await {
-        Ok(e) => e.capacity,
-        Err(e) => return internal_error(e),
-    };
+    // capacity 取得失敗時はフォールバック（None = 無制限）として処理継続
+    let event_capacity = event_repo::find_event_by_id(&pool, event_id)
+        .await
+        .ok()
+        .and_then(|e| e.capacity);
     match event_repo::auto_assign(&pool, event_id, event_capacity).await {
-        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Ok(_) => {
+            // 割り当て後の参加者一覧を返すことでフロント側がリロードなしでDOMを更新できる
+            match event_repo::find_participants_by_event(&pool, event_id).await {
+                Ok(participants) => (StatusCode::OK, Json(json!({"status": "ok", "participants": participants}))),
+                Err(_) => (StatusCode::OK, Json(json!({"status": "ok", "participants": []}))),
+            }
+        },
         Err(e) => internal_error(e),
     }
 }

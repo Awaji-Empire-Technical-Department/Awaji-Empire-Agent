@@ -420,6 +420,7 @@ async def download_csv(survey_id):
             return "Forbidden", 403
 
         responses = await SurveyService.get_responses(None, survey_id)
+        event_info = await EventService.get_event_by_survey(survey_id)
     except BridgeUnavailableError:
         return await render_template('maintenance.html'), 503
     except Exception:
@@ -429,14 +430,46 @@ async def download_csv(survey_id):
     si = io.StringIO()
     writer = csv.writer(si)
 
+    # イベントフォームの場合: 参加者情報を response_id で引けるよう map 化
+    participant_map = {}
+    session_map = {}
+    if event_info:
+        event_id = event_info['event']['id']
+        participants = await EventService.list_participants(event_id)
+        participant_map = {str(p['response_id']): p for p in participants if p.get('response_id')}
+        session_map = {s['id']: s['name'] for s in event_info.get('sessions', [])}
+
+    # ヘッダー行
     header = ['回答日時', '回答者']
+    if event_info:
+        header += ['参加意思', '状態', '割り当て部', '希望部']
     for i, q in enumerate(questions):
         q_text = q.get('text', f'Q{i+1}')
         header.append(f"Q{i+1}: {q_text}")
     writer.writerow(header)
 
+    APPROVAL_LABELS = {'pending': '確認中', 'accepted': '承認', 'rejected': '否認', 'waitlist': '補欠'}
+
     for r in responses:
         row = [str(r['submitted_at']), r['user_name']]
+
+        if event_info:
+            p = participant_map.get(str(r['id']))
+            if p:
+                # 参加意思: preferred_session_ids が None なら不参加
+                attending = '不参加' if p.get('preferred_session_ids') is None else '参加'
+                approval = APPROVAL_LABELS.get(p.get('approval', ''), p.get('approval', ''))
+                assigned = session_map.get(p.get('session_id')) if p.get('session_id') else ''
+                # 希望部: preferred_session_ids JSON から部名リストに変換
+                try:
+                    pref_ids = json.loads(p['preferred_session_ids']) if isinstance(p.get('preferred_session_ids'), str) else []
+                    preferred = ', '.join(session_map.get(sid, str(sid)) for sid in pref_ids) if pref_ids else ''
+                except Exception:
+                    preferred = ''
+                row += [attending, approval, assigned, preferred]
+            else:
+                row += ['', '', '', '']
+
         try:
             ans_json = r['answers']
             if isinstance(ans_json, str):

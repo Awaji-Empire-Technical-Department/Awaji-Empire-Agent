@@ -69,6 +69,9 @@
             <button class="btn btn-success" onclick="notifyAll()" id="btn-notify">
                 <i class="fas fa-paper-plane"></i> 全員に通知送信
             </button>
+            <a href="{{ url_for('survey.download_csv', survey_id=event['survey_id']) }}" class="btn btn-outline">
+                <i class="fas fa-download"></i> CSV ダウンロード
+            </a>
         </div>
     </div>
 
