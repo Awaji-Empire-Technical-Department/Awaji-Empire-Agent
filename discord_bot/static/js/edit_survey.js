@@ -263,3 +263,159 @@ function updateHiddenJson() {
 document.getElementById('surveyForm').addEventListener('submit', () => {
     updateHiddenJson();
 });
+
+// ============================================================
+// イベント参加フォーム設定UI
+// ============================================================
+
+(function initEventSection() {
+    const checkbox    = document.getElementById('is-event-form');
+    const section     = document.getElementById('event-settings-section');
+    const sessionList = document.getElementById('event-session-list');
+    if (!checkbox || !section) return;
+
+    // 'none' = 部制なし, 'sessions' = n部制
+    let sessionMode = 'none';
+    let sessions = [];
+
+    // DB形式 "YYYY-MM-DD HH:MM:SS" または "YYYY-MM-DDTHH:MM:SS" → datetime-local用 "YYYY-MM-DDTHH:MM"
+    function toDatetimeLocal(dt) {
+        if (!dt) return '';
+        return dt.replace(' ', 'T').slice(0, 16);
+    }
+
+    function applySessionMode(mode) {
+        sessionMode = mode;
+        const radioNone     = document.getElementById('session-mode-none');
+        const radioSessions = document.getElementById('session-mode-sessions');
+        if (radioNone)     radioNone.checked     = (mode === 'none');
+        if (radioSessions) radioSessions.checked = (mode === 'sessions');
+        const noFields  = document.getElementById('no-session-fields');
+        const sesFields = document.getElementById('session-fields');
+        if (noFields)  noFields.style.display  = (mode === 'none')     ? 'flex' : 'none';
+        if (sesFields) sesFields.style.display = (mode === 'sessions') ? 'block' : 'none';
+        syncEventJson();
+    }
+
+    // 既存のイベント設定を復元
+    const existingJson = checkbox.dataset.eventInfo;
+    if (existingJson) {
+        try {
+            const existing = JSON.parse(existingJson);
+            const ev = existing.event || {};
+            const evSessions = existing.sessions || [];
+
+            const feeEl      = document.getElementById('event-fee');
+            const deadlineEl = document.getElementById('event-deadline');
+            const dateEl     = document.getElementById('event-date');
+            const endDateEl  = document.getElementById('event-end-date');
+            const locationEl = document.getElementById('event-location');
+            const notesEl    = document.getElementById('event-notes');
+
+            const capacityEl = document.getElementById('event-capacity');
+
+            if (feeEl)      feeEl.value      = ev.fee ?? '';
+            if (deadlineEl) deadlineEl.value = toDatetimeLocal(ev.application_deadline);
+            if (dateEl)     dateEl.value     = toDatetimeLocal(ev.event_date);
+            if (endDateEl)  endDateEl.value  = toDatetimeLocal(ev.end_date);
+            if (locationEl) locationEl.value = ev.location ?? '';
+            if (notesEl)    notesEl.value    = ev.notes ?? '';
+            if (capacityEl) capacityEl.value = ev.capacity ?? '';
+
+            sessions = evSessions.map(s => ({
+                name:       s.name || '',
+                event_date: toDatetimeLocal(s.event_date),
+                end_date:   toDatetimeLocal(s.end_date),
+                location:   s.location || '',
+                capacity:   s.capacity ?? '',
+            }));
+
+            section.style.display = 'block';
+            applySessionMode(sessions.length > 0 ? 'sessions' : 'none');
+            renderSessions();
+        } catch (e) {
+            console.error('[event-form] restore failed:', e);
+        }
+    } else {
+        applySessionMode('none');
+    }
+
+    // 部制ラジオ切り替え
+    document.querySelectorAll('input[name="session-mode"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.value === 'sessions' && sessions.length === 0) addSession();
+            applySessionMode(radio.value);
+            renderSessions();
+        });
+    });
+
+    checkbox.addEventListener('change', () => {
+        section.style.display = checkbox.checked ? 'block' : 'none';
+        syncEventJson();
+    });
+
+    document.getElementById('btn-add-session')?.addEventListener('click', addSession);
+
+    function addSession() {
+        const idx = sessions.length;
+        sessions.push({ name: `${idx + 1}部`, event_date: '', end_date: '', location: '', capacity: '' });
+        renderSessions();
+    }
+
+    function renderSessions() {
+        const sl = document.getElementById('event-session-list');
+        if (!sl) return;
+        sl.innerHTML = '';
+        console.log('[event-form] renderSessions count=', sessions.length);
+        sessions.forEach((s, i) => {
+            const div = document.createElement('div');
+            div.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:10px;background:#f8f9fa;border-radius:6px;';
+            div.innerHTML = `
+                <span style="font-weight:bold;min-width:40px;">${i + 1}部</span>
+                <input type="text" placeholder="部名 (例: 1部)" value="${s.name}" style="width:80px;padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'name',this.value)">
+                <input type="datetime-local" value="${s.event_date}" style="padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'event_date',this.value)" title="開始日時">
+                <input type="datetime-local" value="${s.end_date}" style="padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'end_date',this.value)" title="終了日時（省略=開始+2時間）">
+                <input type="text" placeholder="集合場所" value="${s.location}" style="width:150px;padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'location',this.value)">
+                <input type="number" placeholder="定員（空=無制限）" value="${s.capacity}" min="1" style="width:120px;padding:5px;border:1px solid #ddd;border-radius:4px;"
+                    oninput="updateSession(${i},'capacity',this.value)">
+                <button type="button" style="background:none;border:none;color:#999;cursor:pointer;" onclick="removeSession(${i})">
+                    <i class="fas fa-times"></i>
+                </button>`;
+            sl.appendChild(div);
+        });
+        syncEventJson();
+    }
+
+    window.updateSession = function (i, key, val) {
+        sessions[i][key] = val;
+        syncEventJson();
+    };
+
+    window.removeSession = function (i) {
+        sessions.splice(i, 1);
+        renderSessions();
+    };
+
+    function syncEventJson() {
+        const hiddenEl = document.getElementById('eventSettingsJson');
+        if (!hiddenEl) return;
+        hiddenEl.value = JSON.stringify({
+            is_event_form: checkbox.checked,
+            fee:                  document.getElementById('event-fee')?.value || null,
+            capacity:             sessionMode === 'none' ? (document.getElementById('event-capacity')?.value || null) : null,
+            location:             sessionMode === 'none' ? (document.getElementById('event-location')?.value || null) : null,
+            notes:                document.getElementById('event-notes')?.value || null,
+            event_date:           sessionMode === 'none' ? (document.getElementById('event-date')?.value || null) : null,
+            end_date:             sessionMode === 'none' ? (document.getElementById('event-end-date')?.value || null) : null,
+            application_deadline: document.getElementById('event-deadline')?.value || null,
+            sessions: sessionMode === 'sessions' ? sessions : [],
+        });
+    }
+
+    // フォーム送信時に最新JSONを反映
+    document.getElementById('surveyForm').addEventListener('submit', syncEventJson, { once: false });
+})();

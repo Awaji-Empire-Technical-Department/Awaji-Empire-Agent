@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post, patch, delete},
     Router,
 };
+
 use sqlx::MySqlPool;
 use tokio::sync::broadcast;
 
@@ -34,6 +35,7 @@ pub fn create_router(pool: MySqlPool) -> Router {
         .nest("/tournament", tournament_routes())
         .nest("/lounge", lounge_routes())
         .nest("/titles", title_routes())
+        .nest("/events", event_routes())
         .route("/ws/hyouibana", get(handlers::ws::ws_handler))
         .route("/logs", get(handlers::list_recent_logs).post(handlers::log_operation))
         .nest("/reset_logs", reset_log_routes())
@@ -97,6 +99,23 @@ fn lounge_routes() -> Router<AppState> {
         .route("/sessions/{id}/standings", get(handlers::lounge::get_standings))
         .route("/sessions/{id}/teams", post(handlers::lounge::create_team).get(handlers::lounge::list_teams))
         .route("/players/{user_id}", get(handlers::lounge::get_player))
+}
+
+/// イベント参加フォーム関連のルーティング。
+fn event_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", post(handlers::event::create_event))
+        .route("/{id}", get(handlers::event::get_event).put(handlers::event::update_event))
+        .route("/{id}/status", patch(handlers::event::update_event_status))
+        .route("/{id}/participants", post(handlers::event::upsert_participant).get(handlers::event::list_participants))
+        .route("/{id}/participants/by-user/{user_id}", get(handlers::event::get_participant_by_user))
+        .route("/{id}/auto-assign", post(handlers::event::auto_assign))
+        .route("/{id}/session-stats", get(handlers::event::get_session_stats))
+        .route("/by-survey/{survey_id}", get(handlers::event::get_event_by_survey))
+        .route("/pending-deadline", get(handlers::event::list_events_past_deadline))
+        .route("/participant/{participant_id}", patch(handlers::event::update_participant))
+        .route("/participant/{participant_id}/notified", patch(handlers::event::mark_participant_notified))
+        .route("/participant/by-token/{token}", get(handlers::event::get_participant_by_token))
 }
 
 /// アンケート関連のルーティング。

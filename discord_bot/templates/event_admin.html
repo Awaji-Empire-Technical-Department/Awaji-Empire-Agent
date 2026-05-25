@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>イベント管理 - {{ event['title'] }}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/event.css') }}?v={{ css_ver }}">
+</head>
+<body>
+<nav class="navbar">
+    <div class="navbar-brand"><i class="fas fa-calendar-check"></i> イベント管理</div>
+    <div class="user-menu">
+        <span class="d-none-sm">{{ user['name'] }}</span>
+        <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,.3);color:white;">
+            <i class="fas fa-arrow-left"></i> <span class="d-none-sm">ダッシュボード</span>
+        </a>
+    </div>
+</nav>
+
+<div class="container">
+
+    <!-- イベント概要 -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="fas fa-star"></i> {{ event['title'] }}</h2>
+            <span class="badge {% if event['status'] == 'open' %}badge-success{% elif event['status'] == 'closed' %}badge-danger{% else %}badge-secondary{% endif %}">
+                {{ {'draft':'下書き','open':'受付中','closed':'締切'}[event['status']] }}
+            </span>
+        </div>
+        <div style="padding:1rem; display:flex; gap:2rem; flex-wrap:wrap;">
+            {% if event['fee'] %}<span class="event-detail-row"><i class="fas fa-yen-sign"></i> 参加費 {{ event['fee'] }}円</span>{% endif %}
+            {% if event['application_deadline'] %}<span class="event-detail-row"><i class="fas fa-clock"></i> 締切 {{ event['application_deadline'] }}</span>{% endif %}
+            {% if event['notes'] %}<span class="event-detail-row"><i class="fas fa-info-circle"></i> {{ event['notes'] }}</span>{% endif %}
+        </div>
+    </div>
+
+    <!-- 部ごとの残席 -->
+    {% if sessions %}
+    <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-layer-group"></i> 部ごとの状況</h3></div>
+        <div style="padding:1rem; display:flex; gap:1rem; flex-wrap:wrap;">
+            {% for s in sessions %}
+            {% set st = session_stats[s['id']] %}
+            <div class="event-session-stat">
+                <div class="session-name">{{ s['name'] }}</div>
+                {% if s['event_date'] %}<div class="session-meta"><i class="fas fa-clock"></i> {{ s['event_date'] }}</div>{% endif %}
+                {% if s['location'] %}<div class="session-meta"><i class="fas fa-map-marker-alt"></i> {{ s['location'] }}</div>{% endif %}
+                <div class="session-count">
+                    <span class="count-num">{{ st['accepted'] }}</span>
+                    {% if s['capacity'] %} / {{ s['capacity'] }}人{% else %} 人確定{% endif %}
+                    {% if st['remaining'] is not none and st['remaining'] <= 3 %}
+                    <span class="badge badge-danger" style="margin-left:4px;">残{{ st['remaining'] }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 操作ボタン -->
+    <div class="card">
+        <div class="event-actions">
+            <button class="btn btn-primary" onclick="autoAssign()">
+                <i class="fas fa-magic"></i> 自動割り当て実行
+            </button>
+            <button class="btn btn-success" onclick="notifyAll()" id="btn-notify">
+                <i class="fas fa-paper-plane"></i> 全員に通知送信
+            </button>
+            <a href="{{ url_for('survey.download_csv', survey_id=event['survey_id']) }}" class="btn btn-outline">
+                <i class="fas fa-download"></i> CSV ダウンロード
+            </a>
+        </div>
+    </div>
+
+    <!-- 応募者一覧 -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-users"></i> 応募者一覧</h3>
+            <span class="badge badge-primary">{{ participants | length }}名</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>名前</th>
+                        <th>希望</th>
+                        <th>割り当て部</th>
+                        <th>状態</th>
+                        {% for q in survey_questions %}<th style="font-size:.8rem; white-space:nowrap;">{{ q.text }}</th>{% endfor %}
+                        <th>個人メモ</th>
+                        <th>通知</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for p in participants %}
+                <tr id="row-{{ p['id'] }}">
+                    <td style="font-weight:bold;">{{ p['username'] }}</td>
+                    <td style="color:var(--gray); font-size:.85rem;">
+                        {% if p['preferred_session_ids'] is none %}
+                            不参加
+                        {% elif p['preferred_session_ids'] == '[]' %}
+                            —
+                        {% else %}
+                            {{ p['preferred_session_ids'] }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <select class="form-control select-session" style="width:auto; min-width:90px;"
+                                onchange="updateSession({{ p['id'] }}, this)">
+                            <option value="">—</option>
+                            {% for s in sessions %}
+                            <option value="{{ s['id'] }}" {% if p['session_id'] == s['id'] %}selected{% endif %}>{{ s['name'] }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td>
+                        <select class="form-control select-approval" style="width:auto;"
+                                onchange="updateApproval({{ p['id'] }}, this)">
+                            <option value="pending"  {% if p['approval']=='pending'  %}selected{% endif %}>確認中</option>
+                            <option value="accepted" {% if p['approval']=='accepted' %}selected{% endif %}>承認</option>
+                            <option value="rejected" {% if p['approval']=='rejected' %}selected{% endif %}>否認</option>
+                            <option value="waitlist" {% if p['approval']=='waitlist' %}selected{% endif %}>補欠</option>
+                        </select>
+                    </td>
+                    {% for q in survey_questions %}
+                    {% set ans = p['answers'].get(loop.index0 | string, '') %}
+                    <td style="font-size:.85rem; color:var(--gray);">
+                        {% if ans is iterable and ans is not string %}{{ ans | join(', ') }}{% else %}{{ ans }}{% endif %}
+                    </td>
+                    {% endfor %}
+                    <td>
+                        <input type="text" class="form-control" style="min-width:120px; width:160px; font-size:.85rem;"
+                               value="{{ p['personal_note'] or '' }}"
+                               placeholder="メモ（参加者非公開）"
+                               onblur="updateNote({{ p['id'] }}, this.value)">
+                    </td>
+                    <td style="text-align:center; font-size:.85rem;">
+                        {% if p['notified_at'] %}
+                        <span style="color:var(--success);"><i class="fas fa-check"></i> 送信済み</span>
+                        {% else %}
+                        <span style="color:var(--gray);">未送信</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline" onclick="copyConfirmUrl('{{ p['access_token'] }}')" title="確認URLをコピー">
+                            <i class="fas fa-link"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="{{ 7 + survey_questions | length }}" style="text-align:center; padding:2rem; color:var(--gray);">応募者はいません</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>window.EVENT_ID = {{ event['id'] }};</script>
+<script src="{{ url_for('static', filename='js/event_admin.js') }}"></script>
+</body>
+</html>

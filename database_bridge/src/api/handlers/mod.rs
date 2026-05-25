@@ -3,6 +3,7 @@ pub mod reset_log;
 pub mod ws;
 pub mod tournament;
 pub mod lounge;
+pub mod event;
 
 // api/handlers.rs (now as mod.rs inside handlers/)
 // Why: 各エンドポイントの実装をここに集約する。

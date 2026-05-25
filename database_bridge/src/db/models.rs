@@ -353,6 +353,58 @@ pub struct ResetLog {
 }
 
 // ============================================================
+// イベント参加フォームシステム (events, event_sessions, event_participants)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Event {
+    pub id: i32,
+    pub survey_id: i32,
+    pub title: String,
+    pub fee: Option<i32>,
+    pub notes: Option<String>,
+    /// 部制なし時の定員（NULL=無制限）
+    pub capacity: Option<i32>,
+    /// 部制なし用の集合場所（住所・場所名）
+    pub location: Option<String>,
+    pub status: String,
+    /// 部制なし用の開始日時
+    pub event_date: Option<String>,
+    /// 部制なし用の終了日時（None → event_date + 2時間）
+    pub end_date: Option<String>,
+    /// 応募締切（None → 無期限）
+    pub application_deadline: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct EventSession {
+    pub id: i32,
+    pub event_id: i32,
+    pub name: String,
+    pub event_date: Option<String>,
+    /// 終了日時（None → event_date + 2時間）
+    pub end_date: Option<String>,
+    pub location: Option<String>,
+    pub capacity: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct EventParticipant {
+    pub id: i32,
+    pub event_id: i32,
+    pub user_id: i64,
+    pub response_id: Option<i32>,
+    pub session_id: Option<i32>,
+    /// 希望部IDのJSON配列文字列 例: "[1,2]"
+    pub preferred_session_ids: Option<String>,
+    pub approval: String,
+    pub personal_note: Option<String>,
+    pub access_token: Option<String>,
+    pub notified_at: Option<String>,
+}
+
+// ============================================================
 // 共通エラー型
 // ============================================================
 

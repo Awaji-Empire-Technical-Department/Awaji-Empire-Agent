@@ -183,6 +183,18 @@ async def room_detail(passcode: str):
 
 
 # ============================================================
+# 順位表 API（Ajax用）
+# ============================================================
+
+@tournament_bp.route("/api/rooms/<passcode>/standings")
+async def api_room_standings(passcode: str):
+    if not _current_user():
+        return jsonify([])
+    standings = await TournamentService.get_standings(passcode)
+    return jsonify(standings)
+
+
+# ============================================================
 # スコア申告 API（Ajax用）
 # ============================================================
 

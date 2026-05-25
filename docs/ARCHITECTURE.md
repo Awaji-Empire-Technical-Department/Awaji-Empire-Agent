@@ -1,55 +1,256 @@
-# ⚙️ Awaji Empire Agent - 全体構成アーキテクチャ
+# Awaji Empire Agent - アーキテクチャ概要
 
 ## 1. 概要
 
-本プロジェクトは、淡路帝国のサーバー管理を自動化し、ユーザー体験を向上させるための統合プラットフォームです。物理サーバー(Proxmox)からエッジネットワーク(Cloudflare)までを一貫して自前で構築しています。
+本プロジェクトは、淡路帝国の Discord サーバー管理・イベント運営・対戦ロビーを統合する自作プラットフォームです。物理サーバー (Proxmox) からエッジネットワーク (Cloudflare) までを一貫して自前で構築しています。
 
-## 2. システム構成図
+---
 
-物理レイヤーから外部サービス連携までの全体像を示します。
+## 2. システム全体構成
 
-![System Architecture](./assets/runtime_architecture.png)
+```mermaid
+graph TD
+    subgraph Internet["インターネット / ユーザー"]
+        Browser["ブラウザ\n(dashboard.awajiempire.net)"]
+        DiscordClient["Discord クライアント"]
+    end
 
-## 3. インフラストラクチャ詳細
+    subgraph Edge["Cloudflare Edge"]
+        CFTunnel["Cloudflare Tunnel\n(IPアドレス非公開)"]
+        WARP["Cloudflare WARP\n(仮想IP管理)"]
+    end
 
-### 3.1 物理サーバー (Node) スペック
+    subgraph VM["Ubuntu 24.04 LTS VM (Proxmox)"]
+        subgraph PythonApp["Python アプリケーション層"]
+            WebApp["webapp.py\n(Quart / ASGI)"]
+            Bot["bot.py\n(discord.py)"]
+        end
 
-本システムの基盤となる物理マシンの構成です。
+        subgraph RustBridge["Rust database_bridge (Axum)"]
+            API["HTTP API\n:7878"]
+            WS["WebSocket\n/ws/hyouibana"]
+            Repos["DB Repos\n(sqlx)"]
+        end
+    end
+
+    subgraph DB["MariaDB CT (Proxmox)"]
+        MariaDB[("MariaDB\n:3306")]
+    end
+
+    Browser -->|HTTPS| CFTunnel
+    CFTunnel --> WebApp
+    DiscordClient <-->|Gateway| Bot
+    WebApp <-->|HTTP / IPC| API
+    WebApp <-->|WS proxy| WS
+    Bot <-->|HTTP / IPC| API
+    API --> Repos
+    WS --> Repos
+    Repos <-->|sqlx| MariaDB
+    WARP -.->|virtual IP sync| WebApp
+```
+
+---
+
+## 3. Python ↔ Rust 内部通信
+
+Python 層はすべての DB 操作を **Rust database_bridge** への HTTP リクエスト経由で行います。Python が MariaDB に直接接続することはありません。
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant WebApp as webapp.py (Quart)
+    participant Route as routes/*.py
+    participant Svc as services/*_service.py
+    participant BC as bridge_client.py
+    participant Bridge as database_bridge (Axum)
+    participant DB as MariaDB
+
+    Browser->>WebApp: HTTP リクエスト
+    WebApp->>Route: Blueprint ルーティング
+    Route->>Svc: Service メソッド呼び出し
+    Svc->>BC: bridge_client.request()
+    BC->>Bridge: HTTP (localhost:7878)
+    Bridge->>DB: sqlx クエリ
+    DB-->>Bridge: 結果
+    Bridge-->>BC: JSON レスポンス
+    BC-->>Svc: dict
+    Svc-->>Route: 処理済みデータ
+    Route-->>Browser: render_template / JSON
+```
+
+### レイヤー責務一覧
+
+| レイヤー | ファイル | 責務 |
+|---|---|---|
+| **Route** | `routes/*.py` | リクエスト受付・認可チェック・レスポンス返却 |
+| **Service** | `services/*_service.py` | ビジネスロジック・bridge_client 呼び出し |
+| **Common** | `common/` | 純粋関数ユーティリティ（カレンダー生成・アンケートパース等）|
+| **BridgeClient** | `services/bridge_client.py` | HTTP セッション管理・エラー変換 |
+| **Handler** | `src/api/handlers/*.rs` | HTTP リクエスト受付・Repo 呼び出し |
+| **Repo** | `src/db/*_repo.rs` | SQL 構築・実行（sqlx） |
+| **Models** | `src/db/models.rs` | DB 行に対応する Rust Struct（FromRow） |
+
+---
+
+## 4. モジュール構成
+
+### 4.1 Python (`discord_bot/`)
+
+```
+discord_bot/
+├── webapp.py               # Quart アプリ・Blueprint 登録・OAuth コールバック
+├── bot.py                  # discord.py Bot イベントハンドラ
+├── main.py                 # webapp + bot の同時起動エントリポイント
+│
+├── routes/
+│   ├── survey.py           # アンケート CRUD・回答送信
+│   ├── event.py            # イベントフォーム管理・確認ページ・DM通知
+│   ├── lobby.py            # 対戦ロビー
+│   ├── tournament.py       # 一般トーナメント
+│   └── lounge.py           # ラウンジ（MMR・ランク）
+│
+├── services/
+│   ├── bridge_client.py    # Rust Bridge への HTTP クライアント
+│   ├── survey_service.py
+│   ├── event_service.py
+│   ├── lobby_service.py
+│   ├── tournament_service.py
+│   ├── lounge_service.py
+│   ├── notification_service.py  # Discord DM 送信
+│   ├── log_service.py
+│   ├── permission_service.py
+│   ├── voice_keeper_service.py
+│   └── stream_comment_reset_service.py
+│
+├── common/
+│   ├── calendar_utils.py   # Google Calendar / Outlook URL・.ics 生成
+│   ├── survey_utils.py     # questions JSON パース
+│   ├── time_utils.py
+│   └── types.py
+│
+├── templates/              # Jinja2 HTML テンプレート
+└── static/
+    ├── js/                 # 機能ごとの JS（edit_survey.js, event_admin.js 等）
+    └── css/                # event.css 等の機能別スタイルシート
+```
+
+### 4.2 Rust (`database_bridge/`)
+
+```
+database_bridge/
+├── src/
+│   ├── main.rs             # Axum サーバー起動・ルーター組み立て
+│   ├── api/
+│   │   ├── mod.rs          # Blueprint 的なルート集約
+│   │   └── handlers/
+│   │       ├── lobby.rs
+│   │       ├── tournament.rs
+│   │       ├── lounge.rs
+│   │       ├── event.rs    # イベントフォーム API
+│   │       ├── reset_log.rs
+│   │       └── ws.rs       # WebSocket (表意盤リアルタイム)
+│   └── db/
+│       ├── models.rs       # 全テーブル対応 Struct (FromRow + Serialize)
+│       ├── connection.rs   # MySqlPool 初期化
+│       ├── survey_repo.rs
+│       ├── event_repo.rs
+│       ├── lobby_repo.rs
+│       ├── tournament_repo.rs
+│       ├── lounge_repo.rs
+│       ├── log_repo.rs
+│       ├── response_repo.rs
+│       └── reset_log_repo.rs
+│
+└── migrations/             # 順番に適用する DDL ファイル
+    ├── 003_lobby_tables.sql
+    ├── ...
+    ├── 009_event_form.sql
+    └── 010_event_location.sql
+```
+
+---
+
+## 5. 機能一覧
+
+| 機能 | Route | 説明 |
+|---|---|---|
+| アンケート | `/` `survey.*` | 質問作成・回答・集計・CSV出力 |
+| イベントフォーム | `/event/*` | オフ会参加申込・部制管理・DM通知・カレンダー連携 |
+| 対戦ロビー | `/lobby/*` | 東方憑依華専用セキュアロビー（Cloudflare WARP IP管理） |
+| 一般トーナメント | `/tournament/*` | ゲームタイトル汎用のトーナメント表・リアルタイム順位 |
+| ラウンジ | `/lounge/*` | MMR・ランク・セッション管理 |
+| Bot 機能 | `bot.py` | メッセージフィルタ・寝落ち検知・マスミュート・称号同期 |
+
+---
+
+## 6. インフラ構成
+
+### 6.1 物理サーバー
 
 | コンポーネント | スペック | 備考 |
-| :--- | :--- | :--- |
-| **CPU** | Intel Core i3 9100F | 4コア/4スレッド。VM・CTの並列稼働を支える心臓部。 |
-| **GPU** | NVIDIA GeForce GT 710 | **望まれざる客。** 映像出力用。 |
-| **RAM** | 16GB | Proxmox上での複数サービス稼働に余裕を持たせた容量。 |
-| **SSD** | 500GB | 高速なディスクI/Oにより、DBアクセスを高速化。 |
+|---|---|---|
+| **CPU** | Intel Core i3 9100F | 4コア/4スレッド |
+| **RAM** | 16GB | VM・CT 複数稼働 |
+| **SSD** | 500GB | DB・ログ高速アクセス |
+| **Hypervisor** | Proxmox VE 9.1 | Ubuntu 24.04 LTS (VM) + MariaDB (CT) |
 
-### 3.2 仮想化・ネットワーク
+### 6.2 ネットワーク・外部サービス
 
-- **Hypervisor**: Proxmox VE 9.1 上で Ubuntu 24.04 LTS (VM) と MariaDB (CT) を稼働。
-- **Network**: Cloudflare Tunnel を使用し、自宅回線のIPを公開せずに `dashboard.awajiempire.net` を運用。
-- **Database**: MariaDB を中央ハブとし、BotとWebアプリ間でリアルタイムなデータ共有を実現。
+| サービス | 用途 |
+|---|---|
+| **Cloudflare Tunnel** | 自宅 IP を公開せず `dashboard.awajiempire.net` を外部公開 |
+| **Cloudflare WARP** | 対戦ロビー参加者の仮想 IP 管理・ログイン時に同期 |
+| **Discord OAuth2** | Web ダッシュボードの認証（ギルドメンバー限定） |
+| **Discord Bot Token** | DM 送信・ロール同期・音声チャンネル管理 |
 
-## 4. 機能別ドキュメント
+---
 
-詳細なロジックは各ドキュメントを参照してください。
+## 7. デプロイ手順
 
-- [メッセージフィルタリング機能](./FEATURE_FILTER.md)
-- [通知マスミュート機能](./FEATURE_MASS_MUTE.md)
-- [内製アンケートシステム](./FEATURE_SURVEY.md)
-- [寝落ち検知機能](./FEATURE_VOICE_KEEPER.md)
-- [セキュア対戦ロビーシステム（東方憑依華専用）](./FEATURE_LOBBY.md)
+### 7.1 DBマイグレーション
 
-## 5. 今後の展望：Rustによるデータアクセス層の再構築 (検討中)
+`database_bridge/migrations/` 以下のSQLファイルは **サーバー起動時に sqlx が自動適用** します（`_sqlx_migrations` テーブルで適用済みを管理）。手動でのSQL実行は不要です。
 
-システムの堅牢性と安全性をさらに高めるため、現在 Python (Quart) で行っている MariaDB との通信部を、Rust による独立したエージェントへ移行する構成を検討しています。
+本番DBが初回デプロイ（または新規環境）の場合、以下が順番に自動実行されます：
 
-### 5.1 背景と目的
+| ファイル | 内容 |
+|---|---|
+| 009_event_form.sql | `events` / `event_sessions` / `event_participants` テーブル作成 |
+| 010_event_location.sql | `events.location` カラム追加 |
+| 011_event_capacity.sql | `events.capacity` カラム追加（部制なし定員） |
 
-- **OSトレンドへの適応**: Ubuntu 26.04 LTS のコアシステムにおける Rust 採用の流れを汲み、システム全体のメモリ安全性を向上させます。
-  - 参照: [Ubuntu、26.04 LTSのコアシステムにRustを導入へ - ZDNET Japan](https://japan.zdnet.com/article/35243565/)
-- **型安全性の確保**: `sqlx` 等のライブラリを活用し、コンパイル時にクエリの妥当性を検証することで、実行時のランタイムエラーを最小化します。
-- **リソース管理の最適化**: Discord Bot や Web アプリからの DB 接続を集約し、コネクションプールを最適化することで、物理サーバー (Proxmox 実行環境) への負荷を軽減します。
+### 7.2 デプロイ手順
 
-### 5.2 構成案
+```bash
+# 1. コード取得
+git pull origin master
 
-現在の `/discord_bot` 内の DB ロジックを切り出し、Rust 製の「DBブリッジ」を介して MariaDB にアクセスするハイブリッド構成を目指します。
+# 2. database_bridge をビルド・再起動（systemd / pm2 等）
+cd database_bridge
+cargo build --release
+# → 起動時に未適用マイグレーションが自動実行される
+
+# 3. 起動ログで確認
+# "Applied migration 009_event_form" 〜 "Applied migration 011_event_capacity" が出ればOK
+# エラー時はプロセスが停止する（ロールバックなし）
+
+# 4. discord_bot を再起動
+cd discord_bot
+# systemd / pm2 等で再起動
+```
+
+### 7.3 新規マイグレーションファイルの追加ルール
+
+- ファイル名は `NNN_description.sql`（連番）
+- **一度適用したファイルは内容を変更しない**（チェックサム不一致でエラーになる）
+- カラム変更・追加は必ず新しい番号のファイルで行う
+
+---
+
+## 8. 関連ドキュメント
+
+- [ADR 一覧](./adr/) — 設計上の意思決定記録
+- [イベントフォーム仕様書](./event_form_spec.md)
+- [ラウンジシステム仕様](./LOUNGE_GUIDE.md)
+- [対戦ロビー機能](./FEATURE_LOBBY.md)
+- [アンケート機能](./FEATURE_SURVEY.md)

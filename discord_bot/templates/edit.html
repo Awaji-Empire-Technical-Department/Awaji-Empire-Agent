@@ -6,6 +6,7 @@
     <title>編集 - {{ survey['title'] }}</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/event.css') }}?v={{ css_ver }}">
 </head>
 <body>
     <nav class="navbar">
@@ -24,6 +25,90 @@
                 <div class="form-group">
                     <label>アンケートタイトル</label>
                     <input type="text" name="title" value="{{ survey['title'] }}" class="form-control" style="font-size:1.2rem; font-weight:bold;" required placeholder="タイトルを入力">
+                </div>
+                <div class="form-group" style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                    <label class="event-checkbox-label">
+                        <input type="checkbox" id="is-event-form"
+                            {% if event_info %}checked{% endif %}
+                            data-event-info="{{ event_info | tojson | forceescape if event_info else '' }}">
+                        <i class="fas fa-calendar-check" style="color:var(--accent-blue);"></i>
+                        イベント参加フォームとして作成する
+                    </label>
+                    <p class="event-settings-hint">
+                        ⚠️ 応募にはDiscordアカウントが必要です。部の設定・参加費・締切を管理できます。
+                    </p>
+                </div>
+            </div>
+
+            <!-- イベント設定セクション（チェック時に展開） -->
+            <input type="hidden" id="eventSettingsJson" name="event_settings_json" value="">
+            <div id="event-settings-section" style="display:none;">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title"><i class="fas fa-cog"></i> イベント設定</h3></div>
+                    <div style="padding:1rem; display:flex; flex-direction:column; gap:1rem;">
+
+                        <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+                            <div class="form-group" style="flex:1; min-width:180px;">
+                                <label>参加費（円）</label>
+                                <input type="number" id="event-fee" min="0" class="form-control" placeholder="0 = 無料">
+                            </div>
+                            <div class="form-group" style="flex:1; min-width:200px;">
+                                <label>応募締切</label>
+                                <input type="datetime-local" id="event-deadline" class="form-control">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>全体備考</label>
+                            <textarea id="event-notes" class="form-control" rows="2" placeholder="参加者全員への共通メモ"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label style="font-weight:bold;"><i class="fas fa-layer-group"></i> 部制</label>
+                            <div style="display:flex; gap:1.5rem; margin:.5rem 0;">
+                                <label style="cursor:pointer; display:flex; align-items:center; gap:.4rem;">
+                                    <input type="radio" name="session-mode" id="session-mode-none" value="none">
+                                    部制なし（全員共通）
+                                </label>
+                                <label style="cursor:pointer; display:flex; align-items:center; gap:.4rem;">
+                                    <input type="radio" name="session-mode" id="session-mode-sessions" value="sessions">
+                                    n部制
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 部制なし用: 日時・場所・定員 -->
+                        <div id="no-session-fields" style="display:flex; flex-direction:column; gap:1rem;">
+                            <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+                                <div class="form-group" style="flex:1; min-width:200px;">
+                                    <label>開始日時</label>
+                                    <input type="datetime-local" id="event-date" class="form-control">
+                                </div>
+                                <div class="form-group" style="flex:1; min-width:200px;">
+                                    <label>終了日時 <span style="font-size:.8rem; color:var(--gray);">（省略=開始+2時間）</span></label>
+                                    <input type="datetime-local" id="event-end-date" class="form-control">
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+                                <div class="form-group" style="flex:2; min-width:200px;">
+                                    <label>集合場所 <span style="font-size:.8rem; color:var(--gray);">（住所または場所名）</span></label>
+                                    <input type="text" id="event-location" class="form-control" placeholder="例: ○○市民会館 大ホール / 東京都千代田区…">
+                                </div>
+                                <div class="form-group" style="flex:1; min-width:120px;">
+                                    <label>定員 <span style="font-size:.8rem; color:var(--gray);">（空=無制限）</span></label>
+                                    <input type="number" id="event-capacity" min="1" class="form-control" placeholder="例: 20">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- n部制用: 部リスト -->
+                        <div id="session-fields" style="display:none;">
+                            <div id="event-session-list"></div>
+                            <button type="button" id="btn-add-session" class="btn btn-outline btn-sm">
+                                <i class="fas fa-plus"></i> 部を追加
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
