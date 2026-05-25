@@ -205,7 +205,49 @@ database_bridge/
 
 ---
 
-## 7. 関連ドキュメント
+## 7. デプロイ手順
+
+### 7.1 DBマイグレーション
+
+`database_bridge/migrations/` 以下のSQLファイルは **サーバー起動時に sqlx が自動適用** します（`_sqlx_migrations` テーブルで適用済みを管理）。手動でのSQL実行は不要です。
+
+本番DBが初回デプロイ（または新規環境）の場合、以下が順番に自動実行されます：
+
+| ファイル | 内容 |
+|---|---|
+| 009_event_form.sql | `events` / `event_sessions` / `event_participants` テーブル作成 |
+| 010_event_location.sql | `events.location` カラム追加 |
+| 011_event_capacity.sql | `events.capacity` カラム追加（部制なし定員） |
+
+### 7.2 デプロイ手順
+
+```bash
+# 1. コード取得
+git pull origin master
+
+# 2. database_bridge をビルド・再起動（systemd / pm2 等）
+cd database_bridge
+cargo build --release
+# → 起動時に未適用マイグレーションが自動実行される
+
+# 3. 起動ログで確認
+# "Applied migration 009_event_form" 〜 "Applied migration 011_event_capacity" が出ればOK
+# エラー時はプロセスが停止する（ロールバックなし）
+
+# 4. discord_bot を再起動
+cd discord_bot
+# systemd / pm2 等で再起動
+```
+
+### 7.3 新規マイグレーションファイルの追加ルール
+
+- ファイル名は `NNN_description.sql`（連番）
+- **一度適用したファイルは内容を変更しない**（チェックサム不一致でエラーになる）
+- カラム変更・追加は必ず新しい番号のファイルで行う
+
+---
+
+## 8. 関連ドキュメント
 
 - [ADR 一覧](./adr/) — 設計上の意思決定記録
 - [イベントフォーム仕様書](./event_form_spec.md)
