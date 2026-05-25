@@ -50,7 +50,11 @@ WHERE status IN ('draft','open')
 
 このエンドポイントはスケジューラー専用。一般ユーザーからのアクセスを想定しない。
 
-### 3. 部制なし / n部制トグルUI（edit.html + edit_survey.js）
+### 3. イベントタイトルの役割（edit.html）
+
+編集画面（`edit.html`）の「タイトル」フィールドは、そのままイベント（オフ会）の名称として使用される。回答フォームのタイトル表示・Discord DM通知・管理画面の一覧表示など、すべてこのタイトルを参照する。フォーム設計時は「タイトル = オフ会名」を前提として入力を促すラベル・placeholder を設定すること。
+
+### 4. 部制なし / n部制トグルUI（edit.html + edit_survey.js）
 
 編集画面のイベント設定セクションに「部制なし（全員共通）」「n部制」のラジオボタンを追加。
 
@@ -65,7 +69,7 @@ WHERE status IN ('draft','open')
 
 保存時は `syncEventJson()` が `sessionMode` に応じて `sessions: []`（部制なし）または部リストをJSON化する。
 
-### 4. 日時フォーマット変換（edit_survey.js）
+### 5. 日時フォーマット変換（edit_survey.js）
 
 DBから返る日時は `"YYYY-MM-DD HH:MM:SS"` 形式だが、HTML `datetime-local` が受け付けるのは `"YYYY-MM-DDTHH:MM"` 形式。`toDatetimeLocal()` ヘルパーで変換して復元することで、編集画面を開き直した際に日時フィールドが正しく表示されるようにした。
 
@@ -84,6 +88,37 @@ DBから返る日時は `"YYYY-MM-DD HH:MM:SS"` 形式だが、HTML `datetime-lo
 ### 部制の専用フラグ（`sessions_enabled` カラム）
 
 - **却下理由**: `event_sessions` の件数（0件=部制なし）で十分に状態を表現できる。専用フラグはスキーマを複雑にするだけで利点が少ない。UI上のラジオトグルは `sessions` 配列の `[]` / 非空 で保存時に自動的に反映される。
+
+---
+
+## 改善実装済み（2026-05-25）
+
+### 部制なし時の定員設定
+
+- DB: `events` テーブルに `capacity INT NULL` カラムを追加（migration `011_event_capacity.sql`）
+- Rust: `insert_event` / `update_event` に `capacity` を組み込み。`auto_assign` で部なしイベントの定員チェック（accepted 数が capacity を超えたら waitlist）を実装。
+- Python: `EventService.create_event` / `update_event` に `capacity` パラメータを追加。
+- UI: `edit.html` の「部制なし」モードに定員フィールドを追加。`edit_survey.js` の `syncEventJson` / 復元処理も対応。
+
+### 回答フォームでの部ごとの集合場所表示
+
+- `form.html` の部選択セクション（`event_session` ループ）に `{% if s.location %}` の場所表示を追加。
+
+### 回答フォームのレイアウト変更（タイトルを最上部へ）
+
+- `form.html` でタイトルカードを最上部（Discordサインイン促しより前）に移動。
+
+### 回答フォームでの定員・残席表示
+
+- Rust: `count_accepted_no_session()` 追加。`GET /events/:id/session-stats` ハンドラーを新設。
+- Python: `EventService.get_session_stats()` を追加。`view_form` ルートで呼び出し、`session_stats` をテンプレートに渡す。
+- `form.html`: 部制ありの選択セクションで残席数を表示し、残席 0 の部のチェックボックスを `disabled`（`session-full` クラスで視覚的にも区別）。部制なしの場合はイベント詳細カードに定員・残席を表示。
+
+---
+
+## 将来的な改善候補（未実装）
+
+（上記「改善実装済み」セクションを参照。将来的な追加候補は現状なし）
 
 ---
 

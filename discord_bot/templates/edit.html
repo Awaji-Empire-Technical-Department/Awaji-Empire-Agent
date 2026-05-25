@@ -77,7 +77,7 @@
                             </div>
                         </div>
 
-                        <!-- 部制なし用: 日時・場所 -->
+                        <!-- 部制なし用: 日時・場所・定員 -->
                         <div id="no-session-fields" style="display:flex; flex-direction:column; gap:1rem;">
                             <div style="display:flex; gap:1rem; flex-wrap:wrap;">
                                 <div class="form-group" style="flex:1; min-width:200px;">
@@ -89,9 +89,15 @@
                                     <input type="datetime-local" id="event-end-date" class="form-control">
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label>集合場所 <span style="font-size:.8rem; color:var(--gray);">（住所または場所名）</span></label>
-                                <input type="text" id="event-location" class="form-control" placeholder="例: ○○市民会館 大ホール / 東京都千代田区…">
+                            <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+                                <div class="form-group" style="flex:2; min-width:200px;">
+                                    <label>集合場所 <span style="font-size:.8rem; color:var(--gray);">（住所または場所名）</span></label>
+                                    <input type="text" id="event-location" class="form-control" placeholder="例: ○○市民会館 大ホール / 東京都千代田区…">
+                                </div>
+                                <div class="form-group" style="flex:1; min-width:120px;">
+                                    <label>定員 <span style="font-size:.8rem; color:var(--gray);">（空=無制限）</span></label>
+                                    <input type="number" id="event-capacity" min="1" class="form-control" placeholder="例: 20">
+                                </div>
                             </div>
                         </div>
 

@@ -312,12 +312,15 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
             const locationEl = document.getElementById('event-location');
             const notesEl    = document.getElementById('event-notes');
 
+            const capacityEl = document.getElementById('event-capacity');
+
             if (feeEl)      feeEl.value      = ev.fee ?? '';
             if (deadlineEl) deadlineEl.value = toDatetimeLocal(ev.application_deadline);
             if (dateEl)     dateEl.value     = toDatetimeLocal(ev.event_date);
             if (endDateEl)  endDateEl.value  = toDatetimeLocal(ev.end_date);
             if (locationEl) locationEl.value = ev.location ?? '';
             if (notesEl)    notesEl.value    = ev.notes ?? '';
+            if (capacityEl) capacityEl.value = ev.capacity ?? '';
 
             sessions = evSessions.map(s => ({
                 name:       s.name || '',
@@ -403,6 +406,7 @@ document.getElementById('surveyForm').addEventListener('submit', () => {
         hiddenEl.value = JSON.stringify({
             is_event_form: checkbox.checked,
             fee:                  document.getElementById('event-fee')?.value || null,
+            capacity:             sessionMode === 'none' ? (document.getElementById('event-capacity')?.value || null) : null,
             location:             sessionMode === 'none' ? (document.getElementById('event-location')?.value || null) : null,
             notes:                document.getElementById('event-notes')?.value || null,
             event_date:           sessionMode === 'none' ? (document.getElementById('event-date')?.value || null) : null,

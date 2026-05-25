@@ -21,6 +21,8 @@ pub struct CreateEventRequest {
     pub title: String,
     pub fee: Option<i32>,
     pub notes: Option<String>,
+    /// 部制なし時の定員（None → 無制限）
+    pub capacity: Option<i32>,
     /// 部制なし用の集合場所（住所・場所名）
     pub location: Option<String>,
     /// 部制なし用の開始日時
@@ -53,6 +55,7 @@ pub async fn create_event(
         &payload.title,
         payload.fee,
         payload.notes.as_deref(),
+        payload.capacity,
         payload.location.as_deref(),
         payload.event_date.as_deref(),
         payload.end_date.as_deref(),
@@ -133,6 +136,7 @@ pub struct UpdateEventRequest {
     pub title: String,
     pub fee: Option<i32>,
     pub notes: Option<String>,
+    pub capacity: Option<i32>,
     pub location: Option<String>,
     pub event_date: Option<String>,
     pub end_date: Option<String>,
@@ -152,6 +156,7 @@ pub async fn update_event(
         &payload.title,
         payload.fee,
         payload.notes.as_deref(),
+        payload.capacity,
         payload.location.as_deref(),
         payload.event_date.as_deref(),
         payload.end_date.as_deref(),
@@ -336,8 +341,63 @@ pub async fn auto_assign(
     State(pool): State<MySqlPool>,
     Path(event_id): Path<i32>,
 ) -> (StatusCode, Json<Value>) {
-    match event_repo::auto_assign(&pool, event_id).await {
+    let event_capacity = match event_repo::find_event_by_id(&pool, event_id).await {
+        Ok(e) => e.capacity,
+        Err(e) => return internal_error(e),
+    };
+    match event_repo::auto_assign(&pool, event_id, event_capacity).await {
         Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
         Err(e) => internal_error(e),
+    }
+}
+
+/// GET /events/:id/session-stats
+/// 部ごとの承認済み参加者数と残席数を返す。
+/// 部制なしの場合は session_id=null のキーで返す。
+pub async fn get_session_stats(
+    State(pool): State<MySqlPool>,
+    Path(event_id): Path<i32>,
+) -> (StatusCode, Json<Value>) {
+    let event = match event_repo::find_event_by_id(&pool, event_id).await {
+        Ok(e) => e,
+        Err(e) => return internal_error(e),
+    };
+    let sessions = match event_repo::find_sessions_by_event(&pool, event_id).await {
+        Ok(s) => s,
+        Err(e) => return internal_error(e),
+    };
+
+    if sessions.is_empty() {
+        let accepted = match event_repo::count_accepted_no_session(&pool, event_id).await {
+            Ok(n) => n,
+            Err(e) => return internal_error(e),
+        };
+        let remaining = event.capacity.map(|cap| (cap - accepted).max(0));
+        (StatusCode::OK, Json(json!({
+            "mode": "no_session",
+            "capacity": event.capacity,
+            "accepted": accepted,
+            "remaining": remaining,
+            "sessions": []
+        })))
+    } else {
+        let counts = match event_repo::count_accepted_per_session(&pool, event_id).await {
+            Ok(m) => m,
+            Err(e) => return internal_error(e),
+        };
+        let session_stats: Vec<Value> = sessions.iter().map(|s| {
+            let accepted = *counts.get(&s.id).unwrap_or(&0);
+            let remaining = s.capacity.map(|cap| (cap - accepted).max(0));
+            json!({
+                "id": s.id,
+                "capacity": s.capacity,
+                "accepted": accepted,
+                "remaining": remaining,
+            })
+        }).collect();
+        (StatusCode::OK, Json(json!({
+            "mode": "sessions",
+            "sessions": session_stats
+        })))
     }
 }
