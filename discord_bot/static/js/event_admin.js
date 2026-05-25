@@ -48,16 +48,40 @@
     // 自動割り当て
     // ============================================================
 
+    const APPROVAL_LABELS = { pending: '確認中', accepted: '承認', rejected: '否認', waitlist: '補欠' };
+
     window.autoAssign = async function () {
         if (!confirm('自動割り当てを実行しますか？\n既に「承認」「否認」済みの方はスキップされます。')) return;
         const res = await fetch(`/event/api/${EVENT_ID}/auto-assign`, { method: 'POST' });
+        if (!res.ok) { alert('割り当てに失敗しました'); return; }
         const d = await res.json();
-        if (d.status === 'ok') {
-            alert('割り当て完了。ページを更新します。');
-            location.reload();
-        } else {
-            alert('割り当てに失敗しました');
-        }
+        if (d.status !== 'ok') { alert('割り当てに失敗しました'); return; }
+
+        // レスポンスに含まれる最新の参加者データでDOMを直接更新
+        let updated = 0;
+        (d.participants || []).forEach(p => {
+            const row = document.getElementById(`row-${p.id}`);
+            if (!row) return;
+
+            const approvalSel = row.querySelector('.select-approval');
+            if (approvalSel && approvalSel.value !== p.approval) {
+                approvalSel.value = p.approval;
+                updated++;
+            }
+
+            const sessionSel = row.querySelector('.select-session');
+            if (sessionSel) {
+                const newVal = p.session_id != null ? String(p.session_id) : '';
+                if (sessionSel.value !== newVal) {
+                    sessionSel.value = newVal;
+                    updated++;
+                }
+            }
+        });
+
+        alert(`割り当て完了（${updated}件更新）。`);
+        // 部ごとの残席カウントはページリロードで最新化
+        location.reload();
     };
 
     // ============================================================
