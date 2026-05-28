@@ -1,40 +1,33 @@
 #!/bin/bash
 
 # setup-systemd.sh
-# Why: Automate the registration and start of the database_bridge service.
+# Why: infra/ 配下の全 .service ファイルを /etc/systemd/system/ へインストールし enable する。
+#      CI/CD から呼ばれることを前提とし、サービスの追加・変更はこのスクリプト1本で完結させる。
 
-SERVICE_NAME="database_bridge.service"
-SOURCE_PATH="/Awaji-Empire-Agent/infra/$SERVICE_NAME"
-TARGET_PATH="/etc/systemd/system/$SERVICE_NAME"
+INFRA_DIR="/Awaji-Empire-Agent/infra"
+SYSTEMD_DIR="/etc/systemd/system"
 
 if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root (sudo)"
-   exit 1
-fi
-
-echo "--- Setting up $SERVICE_NAME ---"
-
-if [ ! -f "$SOURCE_PATH" ]; then
-    echo "Error: Source service file not found at $SOURCE_PATH"
+    echo "This script must be run as root (sudo)"
     exit 1
 fi
 
-# Copy the service file
-echo "Copying $SERVICE_NAME to $TARGET_PATH..."
-cp "$SOURCE_PATH" "$TARGET_PATH"
+echo "--- Setting up systemd services from ${INFRA_DIR} ---"
 
-# Reload systemd
+for SOURCE_PATH in "${INFRA_DIR}"/*.service; do
+    [ -f "${SOURCE_PATH}" ] || continue
+
+    SERVICE_NAME="$(basename "${SOURCE_PATH}")"
+    TARGET_PATH="${SYSTEMD_DIR}/${SERVICE_NAME}"
+
+    echo "Copying ${SERVICE_NAME} → ${TARGET_PATH}"
+    cp "${SOURCE_PATH}" "${TARGET_PATH}"
+
+    echo "Enabling ${SERVICE_NAME}..."
+    systemctl enable "${SERVICE_NAME}"
+done
+
 echo "Reloading systemd daemon..."
 systemctl daemon-reload
 
-# Enable and start
-echo "Enabling $SERVICE_NAME..."
-systemctl enable "$SERVICE_NAME"
-
-echo "Restarting $SERVICE_NAME..."
-systemctl restart "$SERVICE_NAME"
-
-echo "Checking status of $SERVICE_NAME..."
-systemctl status "$SERVICE_NAME" --no-pager
-
-echo "✅ Setup completed successfully."
+echo "✅ All services installed successfully."

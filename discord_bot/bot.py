@@ -2,14 +2,14 @@ import discord
 from discord.ext import commands
 import asyncio
 import os
+import sys
 import mysql.connector
 from dotenv import load_dotenv
 
-DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
-
-# .envファイルを読み込む
+# .envファイルを読み込む（他の os.getenv より先に呼ぶ）
 load_dotenv()
 
+DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
 ADMIN_USER_ID = os.getenv('ADMIN_USER_ID', '')
 DISCORD_GUILD_ID = os.getenv('DISCORD_GUILD_ID', '')
 
@@ -75,18 +75,13 @@ class MyBot(commands.Bot):
 # Botインスタンスの作成
 bot = MyBot()
 
-def get_token_from_file(filename="token.txt"):
-    """token.txtファイルからトークンを読み込む"""
-    try:
-        with open(filename, 'r') as f:
-            token = f.read().strip()
-            return token
-    except FileNotFoundError:
-        print(f"Error: Token file '{filename}' not found.")
+def get_token() -> str | None:
+    """環境変数 DISCORD_TOKEN からトークンを取得する"""
+    token = os.getenv('DISCORD_TOKEN', '').strip()
+    if not token:
+        print("Error: DISCORD_TOKEN が設定されていません。.env を確認してください。", file=sys.stderr)
         return None
-    except Exception as e:
-        print(f"Error reading token file: {e}")
-        return None
+    return token
 
 @bot.event
 async def on_ready():
@@ -145,11 +140,7 @@ async def _event_deadline_scheduler():
     from services.notification_service import NotificationService
     from common.calendar_utils import build_calendar_urls
 
-    try:
-        with open('token.txt', 'r', encoding='utf-8') as f:
-            bot_token = f.read().strip()
-    except FileNotFoundError:
-        bot_token = None
+    bot_token = os.getenv('DISCORD_TOKEN', '').strip() or None
 
     while not bot.is_closed():
         try:
@@ -242,8 +233,8 @@ async def _event_deadline_scheduler():
 
 
 if __name__ == '__main__':
-    bot_token = get_token_from_file()
-    
+    bot_token = get_token()
+
     if bot_token:
         try:
             bot.run(bot_token, reconnect=True)

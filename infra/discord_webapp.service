@@ -1,0 +1,16 @@
+[Unit]
+Description=Discord Bot Web Dashboard
+After=network.target mysql.service
+
+[Service]
+User=devuser
+Group=root
+WorkingDirectory=/Awaji-Empire-Agent/discord_bot
+Environment=DISCORD_REDIRECT_URI=https://dashboard.awajiempire.net/callback
+EnvironmentFile=/Awaji-Empire-Agent/discord_bot/.env
+ExecStart=/Awaji-Empire-Agent/discord_bot/.venv/bin/python3 webapp.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
