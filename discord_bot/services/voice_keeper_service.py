@@ -65,7 +65,10 @@ class VoiceKeeperService:
             送信成功かどうか
         """
         report_ch = discord.utils.get(guild.text_channels, name=report_channel_name)
-        if not report_ch:
+        if report_ch is None:
+            # テキストチャンネルに見つからない場合、ボイスチャンネルのOpenChatを探す
+            report_ch = discord.utils.get(guild.voice_channels, name=report_channel_name)
+        if report_ch is None:
             logger.info(
                 "[VoiceKeeper] Report channel not found name=%s guild=%s(%s)",
                 report_channel_name, guild.name, guild.id,
