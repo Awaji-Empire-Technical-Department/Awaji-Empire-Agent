@@ -6,7 +6,16 @@
 ## 2. 実行ロジック
 複数のトリガーによって、常に定義通りの権限状態を維持します。
 
-![Mass Mute Operation](./assets/mass-mute_operation.png)
+```mermaid
+flowchart TD
+    T1([Bot起動時]) --> E
+    T2([定時タスク\n0:00 / 8:00 / 16:00 JST]) --> E
+    T3([チャンネル作成時]) --> E
+    E[対象チャンネルリストを取得] --> F{チャンネルが存在する?}
+    F -- No --> Z([スキップ])
+    F -- Yes --> G[@everyone の通知権限を上書き\nmention_everyone=False\nmanage_webhooks=False]
+    G --> H([完了])
+```
 
 ## 3. 主な仕様
 - **実行タイミング**: 

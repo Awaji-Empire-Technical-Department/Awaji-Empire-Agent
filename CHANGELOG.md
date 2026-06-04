@@ -3,6 +3,21 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
+## [1.7.1] - 2026-06-04
+
+ドキュメント整備・VoiceKeeper ボイスチャンネル内OpenChatへの報告対応。
+
+### Fixed
+
+- **VoiceKeeper**: `REPORT_CHANNEL_NAME` に指定されたチャンネルがテキストチャンネルに存在しない場合、同名のボイスチャンネル内 OpenChat へフォールバックして報告を送信するよう修正（`services/voice_keeper_service.py`）
+
+### Changed
+
+- **FEATUREドキュメント**: フローチャートを PNG 画像から Mermaid 図に移行（`FEATURE_VOICE_KEEPER.md`, `FEATURE_MASS_MUTE.md`）
+- **FEATURE_FILTER.md**: メッセージフィルタリング機能を廃止済みとしてマーク
+
+---
+
 ## [1.7.0] - 2026-05-25
 
 イベント参加フォームシステムの完成・改善実装。設計記録: `docs/adr/021`, `022`
