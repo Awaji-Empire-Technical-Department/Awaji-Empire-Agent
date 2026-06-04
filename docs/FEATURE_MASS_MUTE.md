@@ -13,7 +13,7 @@ flowchart TD
     T3([チャンネル作成時]) --> E
     E[対象チャンネルリストを取得] --> F{チャンネルが存在する?}
     F -- No --> Z([スキップ])
-    F -- Yes --> G[@everyone の通知権限を上書き\nmention_everyone=False\nmanage_webhooks=False]
+    F -- Yes --> G["@everyone の通知権限を上書き\nmention_everyone=False\nmanage_webhooks=False"]
     G --> H([完了])
 ```
 
