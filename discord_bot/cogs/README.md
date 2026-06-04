@@ -45,7 +45,7 @@ cogs/
 
 ユーザーがコマンドを実行した際の処理の流れは以下の通りです。
 
-```
+```mermaid
 sequenceDiagram
     participant User
     participant Cog (cog.py)
