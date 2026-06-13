@@ -2,6 +2,7 @@ import os
 import asyncio
 import aiohttp
 import httpx
+from urllib.parse import urlparse
 from quart import Quart, render_template, request, redirect, url_for, session, current_app, websocket
 from quart_cors import cors
 from dotenv import load_dotenv
@@ -143,7 +144,10 @@ async def callback():
             auth_header = {'Authorization': f'Bearer {access_token}'}
 
             # 2. ギルドチェック (必要な場合のみ)
-            if Config.TARGET_GUILD_ID:
+            # フォーム回答 (/form/<id>) へのログインは「淡路帝国」サーバー未参加でも許可する
+            next_url = session.get('next_url', '')
+            is_form_login = urlparse(next_url).path.startswith('/form/')
+            if Config.TARGET_GUILD_ID and not is_form_login:
                 r_guilds = await client.get('https://discord.com/api/users/@me/guilds', headers=auth_header)
                 if r_guilds.status_code == 200:
                     guilds = r_guilds.json()
