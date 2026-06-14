@@ -125,6 +125,7 @@ fn event_routes() -> Router<AppState> {
 fn survey_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(handlers::list_surveys).post(handlers::create_survey))
+        .route("/shared", get(handlers::list_shared_surveys))
         .route("/{id}", get(handlers::get_survey).patch(handlers::update_survey).delete(handlers::delete_survey))
         .route("/{id}/toggle", post(handlers::toggle_survey_status))
         .route("/{id}/responses", get(handlers::list_responses))

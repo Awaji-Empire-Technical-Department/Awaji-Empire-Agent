@@ -41,6 +41,12 @@ class SurveyService:
         return res if isinstance(res, list) else []
 
     @staticmethod
+    async def get_shared_surveys(user_id: str) -> List[Dict[str, Any]]:
+        """指定ユーザーにスタッフとして共有されているアンケート一覧を取得する。"""
+        res = await bridge_client.request("GET", "/surveys/shared", params={"user_id": user_id})
+        return res if isinstance(res, list) else []
+
+    @staticmethod
     async def get_active_surveys(pool: Any) -> List[Dict[str, Any]]:
         """稼働中の全アンケートを取得する。"""
         # 現在はオーナー指定なしで active を取るエンドポイントはないが
