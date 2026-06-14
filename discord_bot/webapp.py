@@ -151,16 +151,24 @@ async def callback():
             #      回答以外の管理系画面は従来通りギルド加入を必須とする。
             next_url = session.get('next_url', '') or ''
             is_form_answer = '/form/' in next_url
-            if Config.TARGET_GUILD_ID and not is_form_answer:
+            # 加入状態を判定してセッションに保持する。
+            # Why: フォーム回答フローはギルド未加入でもログインを許可する（ADR-024）が、
+            #      その結果ダッシュボード(index)へ素通りできてしまう不具合があった。
+            #      未加入フラグをセッションに残し、回答フロー以外の画面（ダッシュボード等）
+            #      では従来通りアクセスを拒否することで根本対処する。
+            is_guild_member = True
+            if Config.TARGET_GUILD_ID:
                 r_guilds = await client.get('https://discord.com/api/users/@me/guilds', headers=auth_header)
                 if r_guilds.status_code == 200:
                     guilds = r_guilds.json()
                     # ID比較は文字列同士で行う
                     guild_ids = [str(g['id']) for g in guilds]
-                    if str(Config.TARGET_GUILD_ID) not in guild_ids:
+                    is_guild_member = str(Config.TARGET_GUILD_ID) in guild_ids
+                    if not is_guild_member and not is_form_answer:
                         return await render_template('access_denied.html'), 403
                 else:
                     return f"Failed to fetch guilds: {r_guilds.status_code}", 500
+            session['is_guild_member'] = is_guild_member
 
             # 3. ユーザー情報取得
             r_user = await client.get('https://discord.com/api/users/@me', headers=auth_header)
@@ -251,7 +259,11 @@ async def index():
     user = session.get('discord_user')
     if not user:
         return redirect(url_for('login'))
-    
+
+    # ギルド未加入者はフォーム回答のみ許可されており、ダッシュボードへは入れない（ADR-024）。
+    if Config.TARGET_GUILD_ID and not session.get('is_guild_member', True):
+        return await render_template('access_denied.html'), 403
+
     try:
         # SurveyService 経由で取得 (Rust Bridge を利用)
         # 自分が作成したフォーム + スタッフとして共有されたフォームをまとめて表示する。
