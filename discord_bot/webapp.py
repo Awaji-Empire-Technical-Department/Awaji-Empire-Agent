@@ -6,6 +6,10 @@ from quart import Quart, render_template, request, redirect, url_for, session, c
 from quart_cors import cors
 from dotenv import load_dotenv
 
+# routes/* のモジュール読込時に DISCORD_TOKEN 等を参照するため、
+# ブループリント import より前に .env を読み込む（ADR-023）。
+load_dotenv()
+
 from routes.survey import survey_bp
 from routes.lobby import lobby_bp
 from routes.tournament import tournament_bp
@@ -17,8 +21,6 @@ from services.lounge_service import LoungeService
 from services.bridge_client import BridgeUnavailableError
 from services.survey_service import SurveyService
 from services.log_service import LogService
-
-load_dotenv()
 
 ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
 

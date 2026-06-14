@@ -21,7 +21,7 @@
                 <div style="margin-top:1rem;">
                     <button type="button" id="shareBtn" onclick="shareForm()"
                         style="background:#5865F2; color:#fff; border:none; border-radius:6px; padding:.55rem 1.2rem; font-size:.9rem; cursor:pointer;">
-                        <i class="fas fa-share-alt"></i> 回答リンクを共有
+                        <i class="fas fa-share-alt"></i> 回答リンクをコピー
                     </button>
                     <span id="shareMsg" style="display:none; color:var(--success); font-size:.85rem; margin-left:.6rem;">
                         <i class="fas fa-check"></i> リンクをコピーしました
@@ -256,13 +256,11 @@
 
     <script src="{{ url_for('static', filename='js/form.js') }}"></script>
     <script>
-        // 回答リンク共有: Web Share API → クリップボード → prompt の順でフォールバック
+        // 回答リンク共有: クリップボードへ自動コピーを優先（他画面の共有ボタンと挙動を統一）。
+        // クリップボード非対応環境のみ prompt にフォールバック。
         function shareForm() {
             const url = window.location.href;
-            const title = {{ survey['title'] | tojson }};
-            if (navigator.share) {
-                navigator.share({ title: title, url: url }).catch(function () {});
-            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(url).then(showShareMsg).catch(function () {
                     window.prompt('以下のリンクをコピーしてください', url);
                 });
