@@ -143,7 +143,13 @@ async def callback():
             auth_header = {'Authorization': f'Bearer {access_token}'}
 
             # 2. ギルドチェック (必要な場合のみ)
-            if Config.TARGET_GUILD_ID:
+            # Why: フォーム回答フロー (/form/<id>) は集計用途のため、ギルド未加入でも
+            #      回答可能とする。オフ会参加者は概ねギルド加入済みだが、最悪のケース
+            #      （未加入者の回答）を取りこぼさないための救済措置。
+            #      回答以外の管理系画面は従来通りギルド加入を必須とする。
+            next_url = session.get('next_url', '') or ''
+            is_form_answer = '/form/' in next_url
+            if Config.TARGET_GUILD_ID and not is_form_answer:
                 r_guilds = await client.get('https://discord.com/api/users/@me/guilds', headers=auth_header)
                 if r_guilds.status_code == 200:
                     guilds = r_guilds.json()

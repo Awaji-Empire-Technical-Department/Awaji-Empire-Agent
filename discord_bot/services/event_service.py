@@ -174,6 +174,24 @@ class EventService:
         )
         return res is not None
 
+    @staticmethod
+    async def set_checkin(participant_id: int, checked_in: bool) -> bool:
+        """当日チェックイン状態を設定する（来場/取消）。"""
+        res = await bridge_client.request(
+            "PATCH",
+            f"/events/participant/{participant_id}/checkin",
+            json={"checked_in": checked_in},
+        )
+        return res is not None
+
+    @staticmethod
+    async def delete_participant(participant_id: int) -> bool:
+        """参加者とその応募（アンケート回答）を削除する（管理者用）。"""
+        res = await bridge_client.request(
+            "DELETE", f"/events/participant/{participant_id}"
+        )
+        return res is not None
+
     # ============================================================
     # 自動割り当て
     # ============================================================

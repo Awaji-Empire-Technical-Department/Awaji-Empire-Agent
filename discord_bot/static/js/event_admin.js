@@ -111,4 +111,20 @@
         const url = `${location.origin}/event/confirm/${token}`;
         navigator.clipboard.writeText(url).then(() => alert('確認URLをコピーしました'));
     };
+
+    // ============================================================
+    // 応募削除（管理者）
+    // ============================================================
+
+    window.deleteParticipant = async function (pid, name) {
+        if (!confirm(`「${name}」さんの応募を削除しますか？\nこの操作は取り消せません（アンケート回答も削除されます）。`)) return;
+        const res = await fetch(`/event/${EVENT_ID}/api/participant/${pid}`, { method: 'DELETE' });
+        const d = await res.json();
+        if (d.status === 'ok') {
+            const row = document.getElementById(`row-${pid}`);
+            if (row) row.remove();
+        } else {
+            alert('削除に失敗しました');
+        }
+    };
 })();

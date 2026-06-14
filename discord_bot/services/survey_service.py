@@ -141,3 +141,49 @@ class SurveyService:
         """ユーザーの既存回答を取得する。"""
         res = await bridge_client.request("GET", f"/surveys/{survey_id}/responses/{user_id}")
         return res if isinstance(res, dict) else {}
+
+    @staticmethod
+    async def delete_own_response(survey_id: int, user_id: str) -> bool:
+        """本人の回答を削除する（紐づくイベント参加者も削除される）。"""
+        res = await bridge_client.request(
+            "DELETE", f"/surveys/{survey_id}/responses/by-user/{user_id}"
+        )
+        return res is not None
+
+    # ============================================================
+    # スタッフ共同編集（survey_collaborators）
+    # ============================================================
+
+    @staticmethod
+    async def list_collaborators(survey_id: int) -> List[Dict[str, Any]]:
+        """スタッフ（共同編集者）一覧を [{user_id, username}] で返す。"""
+        res = await bridge_client.request("GET", f"/surveys/{survey_id}/collaborators")
+        return res if isinstance(res, list) else []
+
+    @staticmethod
+    async def add_collaborator(survey_id: int, user_id: int) -> bool:
+        """スタッフを追加する。"""
+        res = await bridge_client.request(
+            "POST", f"/surveys/{survey_id}/collaborators", json={"user_id": user_id}
+        )
+        return res is not None
+
+    @staticmethod
+    async def remove_collaborator(survey_id: int, user_id: int) -> bool:
+        """スタッフを削除する。"""
+        res = await bridge_client.request(
+            "DELETE", f"/surveys/{survey_id}/collaborators/{user_id}"
+        )
+        return res is not None
+
+    @staticmethod
+    async def is_collaborator(survey_id: int, user_id: str) -> bool:
+        """指定ユーザーがそのアンケートのスタッフか判定する。"""
+        collaborators = await SurveyService.list_collaborators(survey_id)
+        return any(str(c.get("user_id")) == str(user_id) for c in collaborators)
+
+    @staticmethod
+    async def search_users(query: str) -> List[Dict[str, Any]]:
+        """ユーザー名でユーザーを検索する（スタッフ追加候補）。"""
+        res = await bridge_client.request("GET", "/users/search", params={"q": query})
+        return res if isinstance(res, list) else []
