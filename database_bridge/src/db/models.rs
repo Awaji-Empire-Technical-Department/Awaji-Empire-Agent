@@ -402,6 +402,8 @@ pub struct EventParticipant {
     pub personal_note: Option<String>,
     pub access_token: Option<String>,
     pub notified_at: Option<String>,
+    /// 当日チェックイン日時。None = 未来場。
+    pub checked_in_at: Option<String>,
 }
 
 // ============================================================

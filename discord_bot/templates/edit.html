@@ -123,9 +123,31 @@
                 </button>
             </div>
         </form>
+
+        {% if is_owner %}
+        <!-- スタッフ共同編集（オーナーのみ表示） -->
+        <div class="card" id="staff-card" data-survey-id="{{ survey['id'] }}">
+            <div class="card-header"><h3 class="card-title"><i class="fas fa-user-friends"></i> 共同編集スタッフ</h3></div>
+            <div style="padding:1rem;">
+                <p style="font-size:.85rem; color:var(--gray); margin-top:0;">
+                    追加したスタッフは、このフォームの編集とイベント管理（応募確認・割り当て・当日受付）が行えます。
+                </p>
+                <div class="form-group" style="position:relative;">
+                    <label>ユーザー名で検索して追加</label>
+                    <input type="text" id="staff-search" class="form-control" placeholder="ユーザー名を2文字以上入力" autocomplete="off">
+                    <div id="staff-search-results" style="display:none; position:absolute; z-index:10; left:0; right:0; background:#fff; border:1px solid var(--border-color); border-radius:6px; max-height:240px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,.1);"></div>
+                </div>
+                <div id="staff-list" style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.8rem;"></div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <script>window.initialQuestions = {{ questions | tojson }};</script>
     <script src="{{ url_for('static', filename='js/edit_survey.js') }}?v={{ css_ver }}"></script>
+    {% if is_owner %}
+    <script>window.initialCollaborators = {{ collaborators | tojson }};</script>
+    <script src="{{ url_for('static', filename='js/staff_collaborators.js') }}?v={{ css_ver }}"></script>
+    {% endif %}
 </body>
 </html>

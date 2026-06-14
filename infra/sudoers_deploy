@@ -12,6 +12,10 @@
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable database_bridge.service
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart database_bridge.service
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl status database_bridge.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable discord_bot.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart discord_bot.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl status discord_bot.service
+<USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable discord_webapp.service
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart discord_webapp.service
 <USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl status discord_webapp.service
 

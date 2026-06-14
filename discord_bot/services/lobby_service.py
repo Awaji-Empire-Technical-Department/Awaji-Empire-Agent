@@ -28,6 +28,16 @@ class LobbyService:
         return res is not None and res.get("status") == "ok"
 
     @staticmethod
+    async def bulk_sync_users(members: List[Dict[str, Any]]) -> int:
+        """ギルドメンバーのユーザー名を一括同期する。
+        members: [{"discord_id": int, "username": str}, ...]
+        戻り値: 影響を受けた行数（MySQL の rows_affected）。"""
+        res = await bridge_client.request(
+            "POST", "/lobby/bulk_sync_users", json={"members": members}
+        )
+        return res.get("affected", 0) if res else 0
+
+    @staticmethod
     async def create_room(passcode: str, host_id: int, mode: str, title: str, description: Optional[str] = None, expires_in_hours: int = 24, extra: Optional[Dict[str, Any]] = None) -> bool:
         """新規ロビーを作成する"""
         payload = {

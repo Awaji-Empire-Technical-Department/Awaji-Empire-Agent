@@ -1,3 +1,23 @@
+# イベントフォーム拡張: スタッフ共同編集 / 回答削除 / 当日モード（2026-06-14）
+
+## ステータス: 実装完了（DB適用・動作検証待ち）
+
+- [x] DBマイグレーション `012_survey_collaborators.sql` / `013_event_checkin.sql`
+- [x] Rust: `EventParticipant.checked_in_at`、survey_repo（collaborator/ユーザー検索）、response_repo（delete）、event_repo（checkin/delete）
+- [x] Rust handler/route: スタッフAPI・ユーザー検索・本人回答削除・参加者削除・チェックイン（`cargo build` 通過）
+- [x] Python service: survey_service / event_service ラッパー
+- [x] Python route: 権限共通化（オーナー or スタッフ）、スタッフ管理API、本人回答削除、当日モード、checkin/delete API、CSV「来場」列
+- [x] Template/JS: edit.html + staff_collaborators.js、form.html（回答削除）、event_admin.html + event_admin.js（削除・当日リンク）、event_checkin.html（新規）
+- [x] ドキュメント: ADR-025、ADR README、EVENT_FORM_MANUAL.md
+- [x] ギルドメンバー一括同期: lobby_repo.bulk_sync_usernames、`POST /lobby/bulk_sync_users`、LobbyService.bulk_sync_users、bot.py（on_ready 1回 + `/sync_members` コマンド）
+
+### 残（デプロイ時）
+- [ ] 本番/ステージング MySQL へ 012・013 を適用
+- [ ] スタッフ追加→別アカウントで編集/管理アクセス、非スタッフ403 を実機確認
+- [ ] 回答削除（本人・管理者）、当日モードのチェックイン動作を実機確認
+
+---
+
 # Phase 1 / Phase 2 実装計画
 
 ## ステータス: 実装完了（コードレビュー・DB適用待ち）

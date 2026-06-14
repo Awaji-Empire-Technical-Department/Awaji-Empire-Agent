@@ -1,0 +1,16 @@
+[Unit]
+Description=Discord Bot Service
+After=network.target mysql.service
+
+[Service]
+Environment=PYTHONPATH=/Awaji-Empire-Agent/discord_bot
+User=devuser
+Group=root
+WorkingDirectory=/Awaji-Empire-Agent/discord_bot
+EnvironmentFile=/Awaji-Empire-Agent/discord_bot/.env
+ExecStart=/Awaji-Empire-Agent/discord_bot/.venv/bin/python3 bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

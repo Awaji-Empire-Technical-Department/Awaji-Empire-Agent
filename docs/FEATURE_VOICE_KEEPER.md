@@ -9,7 +9,20 @@
 
 この機能は以下のロジックで動作します。
 
-![Voice Keeper Operation Flow](./assets/voice-keeper_operation.png)
+```mermaid
+flowchart TD
+    A([ホストがVCから退出/移動]) --> B{稼働時間内?}
+    B -- No --> Z([処理スキップ])
+    B -- Yes --> C[タイマー開始\nAFK_TIMEOUT_SECONDS 待機]
+    C --> D{ホストが元VCに戻った?}
+    D -- Yes --> Z
+    D -- No --> E{まだ稼働時間内?}
+    E -- No --> Z
+    E -- Yes --> F[VC内のBot以外を全員切断]
+    F --> G[切断人数を集計]
+    G --> H[REPORT_CHANNELに報告送信]
+    H --> I([完了])
+```
 
 1. **稼働時間の判定**:
     * ~~指定された深夜帯（例: 0:00 〜 6:00）のみ機能が有効になります。~~
@@ -83,4 +96,12 @@ bot.py
               └─ (Discord操作: move_to / send などの副作用をここに集約)
 ```
 
-![Voice Keeper Operation Flow](./assets/Voice_Keeper_component.png)
+```mermaid
+graph TD
+    bot[bot.py] --> cog[cogs/voice_keeper/cog.py\nDiscordイベント監視・タイマー管理]
+    cog --> logic[cogs/voice_keeper/logic.py\nビジネスロジック]
+    cog --> time_utils[common/time_utils.py\n稼働時間判定]
+    cog --> types[common/types.py\nWatchKey等の共通型定義]
+    logic --> service[services/voice_keeper_service.py\n切断処理・報告送信]
+    logic --> time_utils
+```

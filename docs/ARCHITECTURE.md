@@ -203,9 +203,87 @@ database_bridge/
 | **Discord OAuth2** | Web ダッシュボードの認証（ギルドメンバー限定） |
 | **Discord Bot Token** | DM 送信・ロール同期・音声チャンネル管理 |
 
+### 6.3 シークレット管理
+
+全シークレットは **サーバー上の `/Awaji-Empire-Agent/discord_bot/.env`** で一元管理する。このファイルはリポジトリに含まれず（`.gitignore` 対象）、手動で配置・更新する。
+
+| キー | 用途 |
+|---|---|
+| `DISCORD_TOKEN` | Bot トークン（`bot.py` 起動・DM 送信） |
+| `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | OAuth2 認証（Web ダッシュボード） |
+| `DB_HOST` / `DB_NAME` / `DB_USER` / `DB_PASS` | MariaDB 接続情報 |
+| `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` | Cloudflare Zero Trust |
+| `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` | Cloudflare サービストークン |
+
+各 systemd サービスは `EnvironmentFile=/Awaji-Empire-Agent/discord_bot/.env` により `.env` を自動的に読み込む。`bot.py` は起動時に `load_dotenv()` でも同ファイルを読み込む（systemd 経由でない手動起動への対応）。
+
+### 6.4 systemd サービス構成
+
+サービスファイルは `infra/` で一元管理し、CI/CD が自動的に `/etc/systemd/system/` へ適用する。
+
+| サービスファイル | 役割 |
+|---|---|
+| `infra/discord_bot.service` | Bot プロセス（`bot.py`） |
+| `infra/discord_webapp.service` | Web ダッシュボード（`webapp.py`） |
+| `infra/database_bridge.service` | Rust Bridge（`database_bridge`） |
+
 ---
 
-## 7. 関連ドキュメント
+## 7. デプロイ手順
+
+### 7.1 DBマイグレーション
+
+`database_bridge/migrations/` 以下のSQLファイルは **サーバー起動時に sqlx が自動適用** します（`_sqlx_migrations` テーブルで適用済みを管理）。手動でのSQL実行は不要です。
+
+本番DBが初回デプロイ（または新規環境）の場合、以下が順番に自動実行されます：
+
+| ファイル | 内容 |
+|---|---|
+| 009_event_form.sql | `events` / `event_sessions` / `event_participants` テーブル作成 |
+| 010_event_location.sql | `events.location` カラム追加 |
+| 011_event_capacity.sql | `events.capacity` カラム追加（部制なし定員） |
+
+### 7.2 デプロイ手順
+
+`master` ブランチへの push で GitHub Actions が自動実行する。手動デプロイが必要な場合は以下を参照。
+
+```bash
+# 1. コード取得
+git pull origin master
+
+# 2. systemd サービスファイルを適用（infra/*.service → /etc/systemd/system/）
+sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
+
+# 3. database_bridge をビルド・再起動
+cd database_bridge
+cargo build --release
+# → 起動時に未適用マイグレーションが自動実行される
+
+# 4. 各サービスを再起動
+sudo systemctl restart discord_bot.service
+sudo systemctl restart discord_webapp.service
+```
+
+**CI/CD（GitHub Actions）での自動適用フロー：**
+
+```
+push to master
+  └─ Rust bridge ビルド
+  └─ rsync でサーバーへ同期
+  └─ uv sync（Python 依存解決）
+  └─ setup-systemd.sh（infra/*.service を全件インストール + daemon-reload）
+  └─ systemctl restart discord_bot / discord_webapp
+```
+
+### 7.3 新規マイグレーションファイルの追加ルール
+
+- ファイル名は `NNN_description.sql`（連番）
+- **一度適用したファイルは内容を変更しない**（チェックサム不一致でエラーになる）
+- カラム変更・追加は必ず新しい番号のファイルで行う
+
+---
+
+## 8. 関連ドキュメント
 
 - [ADR 一覧](./adr/) — 設計上の意思決定記録
 - [イベントフォーム仕様書](./event_form_spec.md)

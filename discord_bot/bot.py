@@ -2,14 +2,14 @@ import discord
 from discord.ext import commands
 import asyncio
 import os
+import sys
 import mysql.connector
 from dotenv import load_dotenv
 
-DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
-
-# .envファイルを読み込む
+# .envファイルを読み込む（他の os.getenv より先に呼ぶ）
 load_dotenv()
 
+DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
 ADMIN_USER_ID = os.getenv('ADMIN_USER_ID', '')
 DISCORD_GUILD_ID = os.getenv('DISCORD_GUILD_ID', '')
 
@@ -75,18 +75,13 @@ class MyBot(commands.Bot):
 # Botインスタンスの作成
 bot = MyBot()
 
-def get_token_from_file(filename="token.txt"):
-    """token.txtファイルからトークンを読み込む"""
-    try:
-        with open(filename, 'r') as f:
-            token = f.read().strip()
-            return token
-    except FileNotFoundError:
-        print(f"Error: Token file '{filename}' not found.")
+def get_token() -> str | None:
+    """環境変数 DISCORD_TOKEN からトークンを取得する"""
+    token = os.getenv('DISCORD_TOKEN', '').strip()
+    if not token:
+        print("Error: DISCORD_TOKEN が設定されていません。.env を確認してください。", file=sys.stderr)
         return None
-    except Exception as e:
-        print(f"Error reading token file: {e}")
-        return None
+    return token
 
 @bot.event
 async def on_ready():
@@ -137,6 +132,70 @@ async def on_ready():
     # --- 3. イベント締切スケジューラー起動 ---
     asyncio.create_task(_event_deadline_scheduler())
 
+    # --- 4. ギルドメンバーの氏名簿を一括同期（起動時1回） ---
+    global _members_synced
+    if not _members_synced:
+        _members_synced = True
+        asyncio.create_task(_sync_guild_members())
+
+
+# 起動時のメンバー同期を一度だけ行うためのフラグ（on_ready は再接続でも発火するため）
+_members_synced = False
+
+
+async def _sync_guild_members() -> int:
+    """ギルドメンバーのユーザー名を user_networks に一括同期する。
+    Discord メンバーの取得はゲートウェイのキャッシュ（members intent）を使うため
+    REST 呼び出しは発生しない。DB 書き込みは 200 件ずつのバッチ upsert にまとめる。
+    戻り値: 同期対象としたメンバー数（Bot を除く）。"""
+    from services.lobby_service import LobbyService
+
+    if not DISCORD_GUILD_ID:
+        print("[member_sync] DISCORD_GUILD_ID 未設定のためスキップ")
+        return 0
+
+    guild = bot.get_guild(int(DISCORD_GUILD_ID))
+    if guild is None:
+        print("[member_sync] ギルドが見つかりません")
+        return 0
+
+    # メンバーがキャッシュされていなければゲートウェイ経由でチャンク取得
+    if not guild.chunked:
+        try:
+            await guild.chunk()
+        except Exception as e:
+            print(f"[member_sync] chunk failed: {e}")
+
+    members = [
+        {"discord_id": m.id, "username": (m.global_name or m.name)}
+        for m in guild.members if not m.bot
+    ]
+
+    CHUNK = 200
+    for i in range(0, len(members), CHUNK):
+        batch = members[i:i + CHUNK]
+        try:
+            await LobbyService.bulk_sync_users(batch)
+        except Exception as e:
+            print(f"[member_sync] bulk upsert failed at offset {i}: {e}")
+
+    print(f"[member_sync] {len(members)}人のメンバーを同期しました")
+    return len(members)
+
+
+@bot.tree.command(
+    name="sync_members",
+    description="ギルドメンバーをダッシュボードの氏名簿に一括同期します（管理者用）",
+)
+async def sync_members(interaction: discord.Interaction):
+    """管理者がいつでも手動でメンバー同期を実行できるスラッシュコマンド。"""
+    if not ADMIN_USER_ID or str(interaction.user.id) != str(ADMIN_USER_ID):
+        await interaction.response.send_message("この操作は管理者のみ実行できます。", ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True)
+    count = await _sync_guild_members()
+    await interaction.followup.send(f"✅ {count}人のメンバーを同期しました。", ephemeral=True)
+
 
 async def _event_deadline_scheduler():
     """1分毎に締切済みイベントを処理する: auto_assign → closed → DM一斉送信。"""
@@ -145,11 +204,7 @@ async def _event_deadline_scheduler():
     from services.notification_service import NotificationService
     from common.calendar_utils import build_calendar_urls
 
-    try:
-        with open('token.txt', 'r', encoding='utf-8') as f:
-            bot_token = f.read().strip()
-    except FileNotFoundError:
-        bot_token = None
+    bot_token = os.getenv('DISCORD_TOKEN', '').strip() or None
 
     while not bot.is_closed():
         try:
@@ -242,8 +297,8 @@ async def _event_deadline_scheduler():
 
 
 if __name__ == '__main__':
-    bot_token = get_token_from_file()
-    
+    bot_token = get_token()
+
     if bot_token:
         try:
             bot.run(bot_token, reconnect=True)
