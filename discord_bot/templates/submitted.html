@@ -18,9 +18,20 @@
                     修正が必要な場合はDM内のリンクからアクセスしてください。
                 </p>
                 <div style="margin-top: 2rem;">
+                    {% if is_guild_member is not defined or is_guild_member %}
                     <a href="{{ url_for('index') }}" class="btn btn-primary" style="text-decoration: none; padding: 10px 20px;">
                         ホームへ戻る
                     </a>
+                    {% else %}
+                    {# ギルド未加入者はダッシュボードへアクセスできないためボタンを無効化する #}
+                    <button type="button" class="btn btn-primary" disabled
+                        style="padding: 10px 20px; opacity: .5; cursor: not-allowed;">
+                        ホームへ戻る
+                    </button>
+                    <p class="note-text" style="margin-top: .8rem;">
+                        このページはギルドメンバー専用です。回答はこれで完了です。
+                    </p>
+                    {% endif %}
                 </div>
             </div>
         </div>

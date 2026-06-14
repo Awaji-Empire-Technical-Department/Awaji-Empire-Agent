@@ -376,7 +376,9 @@ async def submit_response():
             if is_sent:
                 await SurveyService.mark_dm_sent(None, response_id)
 
-    return await render_template('submitted.html')
+    # ギルド未加入者はダッシュボードへ入れないため「ホームへ戻る」ボタンを無効化する。
+    is_guild_member = session.get('is_guild_member', True)
+    return await render_template('submitted.html', is_guild_member=is_guild_member)
 
 
 @survey_bp.route('/delete_my_response', methods=['POST'])
