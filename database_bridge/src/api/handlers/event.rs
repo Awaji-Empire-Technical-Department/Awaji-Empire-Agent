@@ -307,6 +307,35 @@ pub async fn update_participant(
     }
 }
 
+#[derive(Deserialize)]
+pub struct CheckinRequest {
+    pub checked_in: bool,
+}
+
+/// PATCH /events/participant/:participant_id/checkin
+pub async fn set_participant_checkin(
+    State(pool): State<MySqlPool>,
+    Path(participant_id): Path<i32>,
+    Json(payload): Json<CheckinRequest>,
+) -> (StatusCode, Json<Value>) {
+    match event_repo::set_checkin(&pool, participant_id, payload.checked_in).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => internal_error(e),
+    }
+}
+
+/// DELETE /events/participant/:participant_id
+/// 参加者とその応募（アンケート回答）を削除する（管理者用）。
+pub async fn delete_participant(
+    State(pool): State<MySqlPool>,
+    Path(participant_id): Path<i32>,
+) -> (StatusCode, Json<Value>) {
+    match event_repo::delete_participant_and_response(&pool, participant_id).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => internal_error(e),
+    }
+}
+
 /// PATCH /events/participant/:participant_id/notified
 pub async fn mark_participant_notified(
     State(pool): State<MySqlPool>,

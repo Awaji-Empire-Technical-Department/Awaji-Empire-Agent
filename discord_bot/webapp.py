@@ -6,6 +6,10 @@ from quart import Quart, render_template, request, redirect, url_for, session, c
 from quart_cors import cors
 from dotenv import load_dotenv
 
+# routes/* のモジュール読込時に DISCORD_TOKEN 等を参照するため、
+# ブループリント import より前に .env を読み込む（ADR-023）。
+load_dotenv()
+
 from routes.survey import survey_bp
 from routes.lobby import lobby_bp
 from routes.tournament import tournament_bp
@@ -17,8 +21,6 @@ from services.lounge_service import LoungeService
 from services.bridge_client import BridgeUnavailableError
 from services.survey_service import SurveyService
 from services.log_service import LogService
-
-load_dotenv()
 
 ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
 
@@ -143,7 +145,13 @@ async def callback():
             auth_header = {'Authorization': f'Bearer {access_token}'}
 
             # 2. ギルドチェック (必要な場合のみ)
-            if Config.TARGET_GUILD_ID:
+            # Why: フォーム回答フロー (/form/<id>) は集計用途のため、ギルド未加入でも
+            #      回答可能とする。オフ会参加者は概ねギルド加入済みだが、最悪のケース
+            #      （未加入者の回答）を取りこぼさないための救済措置。
+            #      回答以外の管理系画面は従来通りギルド加入を必須とする。
+            next_url = session.get('next_url', '') or ''
+            is_form_answer = '/form/' in next_url
+            if Config.TARGET_GUILD_ID and not is_form_answer:
                 r_guilds = await client.get('https://discord.com/api/users/@me/guilds', headers=auth_header)
                 if r_guilds.status_code == 200:
                     guilds = r_guilds.json()
@@ -246,7 +254,10 @@ async def index():
     
     try:
         # SurveyService 経由で取得 (Rust Bridge を利用)
+        # 自分が作成したフォーム + スタッフとして共有されたフォームをまとめて表示する。
         surveys = await SurveyService.get_surveys_by_owner(None, user['id'])
+        shared_surveys = await SurveyService.get_shared_surveys(user['id'])
+        surveys = list(surveys) + list(shared_surveys)
         
         # LogService 経由で取得 (Rust Bridge を利用)
         logs = await LogService.get_recent_logs(None, limit=30)

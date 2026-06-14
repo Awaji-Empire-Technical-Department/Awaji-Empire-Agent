@@ -47,8 +47,9 @@ jobs:
           
           echo "Executing setup script..."
           sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
-          
-          echo "Restarting additional services..."
+
+          echo "Restarting services (bridge first so dependents reconnect to the new binary)..."
+          sudo systemctl restart database_bridge.service
           sudo systemctl restart discord_bot.service
           sudo systemctl restart discord_webapp.service
 
@@ -92,5 +93,6 @@ jobs:
           sudo chmod +x /Awaji-Empire-Agent/scripts/setup-systemd.sh
           
           sudo /Awaji-Empire-Agent/scripts/setup-systemd.sh
+          sudo systemctl restart database_bridge.service
           sudo systemctl restart discord_bot.service
           sudo systemctl restart discord_webapp.service

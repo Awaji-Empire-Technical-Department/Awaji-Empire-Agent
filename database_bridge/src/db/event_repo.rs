@@ -236,7 +236,8 @@ pub async fn find_participant_by_user(
     Ok(sqlx::query_as::<_, EventParticipant>(
         "SELECT id, event_id, user_id, response_id, session_id, \
          preferred_session_ids, approval, personal_note, access_token, \
-         CAST(notified_at AS CHAR) as notified_at \
+         CAST(notified_at AS CHAR) as notified_at, \
+         CAST(checked_in_at AS CHAR) as checked_in_at \
          FROM event_participants WHERE event_id = ? AND user_id = ?",
     )
     .bind(event_id)
@@ -252,7 +253,8 @@ pub async fn find_participants_by_event(
     Ok(sqlx::query_as::<_, EventParticipant>(
         "SELECT id, event_id, user_id, response_id, session_id, \
          preferred_session_ids, approval, personal_note, access_token, \
-         CAST(notified_at AS CHAR) as notified_at \
+         CAST(notified_at AS CHAR) as notified_at, \
+         CAST(checked_in_at AS CHAR) as checked_in_at \
          FROM event_participants WHERE event_id = ? ORDER BY id",
     )
     .bind(event_id)
@@ -267,7 +269,8 @@ pub async fn find_participant_by_token(
     sqlx::query_as::<_, EventParticipant>(
         "SELECT id, event_id, user_id, response_id, session_id, \
          preferred_session_ids, approval, personal_note, access_token, \
-         CAST(notified_at AS CHAR) as notified_at \
+         CAST(notified_at AS CHAR) as notified_at, \
+         CAST(checked_in_at AS CHAR) as checked_in_at \
          FROM event_participants WHERE access_token = ?",
     )
     .bind(token)
@@ -304,6 +307,53 @@ pub async fn mark_notified(pool: &MySqlPool, participant_id: i32) -> BridgeResul
     .bind(participant_id)
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+/// 当日チェックイン状態を設定する（true=来場時刻を記録 / false=取消）。
+pub async fn set_checkin(pool: &MySqlPool, participant_id: i32, checked_in: bool) -> BridgeResult<()> {
+    let sql = if checked_in {
+        "UPDATE event_participants SET checked_in_at = NOW() WHERE id = ?"
+    } else {
+        "UPDATE event_participants SET checked_in_at = NULL WHERE id = ?"
+    };
+    sqlx::query(sql)
+        .bind(participant_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// アンケート回答 ID に紐づく参加者を削除する（回答削除時のクリーンアップ）。
+pub async fn delete_participant_by_response(pool: &MySqlPool, response_id: i32) -> BridgeResult<()> {
+    sqlx::query("DELETE FROM event_participants WHERE response_id = ?")
+        .bind(response_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// 参加者を ID で削除し、紐づくアンケート回答も併せて削除する（管理者用）。
+pub async fn delete_participant_and_response(pool: &MySqlPool, participant_id: i32) -> BridgeResult<()> {
+    let row = sqlx::query("SELECT response_id FROM event_participants WHERE id = ?")
+        .bind(participant_id)
+        .fetch_optional(pool)
+        .await?;
+
+    let Some(row) = row else { return Ok(()); };
+    let response_id: Option<i32> = row.try_get("response_id").ok();
+
+    sqlx::query("DELETE FROM event_participants WHERE id = ?")
+        .bind(participant_id)
+        .execute(pool)
+        .await?;
+
+    if let Some(rid) = response_id {
+        sqlx::query("DELETE FROM survey_responses WHERE id = ?")
+            .bind(rid)
+            .execute(pool)
+            .await?;
+    }
     Ok(())
 }
 

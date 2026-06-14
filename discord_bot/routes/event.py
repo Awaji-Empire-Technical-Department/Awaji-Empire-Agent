@@ -16,15 +16,30 @@ event_bp = Blueprint('event', __name__, url_prefix='/event')
 
 DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
 
-try:
-    with open('token.txt', 'r', encoding='utf-8') as f:
-        DISCORD_BOT_TOKEN = f.read().strip()
-except FileNotFoundError:
-    DISCORD_BOT_TOKEN = None
+# ADR-023 以降、トークンは .env の DISCORD_TOKEN で管理する（token.txt はフォールバック）。
+DISCORD_BOT_TOKEN = os.getenv('DISCORD_TOKEN', '').strip() or None
+if not DISCORD_BOT_TOKEN:
+    try:
+        with open('token.txt', 'r', encoding='utf-8') as f:
+            DISCORD_BOT_TOKEN = f.read().strip()
+    except FileNotFoundError:
+        DISCORD_BOT_TOKEN = None
 
 
 def _current_user():
     return session.get('discord_user')
+
+
+async def _can_manage_event(event_id: int, user_id) -> bool:
+    """イベント（紐づくアンケート）のオーナー or スタッフなら True。"""
+    result = await EventService.get_event(event_id)
+    if not result:
+        return False
+    survey_id = result['event']['survey_id']
+    owner_id = await SurveyService.get_owner_id(None, survey_id)
+    if owner_id and str(owner_id) == str(user_id):
+        return True
+    return await SurveyService.is_collaborator(survey_id, user_id)
 
 
 # ============================================================
@@ -109,9 +124,11 @@ async def admin(event_id: int):
         event    = result['event']
         sessions = result['sessions']
 
-        # オーナー確認（アンケートのオーナー = イベントオーナー）
+        # 権限確認（アンケートのオーナー or スタッフ）
         owner_id = await SurveyService.get_owner_id(None, event['survey_id'])
-        if not owner_id or owner_id != str(user['id']):
+        if not owner_id:
+            return 'Forbidden', 403
+        if owner_id != str(user['id']) and not await SurveyService.is_collaborator(event['survey_id'], user['id']):
             return 'Forbidden', 403
 
         participants = await EventService.list_participants(event_id)
@@ -153,6 +170,92 @@ async def admin(event_id: int):
         session_stats=session_stats,
         survey_questions=survey_questions,
     )
+
+
+# ============================================================
+# 当日モード（チェックイン受付）
+# ============================================================
+
+@event_bp.route('/<int:event_id>/checkin')
+async def checkin_page(event_id: int):
+    """オフ会当日の受付用ページ。承認済み参加者を部ごとに表示しチェックインを行う。"""
+    user = _current_user()
+    if not user:
+        return redirect(url_for('login'))
+
+    try:
+        result = await EventService.get_event(event_id)
+        if not result:
+            return 'Not Found', 404
+
+        event    = result['event']
+        sessions = result['sessions']
+
+        if not await _can_manage_event(event_id, user['id']):
+            return 'Forbidden', 403
+
+        participants = await EventService.list_participants(event_id)
+
+        # 回答者名を survey responses から補完
+        survey    = await SurveyService.get_survey(None, event['survey_id'])
+        responses = await SurveyService.get_responses(None, event['survey_id'])
+        resp_map  = {str(r['id']): r for r in responses}
+        for p in participants:
+            resp = resp_map.get(str(p.get('response_id', '')), {})
+            if not p.get('username'):
+                p['username'] = resp.get('user_name', f"ID:{p['user_id']}")
+
+        # 承認済みのみ対象。部ごとにグルーピング（部なしは None キー）
+        accepted = [p for p in participants if p.get('approval') == 'accepted']
+        session_map = {s['id']: s for s in sessions}
+        grouped = {}
+        for p in accepted:
+            sid = p.get('session_id')
+            grouped.setdefault(sid, []).append(p)
+
+        checked_in_count = sum(1 for p in accepted if p.get('checked_in_at'))
+
+    except BridgeUnavailableError:
+        return await render_template('maintenance.html'), 503
+
+    return await render_template(
+        'event_checkin.html',
+        user=user,
+        event=event,
+        sessions=sessions,
+        session_map=session_map,
+        grouped=grouped,
+        accepted_total=len(accepted),
+        checked_in_count=checked_in_count,
+    )
+
+
+@event_bp.route('/<int:event_id>/api/participant/<int:participant_id>/checkin', methods=['POST'])
+async def api_checkin(event_id: int, participant_id: int):
+    """参加者のチェックイン状態を切り替える。"""
+    user = _current_user()
+    if not user:
+        return jsonify({'status': 'error'}), 401
+    if not await _can_manage_event(event_id, user['id']):
+        return jsonify({'status': 'forbidden'}), 403
+
+    data = await request.get_json()
+    checked_in = bool(data.get('checked_in'))
+    ok = await EventService.set_checkin(participant_id, checked_in)
+    return jsonify({'status': 'ok' if ok else 'error'})
+
+
+@event_bp.route('/<int:event_id>/api/participant/<int:participant_id>', methods=['DELETE'])
+async def api_delete_participant(event_id: int, participant_id: int):
+    """応募（参加者＋アンケート回答）を削除する。オーナー/スタッフのみ。"""
+    user = _current_user()
+    if not user:
+        return jsonify({'status': 'error'}), 401
+    if not await _can_manage_event(event_id, user['id']):
+        return jsonify({'status': 'forbidden'}), 403
+
+    ok = await EventService.delete_participant(participant_id)
+    return jsonify({'status': 'ok' if ok else 'error'})
 
 
 # ============================================================

@@ -132,6 +132,70 @@ async def on_ready():
     # --- 3. イベント締切スケジューラー起動 ---
     asyncio.create_task(_event_deadline_scheduler())
 
+    # --- 4. ギルドメンバーの氏名簿を一括同期（起動時1回） ---
+    global _members_synced
+    if not _members_synced:
+        _members_synced = True
+        asyncio.create_task(_sync_guild_members())
+
+
+# 起動時のメンバー同期を一度だけ行うためのフラグ（on_ready は再接続でも発火するため）
+_members_synced = False
+
+
+async def _sync_guild_members() -> int:
+    """ギルドメンバーのユーザー名を user_networks に一括同期する。
+    Discord メンバーの取得はゲートウェイのキャッシュ（members intent）を使うため
+    REST 呼び出しは発生しない。DB 書き込みは 200 件ずつのバッチ upsert にまとめる。
+    戻り値: 同期対象としたメンバー数（Bot を除く）。"""
+    from services.lobby_service import LobbyService
+
+    if not DISCORD_GUILD_ID:
+        print("[member_sync] DISCORD_GUILD_ID 未設定のためスキップ")
+        return 0
+
+    guild = bot.get_guild(int(DISCORD_GUILD_ID))
+    if guild is None:
+        print("[member_sync] ギルドが見つかりません")
+        return 0
+
+    # メンバーがキャッシュされていなければゲートウェイ経由でチャンク取得
+    if not guild.chunked:
+        try:
+            await guild.chunk()
+        except Exception as e:
+            print(f"[member_sync] chunk failed: {e}")
+
+    members = [
+        {"discord_id": m.id, "username": (m.global_name or m.name)}
+        for m in guild.members if not m.bot
+    ]
+
+    CHUNK = 200
+    for i in range(0, len(members), CHUNK):
+        batch = members[i:i + CHUNK]
+        try:
+            await LobbyService.bulk_sync_users(batch)
+        except Exception as e:
+            print(f"[member_sync] bulk upsert failed at offset {i}: {e}")
+
+    print(f"[member_sync] {len(members)}人のメンバーを同期しました")
+    return len(members)
+
+
+@bot.tree.command(
+    name="sync_members",
+    description="ギルドメンバーをダッシュボードの氏名簿に一括同期します（管理者用）",
+)
+async def sync_members(interaction: discord.Interaction):
+    """管理者がいつでも手動でメンバー同期を実行できるスラッシュコマンド。"""
+    if not ADMIN_USER_ID or str(interaction.user.id) != str(ADMIN_USER_ID):
+        await interaction.response.send_message("この操作は管理者のみ実行できます。", ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True)
+    count = await _sync_guild_members()
+    await interaction.followup.send(f"✅ {count}人のメンバーを同期しました。", ephemeral=True)
+
 
 async def _event_deadline_scheduler():
     """1分毎に締切済みイベントを処理する: auto_assign → closed → DM一斉送信。"""

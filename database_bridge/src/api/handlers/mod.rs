@@ -16,7 +16,7 @@ use serde_json::{json, Value};
 use sqlx::MySqlPool;
 use tracing::error;
 
-use crate::db::{models::BridgeError, survey_repo, response_repo, log_repo};
+use crate::db::{models::BridgeError, survey_repo, response_repo, event_repo, log_repo};
 use crate::bot::survey_handler;
 
 // ============================================================
@@ -221,6 +221,99 @@ pub async fn mark_dm_sent(
 ) -> (StatusCode, Json<Value>) {
     match response_repo::mark_dm_sent(&pool, id).await {
         Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+// ============================================================
+// スタッフ共同編集 / ユーザー検索
+// ============================================================
+
+#[derive(Deserialize)]
+pub struct AddCollaboratorRequest {
+    user_id: i64,
+}
+
+/// GET /surveys/:id/collaborators
+pub async fn list_collaborators(
+    State(pool): State<MySqlPool>,
+    Path(id): Path<i64>,
+) -> (StatusCode, Json<Value>) {
+    match survey_repo::list_collaborators(&pool, id).await {
+        Ok(list) => (StatusCode::OK, Json(json!(list))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+/// POST /surveys/:id/collaborators
+pub async fn add_collaborator(
+    State(pool): State<MySqlPool>,
+    Path(id): Path<i64>,
+    Json(payload): Json<AddCollaboratorRequest>,
+) -> (StatusCode, Json<Value>) {
+    match survey_repo::add_collaborator(&pool, id, payload.user_id).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+/// DELETE /surveys/:id/collaborators/:user_id
+pub async fn remove_collaborator(
+    State(pool): State<MySqlPool>,
+    Path((id, user_id)): Path<(i64, i64)>,
+) -> (StatusCode, Json<Value>) {
+    match survey_repo::remove_collaborator(&pool, id, user_id).await {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct SharedSurveysQuery {
+    user_id: i64,
+}
+
+/// GET /surveys/shared?user_id=
+/// スタッフとして共有されているアンケート一覧を返す。
+pub async fn list_shared_surveys(
+    State(pool): State<MySqlPool>,
+    Query(query): Query<SharedSurveysQuery>,
+) -> (StatusCode, Json<Value>) {
+    match survey_repo::find_shared_with(&pool, query.user_id).await {
+        Ok(list) => (StatusCode::OK, Json(json!(list))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct SearchUsersQuery {
+    q: String,
+}
+
+/// GET /users/search?q=
+pub async fn search_users(
+    State(pool): State<MySqlPool>,
+    Query(query): Query<SearchUsersQuery>,
+) -> (StatusCode, Json<Value>) {
+    match survey_repo::search_users_by_username(&pool, &query.q).await {
+        Ok(list) => (StatusCode::OK, Json(json!(list))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+/// DELETE /surveys/:id/responses/by-user/:user_id
+/// 本人の回答を削除し、紐づくイベント参加者も削除する。
+pub async fn delete_user_response(
+    State(pool): State<MySqlPool>,
+    Path((id, user_id)): Path<(i64, String)>,
+) -> (StatusCode, Json<Value>) {
+    match response_repo::delete_by_user(&pool, id, &user_id).await {
+        Ok(Some(response_id)) => {
+            // 紐づくイベント参加者も削除（イベントフォームでない場合は no-op）
+            let _ = event_repo::delete_participant_by_response(&pool, response_id as i32).await;
+            (StatusCode::OK, Json(json!({"status": "ok"})))
+        }
+        Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"status": "not_found"}))),
         Err(e) => map_bridge_error(e),
     }
 }

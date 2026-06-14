@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>当日受付 - {{ event['title'] }}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_ver }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/event.css') }}?v={{ css_ver }}">
+    <style>
+        .checkin-row {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:.9rem 1rem; border-bottom:1px solid var(--border-color); gap:1rem;
+        }
+        .checkin-row.is-in { background:#eafaf1; }
+        .checkin-name { font-size:1.1rem; font-weight:bold; }
+        .checkin-time { font-size:.8rem; color:var(--gray); }
+        .checkin-toggle {
+            min-width:120px; padding:.7rem 1rem; font-size:1rem; border:none; border-radius:8px;
+            cursor:pointer; color:#fff; background:var(--gray);
+        }
+        .checkin-toggle.is-in { background:var(--success); }
+        .checkin-counter { font-size:1.3rem; font-weight:bold; }
+    </style>
+</head>
+<body style="background:#eef2f5;">
+<nav class="navbar">
+    <div class="navbar-brand"><i class="fas fa-clipboard-check"></i> 当日受付モード</div>
+    <div class="user-menu">
+        <a href="{{ url_for('event.admin', event_id=event['id']) }}" class="btn btn-sm btn-outline" style="border-color:rgba(255,255,255,.3);color:white;">
+            <i class="fas fa-arrow-left"></i> <span class="d-none-sm">管理画面</span>
+        </a>
+    </div>
+</nav>
+
+<div class="container" style="max-width:760px;" data-event-id="{{ event['id'] }}" id="checkin-container">
+
+    <div class="card" style="text-align:center;">
+        <h2 class="card-title" style="margin-bottom:.3rem;">{{ event['title'] }}</h2>
+        <div>
+            来場 <span class="checkin-counter" id="checked-count" style="color:var(--success);">{{ checked_in_count }}</span>
+            / <span id="accepted-total">{{ accepted_total }}</span> 名
+        </div>
+    </div>
+
+    {% if accepted_total == 0 %}
+    <div class="card" style="text-align:center; padding:2rem; color:var(--gray);">
+        承認済みの参加者がいません。先に管理画面で割り当て・承認を行ってください。
+    </div>
+    {% endif %}
+
+    {% for sid, plist in grouped.items() %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-layer-group"></i>
+                {% if sid and session_map.get(sid) %}{{ session_map[sid]['name'] }}{% else %}部指定なし{% endif %}
+            </h3>
+            <span class="badge badge-primary">{{ plist | length }}名</span>
+        </div>
+        {% for p in plist %}
+        <div class="checkin-row {% if p['checked_in_at'] %}is-in{% endif %}" id="ci-row-{{ p['id'] }}">
+            <div>
+                <div class="checkin-name">{{ p['username'] }}</div>
+                <div class="checkin-time" id="ci-time-{{ p['id'] }}">
+                    {% if p['checked_in_at'] %}受付済み {{ p['checked_in_at'] }}{% else %}未受付{% endif %}
+                </div>
+            </div>
+            <button class="checkin-toggle {% if p['checked_in_at'] %}is-in{% endif %}"
+                    id="ci-btn-{{ p['id'] }}"
+                    data-pid="{{ p['id'] }}"
+                    data-in="{{ '1' if p['checked_in_at'] else '0' }}"
+                    onclick="toggleCheckin({{ p['id'] }})">
+                {% if p['checked_in_at'] %}<i class="fas fa-check"></i> 受付済{% else %}受付する{% endif %}
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+</div>
+
+<script>
+    const EVENT_ID = document.getElementById('checkin-container').dataset.eventId;
+
+    async function toggleCheckin(pid) {
+        const btn = document.getElementById(`ci-btn-${pid}`);
+        const isIn = btn.dataset.in === '1';
+        const next = !isIn;
+        btn.disabled = true;
+        const res = await fetch(`/event/${EVENT_ID}/api/participant/${pid}/checkin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ checked_in: next }),
+        });
+        const d = await res.json();
+        btn.disabled = false;
+        if (d.status !== 'ok') { alert('更新に失敗しました'); return; }
+
+        // DOM 反映
+        btn.dataset.in = next ? '1' : '0';
+        const row = document.getElementById(`ci-row-${pid}`);
+        const time = document.getElementById(`ci-time-${pid}`);
+        if (next) {
+            btn.classList.add('is-in'); row.classList.add('is-in');
+            btn.innerHTML = '<i class="fas fa-check"></i> 受付済';
+            time.textContent = '受付済み（たった今）';
+        } else {
+            btn.classList.remove('is-in'); row.classList.remove('is-in');
+            btn.textContent = '受付する';
+            time.textContent = '未受付';
+        }
+        updateCounter(next ? 1 : -1);
+    }
+
+    function updateCounter(delta) {
+        const el = document.getElementById('checked-count');
+        el.textContent = Math.max(0, parseInt(el.textContent, 10) + delta);
+    }
+</script>
+</body>
+</html>

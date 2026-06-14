@@ -60,6 +60,36 @@ pub async fn sync_user(
 }
 
 // ---------------------------------------------------------
+// POST /lobby/bulk_sync_users
+// ギルドメンバーのユーザー名を一括同期する（Bot から呼ばれる）。
+// ---------------------------------------------------------
+#[derive(Deserialize)]
+pub struct BulkSyncMember {
+    discord_id: i64,
+    username: String,
+}
+
+#[derive(Deserialize)]
+pub struct BulkSyncRequest {
+    members: Vec<BulkSyncMember>,
+}
+
+pub async fn bulk_sync_users(
+    State(state): State<AppState>,
+    Json(payload): Json<BulkSyncRequest>,
+) -> (StatusCode, Json<Value>) {
+    let members: Vec<(i64, String)> = payload
+        .members
+        .into_iter()
+        .map(|m| (m.discord_id, m.username))
+        .collect();
+    match lobby_repo::bulk_sync_usernames(&state.pool, &members).await {
+        Ok(affected) => (StatusCode::OK, Json(json!({"status": "ok", "affected": affected}))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+// ---------------------------------------------------------
 // GET /lobby/rooms
 // ---------------------------------------------------------
 pub async fn list_rooms(State(pool): State<MySqlPool>) -> (StatusCode, Json<Value>) {

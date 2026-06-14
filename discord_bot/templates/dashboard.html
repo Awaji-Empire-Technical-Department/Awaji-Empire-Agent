@@ -110,6 +110,15 @@
                                 <strong>{{ s['title'] }}</strong>
                                 {% if not s['title'] %}<span style="color:var(--gray); font-style:italic;">(無題)</span>{%
                                 endif %}
+                                {% if s['is_shared'] %}
+                                <span class="badge badge-primary" style="margin-left:6px;" title="共同編集者として共有されています">
+                                    <i class="fas fa-user-friends"></i> 共有
+                                </span>
+                                <div style="font-size:.75rem; color:var(--gray); margin-top:2px;">
+                                    <i class="fas fa-share-alt"></i>
+                                    {{ s['shared_by'] if s['shared_by'] else 'オーナー' }} さんから共有
+                                </div>
+                                {% endif %}
                             </td>
                             <td>
                                 <span class="badge {{ 'badge-success' if s['is_active'] else 'badge-secondary' }}">
@@ -119,6 +128,7 @@
                             <td style="font-size:0.85rem; color:var(--gray);">{{ s['created_at'] }}</td>
                             <td>
                                 <div class="btn-toolbar">
+                                    {% if not s['is_shared'] %}
                                     <form action="{{ url_for('survey.toggle_status', survey_id=s['id']) }}"
                                         method="post">
                                         <button
@@ -127,6 +137,7 @@
                                             <i class="fas {{ 'fa-pause' if s['is_active'] else 'fa-play' }}"></i>
                                         </button>
                                     </form>
+                                    {% endif %}
 
                                     <a href="{{ url_for('survey.edit_survey', survey_id=s['id']) }}"
                                         class="btn btn-primary btn-icon" title="編集">
@@ -145,12 +156,18 @@
                                         class="btn btn-outline btn-icon" title="プレビュー">
                                         <i class="fas fa-external-link-alt"></i>
                                     </a>
+                                    <button type="button" class="btn btn-outline btn-icon"
+                                        title="回答リンクをコピー" onclick="copyFormLink({{ s['id'] }}, this)">
+                                        <i class="fas fa-share-alt"></i>
+                                    </button>
 
+                                    {% if not s['is_shared'] %}
                                     <form action="{{ url_for('survey.delete_survey', survey_id=s['id']) }}"
                                         method="post" onsubmit="return confirm('本当に削除しますか？');">
                                         <button class="btn btn-danger btn-icon" title="削除"><i
                                                 class="fas fa-trash"></i></button>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -396,6 +413,24 @@
 
     </div>
 
+    <script>
+    // 回答リンク（/form/<id>）をクリップボードにコピーし、参加者へ共有しやすくする。
+    function copyFormLink(id, btn) {
+        const url = location.origin + '/form/' + id;
+        const icon = btn.querySelector('i');
+        const done = function () {
+            const prev = icon.className;
+            icon.className = 'fas fa-check';
+            btn.title = 'コピーしました';
+            setTimeout(function () { icon.className = prev; btn.title = '回答リンクをコピー'; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(done).catch(function () { window.prompt('以下のリンクをコピーしてください', url); });
+        } else {
+            window.prompt('以下のリンクをコピーしてください', url);
+        }
+    }
+    </script>
     <script>window.IS_ADMIN = {{ 'true' if is_admin else 'false' }};</script>
     <script src="{{ url_for('static', filename='js/dashboard_titles.js', v='20260523') }}"></script>
 </body>

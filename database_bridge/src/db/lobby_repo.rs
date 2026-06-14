@@ -35,6 +35,32 @@ pub async fn sync_user_network(pool: &MySqlPool, discord_id: i64, email: &str, u
     Ok(())
 }
 
+/// ギルドメンバーのユーザー名を一括 upsert する。
+/// Why: ダッシュボード未ログインのメンバーも氏名検索の対象にするため、Bot から定期同期する。
+///      email / virtual_ip は既存値を保持し、username のみ更新する（Discord はメール非提供）。
+///      新規行は email='' で作成（user_networks.email は NOT NULL）。
+pub async fn bulk_sync_usernames(pool: &MySqlPool, members: &[(i64, String)]) -> BridgeResult<u64> {
+    if members.is_empty() {
+        return Ok(0);
+    }
+    // (?, '', ?), (?, '', ?), ... を動的構築
+    let placeholders = members
+        .iter()
+        .map(|_| "(?, '', ?)")
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        "INSERT INTO user_networks (discord_id, email, username) VALUES {placeholders} \
+         ON DUPLICATE KEY UPDATE username = VALUES(username)"
+    );
+    let mut query = sqlx::query(&sql);
+    for (id, name) in members {
+        query = query.bind(id).bind(name);
+    }
+    let result = query.execute(pool).await?;
+    Ok(result.rows_affected())
+}
+
 pub async fn cleanup_expired_rooms(pool: &MySqlPool) -> BridgeResult<()> {
     let query = "DELETE FROM matchmaking_rooms WHERE expires_at <= NOW()";
     let _ = sqlx::query(query).execute(pool).await; // Ignore errors in lazy deletion

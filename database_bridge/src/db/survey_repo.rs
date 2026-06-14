@@ -1,6 +1,7 @@
 // db/survey_repo.rs
 // Why: surveys テーブルへの純粋な CRUD をここに集約する。
 
+use serde_json::{json, Value};
 use sqlx::{mysql::MySqlPool, Row};
 use tracing::error;
 
@@ -117,4 +118,123 @@ pub async fn get_owner_id(pool: &MySqlPool, survey_id: i64) -> BridgeResult<Stri
         .ok_or_else(|| BridgeError::NotFound(format!("survey_id={survey_id}")))?;
 
     Ok(row.try_get("owner_id").map_err(BridgeError::Sqlx)?)
+}
+
+// ============================================================
+// スタッフ共同編集（survey_collaborators）
+// ============================================================
+
+/// スタッフ（共同編集者）を追加する。重複は無視。
+pub async fn add_collaborator(pool: &MySqlPool, survey_id: i64, user_id: i64) -> BridgeResult<()> {
+    sqlx::query("INSERT IGNORE INTO survey_collaborators (survey_id, user_id) VALUES (?, ?)")
+        .bind(survey_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// スタッフを削除する。
+pub async fn remove_collaborator(pool: &MySqlPool, survey_id: i64, user_id: i64) -> BridgeResult<()> {
+    sqlx::query("DELETE FROM survey_collaborators WHERE survey_id = ? AND user_id = ?")
+        .bind(survey_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// スタッフ一覧を {user_id, username} の配列で返す。username は user_networks から解決。
+pub async fn list_collaborators(pool: &MySqlPool, survey_id: i64) -> BridgeResult<Vec<Value>> {
+    let rows = sqlx::query(
+        "SELECT c.user_id, u.username \
+         FROM survey_collaborators c \
+         LEFT JOIN user_networks u ON c.user_id = u.discord_id \
+         WHERE c.survey_id = ? ORDER BY c.added_at",
+    )
+    .bind(survey_id)
+    .fetch_all(pool)
+    .await?;
+
+    let list = rows
+        .iter()
+        .map(|row| {
+            let user_id: i64 = row.try_get("user_id").unwrap_or(0);
+            let username: Option<String> = row.try_get("username").ok();
+            // user_id は JS 側で誤差なく扱えるよう文字列で返す
+            json!({"user_id": user_id.to_string(), "username": username})
+        })
+        .collect();
+    Ok(list)
+}
+
+/// 指定ユーザーがスタッフとして共有されているアンケート一覧を返す。
+/// ダッシュボードの「共有されたフォーム」表示用。owner の username も同梱する。
+pub async fn find_shared_with(pool: &MySqlPool, user_id: i64) -> BridgeResult<Vec<Value>> {
+    let rows = sqlx::query(
+        "SELECT s.id, s.owner_id, s.title, s.is_active, \
+         CAST(s.created_at AS CHAR) as created_at, u.username as shared_by \
+         FROM surveys s \
+         JOIN survey_collaborators c ON s.id = c.survey_id \
+         LEFT JOIN user_networks u ON s.owner_id = u.discord_id \
+         WHERE c.user_id = ? ORDER BY s.created_at DESC",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    let list = rows
+        .iter()
+        .map(|row| {
+            let id: i64 = row.try_get("id").unwrap_or(0);
+            let owner_id: String = row.try_get("owner_id").unwrap_or_default();
+            let title: Option<String> = row.try_get("title").ok();
+            let is_active: bool = row.try_get("is_active").unwrap_or(false);
+            let created_at: Option<String> = row.try_get("created_at").ok();
+            let shared_by: Option<String> = row.try_get("shared_by").ok();
+            json!({
+                "id": id,
+                "owner_id": owner_id,
+                "title": title,
+                "is_active": is_active,
+                "created_at": created_at,
+                "shared_by": shared_by,
+                "is_shared": true,
+            })
+        })
+        .collect();
+    Ok(list)
+}
+
+/// 指定ユーザーがそのアンケートのスタッフか判定する。
+pub async fn is_collaborator(pool: &MySqlPool, survey_id: i64, user_id: i64) -> BridgeResult<bool> {
+    let row = sqlx::query("SELECT 1 FROM survey_collaborators WHERE survey_id = ? AND user_id = ? LIMIT 1")
+        .bind(survey_id)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.is_some())
+}
+
+/// ユーザー名（部分一致）でユーザーを検索する。スタッフ追加候補の提示に使用。
+pub async fn search_users_by_username(pool: &MySqlPool, q: &str) -> BridgeResult<Vec<Value>> {
+    let pattern = format!("%{q}%");
+    let rows = sqlx::query(
+        "SELECT discord_id, username FROM user_networks \
+         WHERE username LIKE ? AND username IS NOT NULL \
+         ORDER BY username LIMIT 20",
+    )
+    .bind(pattern)
+    .fetch_all(pool)
+    .await?;
+
+    let list = rows
+        .iter()
+        .map(|row| {
+            let discord_id: i64 = row.try_get("discord_id").unwrap_or(0);
+            let username: Option<String> = row.try_get("username").ok();
+            json!({"user_id": discord_id.to_string(), "username": username})
+        })
+        .collect();
+    Ok(list)
 }

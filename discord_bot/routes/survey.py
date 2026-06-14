@@ -13,6 +13,7 @@ from quart import (
     Blueprint,
     current_app,
     flash,
+    jsonify,
     make_response,
     redirect,
     render_template,
@@ -34,11 +35,15 @@ survey_bp = Blueprint('survey', __name__)
 # Bot Token の読み込み
 # Why: DM送信時にBot Tokenが必要。routes 層では読み込みのみ行い、
 #      実際の送信処理は NotificationService に委譲する。
-try:
-    with open('token.txt', 'r', encoding='utf-8') as f:
-        DISCORD_BOT_TOKEN = f.read().strip()
-except FileNotFoundError:
-    DISCORD_BOT_TOKEN = None
+# ADR-023 以降、トークンは .env の DISCORD_TOKEN で管理する。
+#      旧 token.txt はフォールバックとしてのみ残す。
+DISCORD_BOT_TOKEN = os.getenv('DISCORD_TOKEN', '').strip() or None
+if not DISCORD_BOT_TOKEN:
+    try:
+        with open('token.txt', 'r', encoding='utf-8') as f:
+            DISCORD_BOT_TOKEN = f.read().strip()
+    except FileNotFoundError:
+        DISCORD_BOT_TOKEN = None
 
 DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
 
@@ -80,12 +85,33 @@ async def edit_survey(survey_id):
     except Exception:
         return "System Error", 503
 
-    if not survey or str(survey['owner_id']) != str(user['id']):
+    if not survey:
         return "Forbidden", 403
+
+    is_owner = str(survey['owner_id']) == str(user['id'])
+    shared_by = None
+    if not is_owner:
+        # スタッフ自身がアクセスした場合、共有元の名前を解決して表示する
+        shared = await SurveyService.get_shared_surveys(user['id'])
+        match = next((s for s in shared if str(s.get('id')) == str(survey_id)), None)
+        if not match:
+            return "Forbidden", 403
+        shared_by = match.get('shared_by')
 
     questions = parse_questions(survey['questions'])
     event_info = await EventService.get_event_by_survey(survey_id)
-    return await render_template('edit.html', user=user, survey=survey, questions=questions, event_info=event_info)
+    # スタッフ管理はオーナーのみ。スタッフ自身は編集はできるが共同編集者の追加削除は不可。
+    collaborators = await SurveyService.list_collaborators(survey_id) if is_owner else []
+    return await render_template(
+        'edit.html',
+        user=user,
+        survey=survey,
+        questions=questions,
+        event_info=event_info,
+        is_owner=is_owner,
+        collaborators=collaborators,
+        shared_by=shared_by,
+    )
 
 
 @survey_bp.route('/save_survey', methods=['POST'])
@@ -101,9 +127,11 @@ async def save_survey():
     event_settings_raw = form.get('event_settings_json', '')
 
     try:
-        # オーナーチェック
+        # 権限チェック（オーナー or スタッフ）
         owner_id = await SurveyService.get_owner_id(None, int(sid))
-        if not owner_id or owner_id != str(user['id']):
+        if not owner_id:
+            return "Forbidden", 403
+        if owner_id != str(user['id']) and not await SurveyService.is_collaborator(int(sid), user['id']):
             return "Forbidden", 403
 
         success = await SurveyService.update_survey(None, int(sid), title, q_json)
@@ -351,6 +379,102 @@ async def submit_response():
     return await render_template('submitted.html')
 
 
+@survey_bp.route('/delete_my_response', methods=['POST'])
+async def delete_my_response():
+    """回答者本人による回答の取り消し（間違えた場合の救済）。
+    紐づくイベント参加者レコードも Rust 側で併せて削除される。"""
+    user = session.get('discord_user')
+    if not user:
+        return "Unauthorized: Please login first", 401
+
+    form = await request.form
+    survey_id = form.get('survey_id')
+    if not survey_id:
+        return "Bad Request", 400
+
+    ok = await SurveyService.delete_own_response(int(survey_id), str(user['id']))
+    if ok:
+        await flash("回答を削除しました", "success")
+    else:
+        await flash("削除対象の回答が見つかりませんでした", "error")
+    return redirect(url_for('survey.view_form', survey_id=int(survey_id)))
+
+
+# --- スタッフ共同編集 API（オーナーのみ） ---
+
+@survey_bp.route('/api/users/search')
+async def api_search_users():
+    """スタッフ追加候補をユーザー名で検索する。"""
+    user = session.get('discord_user')
+    if not user:
+        return jsonify({'status': 'error'}), 401
+    q = request.args.get('q', '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    results = await SurveyService.search_users(q)
+    # 自分自身は候補から除外
+    results = [r for r in results if str(r.get('user_id')) != str(user['id'])]
+    return jsonify(results)
+
+
+@survey_bp.route('/api/<int:survey_id>/collaborators', methods=['GET', 'POST'])
+async def api_collaborators(survey_id):
+    """スタッフ一覧の取得・追加。オーナーのみ操作可能。"""
+    user = session.get('discord_user')
+    if not user:
+        return jsonify({'status': 'error'}), 401
+
+    owner_id = await SurveyService.get_owner_id(None, survey_id)
+    if not owner_id or owner_id != str(user['id']):
+        return jsonify({'status': 'forbidden'}), 403
+
+    if request.method == 'GET':
+        return jsonify(await SurveyService.list_collaborators(survey_id))
+
+    data = await request.get_json()
+    target_id = data.get('user_id')
+    if not target_id:
+        return jsonify({'status': 'error', 'message': 'user_id required'}), 400
+    ok = await SurveyService.add_collaborator(survey_id, int(target_id))
+    if ok:
+        await LogService.log_operation(None, user['id'], user['name'], "STAFF_ADD", f"ID:{survey_id} にスタッフ {target_id} を追加")
+        # 共有された本人へ DM 通知（控え兼アクセス導線）
+        survey = await SurveyService.get_survey(None, survey_id)
+        title = survey['title'] if survey else f"フォーム#{survey_id}"
+        msg = (
+            f"【フォーム共同編集の共有】\n"
+            f"{user['name']} さんからフォーム「{title}」の共同編集者に追加されました。\n"
+            f"ダッシュボードまたは下記から編集・管理できます:\n"
+            f"{DASHBOARD_URL}/edit/{survey_id}"
+        )
+        try:
+            await NotificationService.send_dm_raw(
+                bot_token=DISCORD_BOT_TOKEN,
+                user_id=str(target_id),
+                message=msg,
+            )
+        except Exception as e:
+            current_app.logger.warning(f"[staff_add] DM送信失敗 user={target_id}: {e}")
+    return jsonify({'status': 'ok' if ok else 'error'})
+
+
+@survey_bp.route('/api/<int:survey_id>/collaborators/<int:target_id>', methods=['DELETE'])
+async def api_remove_collaborator(survey_id, target_id):
+    """スタッフを削除する。オーナーのみ操作可能。"""
+    user = session.get('discord_user')
+    if not user:
+        return jsonify({'status': 'error'}), 401
+
+    owner_id = await SurveyService.get_owner_id(None, survey_id)
+    if not owner_id or owner_id != str(user['id']):
+        return jsonify({'status': 'forbidden'}), 403
+
+    ok = await SurveyService.remove_collaborator(survey_id, target_id)
+    if ok:
+        await LogService.log_operation(None, user['id'], user['name'], "STAFF_REMOVE", f"ID:{survey_id} のスタッフ {target_id} を削除")
+    return jsonify({'status': 'ok' if ok else 'error'})
+
+
 @survey_bp.route('/results/<int:survey_id>')
 async def view_results(survey_id):
     user = session.get('discord_user')
@@ -359,7 +483,9 @@ async def view_results(survey_id):
 
     try:
         survey = await SurveyService.get_survey(None, survey_id)
-        if not survey or str(survey['owner_id']) != str(user['id']):
+        if not survey:
+            return "Forbidden", 403
+        if str(survey['owner_id']) != str(user['id']) and not await SurveyService.is_collaborator(survey_id, user['id']):
             return "Forbidden", 403
 
         # イベントフォームの場合はイベント管理画面へリダイレクト
@@ -416,7 +542,9 @@ async def download_csv(survey_id):
 
     try:
         survey = await SurveyService.get_survey(None, survey_id)
-        if not survey or str(survey['owner_id']) != str(user['id']):
+        if not survey:
+            return "Forbidden", 403
+        if str(survey['owner_id']) != str(user['id']) and not await SurveyService.is_collaborator(survey_id, user['id']):
             return "Forbidden", 403
 
         responses = await SurveyService.get_responses(None, survey_id)
@@ -442,7 +570,7 @@ async def download_csv(survey_id):
     # ヘッダー行
     header = ['回答日時', '回答者']
     if event_info:
-        header += ['参加意思', '状態', '割り当て部', '希望部']
+        header += ['参加意思', '状態', '割り当て部', '希望部', '来場']
     for i, q in enumerate(questions):
         q_text = q.get('text', f'Q{i+1}')
         header.append(f"Q{i+1}: {q_text}")
@@ -466,9 +594,10 @@ async def download_csv(survey_id):
                     preferred = ', '.join(session_map.get(sid, str(sid)) for sid in pref_ids) if pref_ids else ''
                 except Exception:
                     preferred = ''
-                row += [attending, approval, assigned, preferred]
+                checkin = '来場' if p.get('checked_in_at') else ''
+                row += [attending, approval, assigned, preferred, checkin]
             else:
-                row += ['', '', '', '']
+                row += ['', '', '', '', '']
 
         try:
             ans_json = r['answers']

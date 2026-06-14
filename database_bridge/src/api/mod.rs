@@ -36,6 +36,7 @@ pub fn create_router(pool: MySqlPool) -> Router {
         .nest("/lounge", lounge_routes())
         .nest("/titles", title_routes())
         .nest("/events", event_routes())
+        .route("/users/search", get(handlers::search_users))
         .route("/ws/hyouibana", get(handlers::ws::ws_handler))
         .route("/logs", get(handlers::list_recent_logs).post(handlers::log_operation))
         .nest("/reset_logs", reset_log_routes())
@@ -46,6 +47,7 @@ pub fn create_router(pool: MySqlPool) -> Router {
 fn lobby_routes() -> Router<AppState> {
     Router::new()
         .route("/sync_user", post(crate::api::handlers::lobby::sync_user))
+        .route("/bulk_sync_users", post(crate::api::handlers::lobby::bulk_sync_users))
         .route("/rooms", get(crate::api::handlers::lobby::list_rooms).post(crate::api::handlers::lobby::create_room))
         .route("/rooms/{passcode}", get(crate::api::handlers::lobby::get_room).patch(crate::api::handlers::lobby::update_room).delete(crate::api::handlers::lobby::delete_room))
         .route("/rooms/{passcode}/start", post(crate::api::handlers::lobby::start_tournament))
@@ -113,8 +115,9 @@ fn event_routes() -> Router<AppState> {
         .route("/{id}/session-stats", get(handlers::event::get_session_stats))
         .route("/by-survey/{survey_id}", get(handlers::event::get_event_by_survey))
         .route("/pending-deadline", get(handlers::event::list_events_past_deadline))
-        .route("/participant/{participant_id}", patch(handlers::event::update_participant))
+        .route("/participant/{participant_id}", patch(handlers::event::update_participant).delete(handlers::event::delete_participant))
         .route("/participant/{participant_id}/notified", patch(handlers::event::mark_participant_notified))
+        .route("/participant/{participant_id}/checkin", patch(handlers::event::set_participant_checkin))
         .route("/participant/by-token/{token}", get(handlers::event::get_participant_by_token))
 }
 
@@ -122,10 +125,14 @@ fn event_routes() -> Router<AppState> {
 fn survey_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(handlers::list_surveys).post(handlers::create_survey))
+        .route("/shared", get(handlers::list_shared_surveys))
         .route("/{id}", get(handlers::get_survey).patch(handlers::update_survey).delete(handlers::delete_survey))
         .route("/{id}/toggle", post(handlers::toggle_survey_status))
         .route("/{id}/responses", get(handlers::list_responses))
         .route("/{id}/responses/{user_id}", get(handlers::get_user_answers))
         .route("/responses/upsert", post(handlers::upsert_response))
         .route("/responses/{id}/dm_sent", patch(handlers::mark_dm_sent))
+        .route("/{id}/responses/by-user/{user_id}", delete(handlers::delete_user_response))
+        .route("/{id}/collaborators", get(handlers::list_collaborators).post(handlers::add_collaborator))
+        .route("/{id}/collaborators/{user_id}", delete(handlers::remove_collaborator))
 }
