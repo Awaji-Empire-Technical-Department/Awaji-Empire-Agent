@@ -75,6 +75,9 @@
             <a href="{{ url_for('event.checkin_page', event_id=event['id']) }}" class="btn btn-outline">
                 <i class="fas fa-clipboard-check"></i> 当日モード（受付）
             </a>
+            <button type="button" class="btn btn-outline" onclick="copyFormLink({{ event['survey_id'] }}, this)">
+                <i class="fas fa-share-alt"></i> 回答リンクをコピー
+            </button>
         </div>
     </div>
 

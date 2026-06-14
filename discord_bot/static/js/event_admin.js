@@ -112,6 +112,23 @@
         navigator.clipboard.writeText(url).then(() => alert('確認URLをコピーしました'));
     };
 
+    // 回答リンク（/form/<survey_id>）を参加者へ共有するためにコピーする。
+    window.copyFormLink = function (surveyId, btn) {
+        const url = `${location.origin}/form/${surveyId}`;
+        const reset = btn ? btn.innerHTML : null;
+        const done = () => {
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-check"></i> コピーしました';
+                setTimeout(() => { btn.innerHTML = reset; }, 1500);
+            }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(done).catch(() => window.prompt('以下のリンクをコピーしてください', url));
+        } else {
+            window.prompt('以下のリンクをコピーしてください', url);
+        }
+    };
+
     // ============================================================
     // 応募削除（管理者）
     // ============================================================

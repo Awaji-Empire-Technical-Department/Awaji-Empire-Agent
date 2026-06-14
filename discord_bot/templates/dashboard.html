@@ -156,6 +156,10 @@
                                         class="btn btn-outline btn-icon" title="プレビュー">
                                         <i class="fas fa-external-link-alt"></i>
                                     </a>
+                                    <button type="button" class="btn btn-outline btn-icon"
+                                        title="回答リンクをコピー" onclick="copyFormLink({{ s['id'] }}, this)">
+                                        <i class="fas fa-share-alt"></i>
+                                    </button>
 
                                     {% if not s['is_shared'] %}
                                     <form action="{{ url_for('survey.delete_survey', survey_id=s['id']) }}"
@@ -409,6 +413,24 @@
 
     </div>
 
+    <script>
+    // 回答リンク（/form/<id>）をクリップボードにコピーし、参加者へ共有しやすくする。
+    function copyFormLink(id, btn) {
+        const url = location.origin + '/form/' + id;
+        const icon = btn.querySelector('i');
+        const done = function () {
+            const prev = icon.className;
+            icon.className = 'fas fa-check';
+            btn.title = 'コピーしました';
+            setTimeout(function () { icon.className = prev; btn.title = '回答リンクをコピー'; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(done).catch(function () { window.prompt('以下のリンクをコピーしてください', url); });
+        } else {
+            window.prompt('以下のリンクをコピーしてください', url);
+        }
+    }
+    </script>
     <script>window.IS_ADMIN = {{ 'true' if is_admin else 'false' }};</script>
     <script src="{{ url_for('static', filename='js/dashboard_titles.js', v='20260523') }}"></script>
 </body>
