@@ -198,3 +198,30 @@ CI/CD は `cargo build --release` で新バイナリを作り rsync するが、
 > **Rust(`database_bridge`)に変更を入れたら、deploy で必ず `database_bridge.service` を
 > restart すること。依存サービス（bot/webapp）より先に bridge を再起動する。**
 > sudoers では既に restart が許可済み（`infra/sudoers_deploy`）。ビルド成功＝反映ではない。
+
+---
+
+## LESSON-008: webapp 側 DM が token.txt 依存で送信されない（ADR-023 移行漏れ）
+
+- **発見日**: 2026-06-14
+- **症状**: 共同編集者の割り当て時など、webapp からの Discord DM が届かない
+- **修正**: `routes/survey.py` / `routes/event.py` のトークン取得を
+  `os.getenv('DISCORD_TOKEN')` 優先・`token.txt` フォールバックに変更し、
+  `webapp.py` の `load_dotenv()` をブループリント import より前へ移動
+
+### 何が起きたか
+
+ADR-023 で Bot のトークンを `token.txt` から `.env` の `DISCORD_TOKEN` へ移行したが、
+**webapp 側の `routes/*.py` は `token.txt` 読み込みのまま**だった。サーバーに token.txt が
+存在しないため `DISCORD_BOT_TOKEN = None` となり、`NotificationService.send_dm_raw` が
+「Bot token missing」で送信をスキップしていた（例外は出ず静かに失敗）。
+
+加えて `webapp.py` では `from routes.survey import ...` が `load_dotenv()` より前にあり、
+モジュール読込時の `os.getenv` が .env 反映前に評価される順序問題もあった
+（systemd の EnvironmentFile があるため本番では顕在化しにくいが、ローカルで壊れる）。
+
+### ルール
+
+> **トークン等のシークレットは `.env`(DISCORD_TOKEN) を唯一の正とし、Bot だけでなく
+> webapp の routes/services も同じ取得経路にすること。`token.txt` 依存を残さない。**
+> モジュール読込時に env を参照するなら `load_dotenv()` を import より前に置く。

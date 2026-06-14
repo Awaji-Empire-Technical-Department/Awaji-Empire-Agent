@@ -16,11 +16,14 @@ event_bp = Blueprint('event', __name__, url_prefix='/event')
 
 DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
 
-try:
-    with open('token.txt', 'r', encoding='utf-8') as f:
-        DISCORD_BOT_TOKEN = f.read().strip()
-except FileNotFoundError:
-    DISCORD_BOT_TOKEN = None
+# ADR-023 以降、トークンは .env の DISCORD_TOKEN で管理する（token.txt はフォールバック）。
+DISCORD_BOT_TOKEN = os.getenv('DISCORD_TOKEN', '').strip() or None
+if not DISCORD_BOT_TOKEN:
+    try:
+        with open('token.txt', 'r', encoding='utf-8') as f:
+            DISCORD_BOT_TOKEN = f.read().strip()
+    except FileNotFoundError:
+        DISCORD_BOT_TOKEN = None
 
 
 def _current_user():
