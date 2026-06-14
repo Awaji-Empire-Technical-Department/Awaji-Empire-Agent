@@ -85,8 +85,14 @@ async def edit_survey(survey_id):
         return "Forbidden", 403
 
     is_owner = str(survey['owner_id']) == str(user['id'])
-    if not is_owner and not await SurveyService.is_collaborator(survey_id, user['id']):
-        return "Forbidden", 403
+    shared_by = None
+    if not is_owner:
+        # スタッフ自身がアクセスした場合、共有元の名前を解決して表示する
+        shared = await SurveyService.get_shared_surveys(user['id'])
+        match = next((s for s in shared if str(s.get('id')) == str(survey_id)), None)
+        if not match:
+            return "Forbidden", 403
+        shared_by = match.get('shared_by')
 
     questions = parse_questions(survey['questions'])
     event_info = await EventService.get_event_by_survey(survey_id)
@@ -100,6 +106,7 @@ async def edit_survey(survey_id):
         event_info=event_info,
         is_owner=is_owner,
         collaborators=collaborators,
+        shared_by=shared_by,
     )
 
 
@@ -427,6 +434,23 @@ async def api_collaborators(survey_id):
     ok = await SurveyService.add_collaborator(survey_id, int(target_id))
     if ok:
         await LogService.log_operation(None, user['id'], user['name'], "STAFF_ADD", f"ID:{survey_id} にスタッフ {target_id} を追加")
+        # 共有された本人へ DM 通知（控え兼アクセス導線）
+        survey = await SurveyService.get_survey(None, survey_id)
+        title = survey['title'] if survey else f"フォーム#{survey_id}"
+        msg = (
+            f"【フォーム共同編集の共有】\n"
+            f"{user['name']} さんからフォーム「{title}」の共同編集者に追加されました。\n"
+            f"ダッシュボードまたは下記から編集・管理できます:\n"
+            f"{DASHBOARD_URL}/edit/{survey_id}"
+        )
+        try:
+            await NotificationService.send_dm_raw(
+                bot_token=DISCORD_BOT_TOKEN,
+                user_id=str(target_id),
+                message=msg,
+            )
+        except Exception as e:
+            current_app.logger.warning(f"[staff_add] DM送信失敗 user={target_id}: {e}")
     return jsonify({'status': 'ok' if ok else 'error'})
 
 

@@ -269,6 +269,23 @@ pub async fn remove_collaborator(
 }
 
 #[derive(Deserialize)]
+pub struct SharedSurveysQuery {
+    user_id: i64,
+}
+
+/// GET /surveys/shared?user_id=
+/// スタッフとして共有されているアンケート一覧を返す。
+pub async fn list_shared_surveys(
+    State(pool): State<MySqlPool>,
+    Query(query): Query<SharedSurveysQuery>,
+) -> (StatusCode, Json<Value>) {
+    match survey_repo::find_shared_with(&pool, query.user_id).await {
+        Ok(list) => (StatusCode::OK, Json(json!(list))),
+        Err(e) => map_bridge_error(e),
+    }
+}
+
+#[derive(Deserialize)]
 pub struct SearchUsersQuery {
     q: String,
 }

@@ -168,6 +168,44 @@ pub async fn list_collaborators(pool: &MySqlPool, survey_id: i64) -> BridgeResul
     Ok(list)
 }
 
+/// 指定ユーザーがスタッフとして共有されているアンケート一覧を返す。
+/// ダッシュボードの「共有されたフォーム」表示用。owner の username も同梱する。
+pub async fn find_shared_with(pool: &MySqlPool, user_id: i64) -> BridgeResult<Vec<Value>> {
+    let rows = sqlx::query(
+        "SELECT s.id, s.owner_id, s.title, s.is_active, \
+         CAST(s.created_at AS CHAR) as created_at, u.username as shared_by \
+         FROM surveys s \
+         JOIN survey_collaborators c ON s.id = c.survey_id \
+         LEFT JOIN user_networks u ON s.owner_id = u.discord_id \
+         WHERE c.user_id = ? ORDER BY s.created_at DESC",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    let list = rows
+        .iter()
+        .map(|row| {
+            let id: i64 = row.try_get("id").unwrap_or(0);
+            let owner_id: String = row.try_get("owner_id").unwrap_or_default();
+            let title: Option<String> = row.try_get("title").ok();
+            let is_active: bool = row.try_get("is_active").unwrap_or(false);
+            let created_at: Option<String> = row.try_get("created_at").ok();
+            let shared_by: Option<String> = row.try_get("shared_by").ok();
+            json!({
+                "id": id,
+                "owner_id": owner_id,
+                "title": title,
+                "is_active": is_active,
+                "created_at": created_at,
+                "shared_by": shared_by,
+                "is_shared": true,
+            })
+        })
+        .collect();
+    Ok(list)
+}
+
 /// 指定ユーザーがそのアンケートのスタッフか判定する。
 pub async fn is_collaborator(pool: &MySqlPool, survey_id: i64, user_id: i64) -> BridgeResult<bool> {
     let row = sqlx::query("SELECT 1 FROM survey_collaborators WHERE survey_id = ? AND user_id = ? LIMIT 1")

@@ -252,7 +252,10 @@ async def index():
     
     try:
         # SurveyService 経由で取得 (Rust Bridge を利用)
+        # 自分が作成したフォーム + スタッフとして共有されたフォームをまとめて表示する。
         surveys = await SurveyService.get_surveys_by_owner(None, user['id'])
+        shared_surveys = await SurveyService.get_shared_surveys(user['id'])
+        surveys = list(surveys) + list(shared_surveys)
         
         # LogService 経由で取得 (Rust Bridge を利用)
         logs = await LogService.get_recent_logs(None, limit=30)
