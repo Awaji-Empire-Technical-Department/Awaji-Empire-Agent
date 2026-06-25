@@ -38,4 +38,4 @@
 
 ---
 
-*詳細は `docs/FEATURE_STREAM_COMMENT_RESET.md` を参照*
+*詳細は `docs/features/FEATURE_STREAM_COMMENT_RESET.md` を参照*

@@ -75,5 +75,5 @@
 - モジュール境界の維持にレビュー時の注意が必要
 
 ### ドキュメント構成
-- 仕様: [`docs/FEATURE_LOUNGE.md`](../FEATURE_LOUNGE.md)
-- 汎用大会システムとの関係: [`docs/FEATURE_GENERAL_TOURNAMENT.md`](../FEATURE_GENERAL_TOURNAMENT.md)
+- 仕様: [`docs/FEATURE_LOUNGE.md`](../features/FEATURE_LOUNGE.md)
+- 汎用大会システムとの関係: [`docs/FEATURE_GENERAL_TOURNAMENT.md`](../features/FEATURE_GENERAL_TOURNAMENT.md)

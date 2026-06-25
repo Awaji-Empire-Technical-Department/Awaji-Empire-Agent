@@ -288,5 +288,5 @@ push to master
 - [ADR 一覧](./adr/) — 設計上の意思決定記録
 - [イベントフォーム仕様書](./event_form_spec.md)
 - [ラウンジシステム仕様](./LOUNGE_GUIDE.md)
-- [対戦ロビー機能](./FEATURE_LOBBY.md)
-- [アンケート機能](./FEATURE_SURVEY.md)
+- [対戦ロビー機能](./features/FEATURE_LOBBY.md)
+- [アンケート機能](./features/FEATURE_SURVEY.md)
