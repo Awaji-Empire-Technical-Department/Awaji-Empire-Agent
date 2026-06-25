@@ -2,7 +2,7 @@
 
 - **日付**: 2026-02-21
 - **ステータス**: 承認済み
-- **関連仕様書**: [phase2-architecture-refactoring.md](../Specifications/phase2-architecture-refactoring.md), [FEATURE_MASS_MUTE.md](../FEATURE_MASS_MUTE.md)
+- **関連仕様書**: [phase2-architecture-refactoring.md](../Specifications/phase2-architecture-refactoring.md), [FEATURE_MASS_MUTE.md](../features/FEATURE_MASS_MUTE.md)
 
 ---
 

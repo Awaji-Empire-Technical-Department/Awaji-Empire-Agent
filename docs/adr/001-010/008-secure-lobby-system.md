@@ -3,7 +3,7 @@
 - **日付**: 2026-02-26
 - **ステータス**: 承認済み
 - **ブランチ**: `feature/secure-lobby`
-- **関連仕様書**: [FEATURE_LOBBY.md](../FEATURE_LOBBY.md)
+- **関連仕様書**: [FEATURE_LOBBY.md](../features/FEATURE_LOBBY.md)
 
 ---
 

@@ -56,7 +56,7 @@
 > [!NOTE]
 > マリオカートワールドのラウンジ運営は **ラウンジモジュール（`FEATURE_LOUNGE.md`）** として別管理する。  
 > インフラ（DB・API基盤・WebSocket・Discord連携）は本システムと共通。スコア計算・コース管理・回線落ち処理などのロジックはラウンジモジュールが独自に保持する。  
-> 詳細は [`docs/FEATURE_LOUNGE.md`](./FEATURE_LOUNGE.md) および [`ADR-013`](./adr/013-lounge-system.md) を参照。
+> 詳細は [`docs/FEATURE_LOUNGE.md`](./FEATURE_LOUNGE.md) および [`ADR-013`](../adr/011-020/013-lounge-system.md) を参照。
 
 ### 2.2 トーナメント形式
 
