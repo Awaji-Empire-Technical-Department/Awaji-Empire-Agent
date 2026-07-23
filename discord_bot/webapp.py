@@ -25,7 +25,10 @@ from services.log_service import LogService
 ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
 
 class Config:
-    SECRET_KEY = os.getenv('SECRET_KEY', 'default_insecure_key')
+    # SECRET_KEY はセッションCookieの署名鍵。既知の固定値へフォールバックすると
+    # Cookie偽造による管理者なりすまし（認証バイパス）が可能になるため、
+    # 未設定なら起動時に停止させる（ADR-025）。
+    SECRET_KEY = os.environ['SECRET_KEY']
     CLIENT_ID = os.getenv('DISCORD_CLIENT_ID')
     CLIENT_SECRET = os.getenv('DISCORD_CLIENT_SECRET')
     REDIRECT_URI = os.getenv('DISCORD_REDIRECT_URI')

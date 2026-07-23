@@ -2,6 +2,12 @@
 (function () {
     'use strict';
 
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     const reportPanel = document.getElementById('report-panel');
     if (!reportPanel) return;
 
@@ -47,7 +53,7 @@
                 const pts  = s.total_points ?? 0;
                 return `<tr class="${i === 0 ? 'standings-first' : ''}">
                     <td>${i + 1}位</td>
-                    <td>${name}</td>
+                    <td>${escapeHtml(name)}</td>
                     <td>${pts}pt</td>
                 </tr>`;
             }).join('');

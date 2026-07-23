@@ -2,6 +2,12 @@
 (function () {
     'use strict';
 
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     // ============================================================
     // 一覧ビュー
     // ============================================================
@@ -191,7 +197,7 @@
             const deltaCell = delta ? `+${delta}` : '—';
             const isFirst  = rank === 1 && !excluded;
             return `<tr class="${isFirst ? 'standings-first' : ''}" style="${dimStyle}">
-                <td>${name}${excluded ? ' <span style="font-size:.75rem;color:var(--gray);">(除外)</span>' : ''}</td>
+                <td>${escapeHtml(name)}${excluded ? ' <span style="font-size:.75rem;color:var(--gray);">(除外)</span>' : ''}</td>
                 <td style="text-align:center;">${rankCell}</td>
                 <td style="text-align:right;font-family:monospace;">${deltaCell}</td>
             </tr>`;
