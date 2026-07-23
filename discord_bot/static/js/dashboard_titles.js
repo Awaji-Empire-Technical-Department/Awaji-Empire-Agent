@@ -6,6 +6,12 @@
     const UNLOCK_LABELS = { manual: '手動', lounge_rank: 'MMR帯', tournament_win: '優勝数' };
     let allTitles = [];
 
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     async function loadTitles() {
         const res = await fetch('/tournament/api/titles');
         allTitles = await res.json();
@@ -21,7 +27,7 @@
         tbody.innerHTML = titles.map(t => `
             <tr>
                 <td style="font-family:monospace;color:var(--gray);">#${t.id}</td>
-                <td><strong>${t.name}</strong>${t.description ? `<br><small style="color:var(--gray)">${t.description}</small>` : ''}</td>
+                <td><strong>${escapeHtml(t.name)}</strong>${t.description ? `<br><small style="color:var(--gray)">${escapeHtml(t.description)}</small>` : ''}</td>
                 <td><span class="badge badge-secondary">${UNLOCK_LABELS[t.unlock_type] || t.unlock_type}</span></td>
                 <td style="font-family:monospace;">${t.unlock_threshold ?? '-'}</td>
                 <td style="font-family:monospace;font-size:.8rem;color:var(--gray);">${t.discord_role_id || '-'}</td>
@@ -29,7 +35,7 @@
                 <td>
                     <div class="btn-toolbar">
                         <button class="btn btn-primary btn-icon" title="編集" onclick="editTitle(${t.id})"><i class="fas fa-pen"></i></button>
-                        <button class="btn btn-danger btn-icon" title="削除" onclick="deleteTitle(${t.id}, '${t.name.replace(/'/g, "\\'")}')"><i class="fas fa-trash"></i></button>
+                        <button class="btn btn-danger btn-icon" title="削除" onclick="deleteTitle(${t.id})"><i class="fas fa-trash"></i></button>
                     </div>
                 </td>` : ''}
             </tr>
@@ -90,7 +96,9 @@
         showModal();
     };
 
-    window.deleteTitle = async function (id, name) {
+    window.deleteTitle = async function (id) {
+        const t = allTitles.find(x => x.id === id);
+        const name = t ? t.name : '';
         if (!confirm(`「${name}」を削除しますか？`)) return;
         await fetch(`/tournament/api/titles/${id}`, { method: 'DELETE' });
         loadTitles();
