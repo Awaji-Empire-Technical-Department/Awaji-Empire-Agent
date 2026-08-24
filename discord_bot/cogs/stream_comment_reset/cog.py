@@ -5,7 +5,7 @@
 
 import os
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, time as dt_time
 
 import discord
 from discord import app_commands, Permissions
@@ -41,6 +41,12 @@ class StreamCommentResetCog(commands.Cog):
         self._pending_reset: bool = False
         self.fallback_reset.start()
 
+    async def cog_load(self):
+        """Bot再起動直後、DBを照会して当月リセット済みなら冪等性状態を復元する。"""
+        now = datetime.now(JST)
+        if await StreamCommentResetLogic.check_already_reset_this_month(now):
+            self._last_reset_month = now.month
+
     def cog_unload(self):
         self.fallback_reset.cancel()
 
@@ -64,9 +70,9 @@ class StreamCommentResetCog(commands.Cog):
     # フォールバック cron
     # ================================================================
 
-    @tasks.loop(hours=24)
+    @tasks.loop(time=dt_time(hour=FALLBACK_HOUR_JST, tzinfo=JST))
     async def fallback_reset(self):
-        """毎月2日 06:00 JST に未リセットなら補完実行する。"""
+        """毎月21日 06:00 JST に未リセットなら補完実行する。"""
         if not StreamCommentResetLogic.should_fallback_run():
             return
         await self._try_monthly_reset(triggered_by="fallback_scheduler")
