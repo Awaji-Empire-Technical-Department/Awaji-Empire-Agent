@@ -73,6 +73,13 @@ class StreamCommentResetLogic:
             now = datetime.now(JST)
         return last_reset_month == now.month
 
+    @staticmethod
+    async def check_already_reset_this_month(now: Optional[datetime] = None) -> bool:
+        """DBを照会し、当月がリセット済みかを返す（Bot再起動直後の冪等性復元用）。"""
+        if now is None:
+            now = datetime.now(JST)
+        return await StreamCommentResetService.check_month_reset(now.year, now.month)
+
     # ================================================================
     # overwrite 構築
     # ================================================================
