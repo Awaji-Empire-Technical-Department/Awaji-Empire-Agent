@@ -1,0 +1,38 @@
+services:
+  mariadb:
+    # 本番と同じ Ubuntu 24.04 + apt の mariadb-server を使うため公式イメージは
+    # 使わず、discord_bot/.env (DB_NAME / DB_USER / DB_PASS) を唯一の情報源に
+    # 初期化する自前の Dockerfile / entrypoint を使う (ADR-028)。
+    build: ./infra/mariadb
+    restart: unless-stopped
+    env_file: ./discord_bot/.env
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./infra/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot --password=\"$$DB_PASS\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # database_bridge は 127.0.0.1:7878 に固定バインドし、webapp.py / bridge_client.py
+  # も接続先を 127.0.0.1:7878 に直書きしている（本番は単一ホスト上で3プロセスが
+  # localhost 経由で通信する構成）。コンテナを分離すると Docker の埋め込みDNSが
+  # 名前空間共有コンテナ側では機能しないため、この3プロセスは同一コンテナ内で
+  # 起動する（infra/app-entrypoint.sh, ADR-028）。アプリコードは一切変更しない。
+  app:
+    build:
+      context: .
+      dockerfile: infra/app.Dockerfile
+    restart: unless-stopped
+    env_file: ./discord_bot/.env
+    environment:
+      DB_HOST: mariadb
+    ports:
+      - "5000:5000"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+volumes:
+  mariadb_data:
