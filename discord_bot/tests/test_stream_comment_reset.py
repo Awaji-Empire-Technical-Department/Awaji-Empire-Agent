@@ -1,6 +1,6 @@
 # tests/test_stream_comment_reset.py
 # StreamCommentReset のユニットテスト
-# - should_fallback_run: 毎月21日06:00 JST のみ True
+# - should_fallback_run: 毎月21日以降 True
 # - check_already_reset_this_month: DB照会結果の伝播
 # - Cog.cog_load: DB照会結果によるインメモリ冪等性状態の復元
 import sys
@@ -20,16 +20,22 @@ JST = timezone(timedelta(hours=9))
 class TestShouldFallbackRun(IsolatedAsyncioTestCase):
     """StreamCommentResetLogic.should_fallback_run のテスト"""
 
-    def test_true_on_day21_hour6(self):
+    def test_true_on_day21(self):
         now = datetime(2026, 8, 21, 6, 30, tzinfo=JST)
         self.assertTrue(StreamCommentResetLogic.should_fallback_run(now))
 
-    def test_false_on_other_day(self):
-        now = datetime(2026, 8, 20, 6, 30, tzinfo=JST)
-        self.assertFalse(StreamCommentResetLogic.should_fallback_run(now))
+    def test_true_on_day_after_21(self):
+        """21日を過ぎても月末までは補完実行できる（当日ミス時の翌日補完）。"""
+        now = datetime(2026, 8, 25, 6, 0, tzinfo=JST)
+        self.assertTrue(StreamCommentResetLogic.should_fallback_run(now))
 
-    def test_false_on_other_hour(self):
+    def test_true_regardless_of_hour(self):
+        """時刻判定は tasks.loop(time=...) 側に一任し、ここでは二重ガードしない。"""
         now = datetime(2026, 8, 21, 7, 0, tzinfo=JST)
+        self.assertTrue(StreamCommentResetLogic.should_fallback_run(now))
+
+    def test_false_before_day21(self):
+        now = datetime(2026, 8, 20, 6, 30, tzinfo=JST)
         self.assertFalse(StreamCommentResetLogic.should_fallback_run(now))
 
 

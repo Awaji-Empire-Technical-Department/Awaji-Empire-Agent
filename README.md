@@ -85,6 +85,37 @@ cd database_bridge
 cargo run
 ```
 
+## 🐳 Docker Compose での開発環境構築
+
+MariaDB を含めた開発環境一式を Docker Compose で再現できます。
+
+```bash
+# 1. .env を作成（未作成の場合）
+cp discord_bot/.env.example discord_bot/.env
+# DISCORD_TOKEN / SECRET_KEY などを編集
+
+# 2. ビルド & 起動
+docker compose up --build
+
+# ダッシュボード: http://localhost:5000
+```
+
+- `mariadb`: MariaDB 本体。`discord_bot/.env` の `DB_NAME` / `DB_USER` / `DB_PASS` をそのまま初期認証情報として使う。
+- `app`: `database_bridge` (Rust) / `bot.py` / `webapp.py` を同一コンテナ内で起動する（理由は [ADR-028](./docs/adr/021-030/028-docker-compose-dev-environment.md) を参照）。
+
+> [!WARNING]
+> `database_bridge/migrations/` は `003_*.sql` から始まっており、`surveys` などのコアテーブルを
+> 作成するマイグレーションがリポジトリに含まれていません。まっさらな DB では一部機能がテーブル
+> 未作成でエラーになります。詳細と対処法は [infra/db-init/README.md](./infra/db-init/README.md)
+> を参照してください。
+
+再作成する場合（DB を初期化してやり直す）:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
 ## 各ディレクトリの説明
 
 詳細な説明は以下のディレクトリのREADME.mdを参照してください。

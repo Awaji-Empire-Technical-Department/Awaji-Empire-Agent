@@ -72,9 +72,15 @@ class StreamCommentResetCog(commands.Cog):
 
     @tasks.loop(time=dt_time(hour=FALLBACK_HOUR_JST, tzinfo=JST))
     async def fallback_reset(self):
-        """毎月21日 06:00 JST に未リセットなら補完実行する。"""
-        if not StreamCommentResetLogic.should_fallback_run():
+        """毎月21日以降 06:00 JST に未リセットなら補完実行する。"""
+        now = datetime.now(JST)
+        if not StreamCommentResetLogic.should_fallback_run(now):
+            logger.info(
+                "[StreamCommentReset] fallback_reset スキップ: 対象日(21日以降)外です (day=%s)",
+                now.day,
+            )
             return
+        logger.info("[StreamCommentReset] fallback_reset 発火 (day=%s)", now.day)
         await self._try_monthly_reset(triggered_by="fallback_scheduler")
 
     @fallback_reset.before_loop
@@ -222,6 +228,11 @@ class StreamCommentResetCog(commands.Cog):
 
         # メモリ上の冪等チェック（管理者による明示的な予約実行はスキップ）
         if not force and StreamCommentResetLogic.is_already_reset(self._last_reset_month, now):
+            logger.info(
+                "[StreamCommentReset] _try_monthly_reset スキップ (トリガー=%s): "
+                "当月(%s月)は既にリセット済み",
+                triggered_by, now.month,
+            )
             return
 
         guild = self.bot.get_guild(GUILD_ID)
