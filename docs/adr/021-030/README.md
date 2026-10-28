@@ -13,7 +13,8 @@
 | [ADR-025](025-survey-collaborators-response-delete-checkin.md) | スタッフ共同編集 / 回答削除 / 当日モード（チェックイン） | 採用 | 2026-06-14 |
 | [ADR-026](026-event-form-guild-nonmember-dashboard-block.md) | ギルド未加入者のダッシュボード流入防止 | 採用 | 2026-06-14 |
 | [ADR-027](027-webapp-xss-and-secret-key-hardening.md) | Webダッシュボードの格納型XSS修正・セッション署名鍵の必須化 | 採用 | 2026-07-23 |
-| [ADR-028](028-docker-compose-dev-environment.md) | Docker Compose による開発環境の再現 | 採用 | 2026-09-22 |
+| [ADR-029](029-production-kernel-update-cve-2026-99999.md) | 本番サーバのカーネル更新（CVE-2026-99999 対応） | 採用（CVE 未解消・追加対応待ち） | 2026-10-28 |
+| [ADR-030](030-domain-registrar-transfer-to-cloudflare.md) | awajiempire.net のレジストラを Cloudflare Registrar へ移管 | 採用 | 2026-10-28 |
 
 ## 概要
 
@@ -24,6 +25,7 @@
 - **ADR-025**: スタッフ共同編集（ユーザー名検索でフォーム管理権限を共有）、回答の本人/管理者削除、オフ会当日の受付（チェックイン）モードを追加。
 - **ADR-026**: ADR-024 の副作用で生じた、ギルド未加入者がフォーム回答後にダッシュボードへ流入できる不具合を修正。加入状態をセッションに保持し、ダッシュボード側でサーバーガード（403）＋回答完了画面のボタン無効化で対処。
 - **ADR-027**: セキュリティレビューで発見した Webダッシュボードの格納型XSS（表示名・称号名を経路とする）を、fetch 由来値の `innerHTML` 描画箇所へ `escapeHtml` を適用して修正。あわせてセッション署名鍵 `SECRET_KEY` のフォールバックを廃し必須化（未設定なら起動失敗）。
-- **ADR-028**: MariaDB / database_bridge / discord_bot / webapp をまとめて起動する Docker Compose 環境を追加。database_bridge 等が `127.0.0.1:7878` に固定バインドしているためアプリコード無変更のまま同一コンテナで3プロセスを起動する構成を採用。
+- **ADR-029**: Linux カーネルの脆弱性 CVE-2026-99999（CVSS 9.3, AV:L）を受けて本番 VM を `apt full-upgrade` と再起動で更新した。ただし Ubuntu 24.04 の修正版（6.8.0-149）はまだ出ておらず、CVE は未解消。
+- **ADR-030**: お名前.com を運営する GMO の別サービスでセキュリティインシデントが起きたことを受け、レジストラを Cloudflare に移管して DNS・Tunnel と一元化した。お名前.com のアカウントは削除。
 
-> **Note:** ADR-029〜030 はまだ未作成です。031 以降は `031-040/` ディレクトリを新設してください（[運用ルール](../README.md) 参照）。
+> **Note:** 031 以降は `031-040/` ディレクトリを新設してください（[運用ルール](../README.md) 参照）。
