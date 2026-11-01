@@ -1,9 +1,9 @@
 import os
 import asyncio
+import secrets
 import aiohttp
 import httpx
-from quart import Quart, render_template, request, redirect, url_for, session, current_app, websocket
-from quart_cors import cors
+from quart import Quart, render_template, request, redirect, url_for, session, current_app, websocket, abort
 from dotenv import load_dotenv
 
 # routes/* のモジュール読込時に DISCORD_TOKEN 等を参照するため、
@@ -37,7 +37,6 @@ class Config:
     CLOUDFLARE_API_TOKEN = os.getenv('CLOUDFLARE_API_TOKEN')
 
 app = Quart(__name__, static_folder='static', static_url_path='/static')
-app = cors(app, allow_origin="*")
 app.secret_key = Config.SECRET_KEY
 
 # Blueprintの登録
@@ -53,6 +52,10 @@ BRIDGE_WS_URL = "ws://127.0.0.1:7878/ws/hyouibana"
 @app.websocket('/ws/hyouibana')
 async def ws_proxy():
     """ブラウザのWSリクエストをRust Bridgeへ中継する。"""
+    # Why: 接続元ページ（ラウンジ・大会・ロビー）はすべてログイン必須なので、
+    #      WS も未ログインなら accept 前に 401 で拒否する（ADR-032）。
+    if not session.get('discord_user'):
+        abort(401)
     async with aiohttp.ClientSession() as sess:
         try:
             async with sess.ws_connect(BRIDGE_WS_URL) as bridge_ws:
@@ -107,14 +110,25 @@ def inject_static_versions():
 @app.route('/login')
 async def login():
     scope = "identify email guilds"
+    # Why: OAuth2 の state で、自分が開始していない認可フローの callback を拒否する
+    #      （ログインCSRF対策, ADR-032）。
+    state = secrets.token_urlsafe(32)
+    session['oauth_state'] = state
     discord_auth_url = (
         f"https://discord.com/api/oauth2/authorize?client_id={Config.CLIENT_ID}"
         f"&redirect_uri={Config.REDIRECT_URI}&response_type=code&scope={scope}"
+        f"&state={state}"
     )
     return await render_template('login.html', auth_url=discord_auth_url)
 
 @app.route('/callback')
 async def callback():
+    expected_state = session.pop('oauth_state', None)
+    state = request.args.get('state', '')
+    # bytes で比較: str の compare_digest は非ASCII入力で TypeError (→500) になるため
+    if not expected_state or not secrets.compare_digest(state.encode(), expected_state.encode()):
+        return "Error: Invalid OAuth state. Please log in again.", 400
+
     code = request.args.get('code')
     if not code:
         return "Error: No code provided.", 400
