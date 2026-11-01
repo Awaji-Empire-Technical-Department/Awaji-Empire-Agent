@@ -3,6 +3,23 @@
 このプロジェクトのすべての重要な変更は、このファイルに記録されます。
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいています。
 
+## [Unreleased]
+
+リポジトリ監査に基づく不要ファイルの削除と、Bot トークン取得経路の統一（ADR-031）。
+
+### Fixed
+
+- **大会・称号のロール操作が動かない問題**: `routes/lobby.py`・`routes/tournament.py` が廃止済みの `token.txt` のみからトークンを読んでおり、`.env` 運用ではロール付与/削除が無言でスキップされていた（ADR-023 の移行漏れ・LESSON-008 と同型）。`DISCORD_TOKEN` から読むように修正
+- **`.env.example` のギルド ID キー誤り**: `GUILD_ID` → `DISCORD_GUILD_ID`（コードが読むキー）。例のとおりに設定するとダッシュボードのギルドメンバー判定が無効になっていた。`DISCORD_REDIRECT_URI` の Markdown 記法混入も修正
+
+### Removed
+
+- `token.txt` フォールバック（`routes/survey.py`・`routes/event.py`）
+- 未使用ファイル: `config.py.example`（ルート / `discord_bot/` の重複）、`discord_bot/cogs/voice_keeper.py.example`、`discord_bot/main.py`（TODO のままのスタブ）、`db_repair.py`（一度きりの破壊的 DB 修復スクリプト）
+- `webapp.py` に残っていた作業用コメント
+
+---
+
 ## [1.8.4] - 2026-09-08
 
 2026年8月分の `#配信コメント` 月次リセットがフォールバックcron含め完全にスキップされたインシデントを受け、再発防止策を適用。

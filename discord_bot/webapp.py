@@ -104,11 +104,6 @@ def inject_static_versions():
     )
 
 # --- 認証ルート (Auth) ---
-# ... (login, callback, logout は変更なしのため省略。実際はそのまま残す)
-# 省略記法が使えないため、全量を書くか、diff を工夫する。
-# ここでは一旦 index のみを書き換える。
-
-# --- 認証ルート (Auth) ---
 @app.route('/login')
 async def login():
     scope = "identify email guilds"

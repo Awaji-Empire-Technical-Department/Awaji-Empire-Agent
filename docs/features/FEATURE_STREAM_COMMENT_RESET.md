@@ -145,7 +145,7 @@ database_bridge/
 
 #### 定数・設定値
 
-`config.py` または `.env` で管理する。
+環境変数で管理する。
 
 ```python
 STREAM_COMMENT_CHANNEL_NAME  = "配信コメント"   # 対象チャンネル名

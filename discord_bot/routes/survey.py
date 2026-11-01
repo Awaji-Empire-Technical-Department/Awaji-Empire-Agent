@@ -35,15 +35,8 @@ survey_bp = Blueprint('survey', __name__)
 # Bot Token の読み込み
 # Why: DM送信時にBot Tokenが必要。routes 層では読み込みのみ行い、
 #      実際の送信処理は NotificationService に委譲する。
-# ADR-023 以降、トークンは .env の DISCORD_TOKEN で管理する。
-#      旧 token.txt はフォールバックとしてのみ残す。
+# ADR-023 / ADR-031: トークンは環境変数 DISCORD_TOKEN のみから読む。
 DISCORD_BOT_TOKEN = os.getenv('DISCORD_TOKEN', '').strip() or None
-if not DISCORD_BOT_TOKEN:
-    try:
-        with open('token.txt', 'r', encoding='utf-8') as f:
-            DISCORD_BOT_TOKEN = f.read().strip()
-    except FileNotFoundError:
-        DISCORD_BOT_TOKEN = None
 
 DASHBOARD_URL = os.getenv('DASHBOARD_URL', 'https://dashboard.awajiempire.net')
 

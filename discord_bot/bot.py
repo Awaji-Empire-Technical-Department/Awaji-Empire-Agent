@@ -303,7 +303,7 @@ if __name__ == '__main__':
         try:
             bot.run(bot_token, reconnect=True)
         except discord.LoginFailure:
-            print("Error: Invalid token in token.txt")
+            print("Error: Invalid DISCORD_TOKEN")
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
     else:
