@@ -22,5 +22,5 @@ flowchart TD
   1. Bot起動時（サービス復旧時）
   2. 定時タスク（日本時間 0:00, 8:00, 16:00）
   3. チャンネル作成時（動的な自動適用）
-- **対象**: `config.py` で定義されたリストに完全一致するチャンネル名。
+- **対象**: 環境変数 `MUTE_ONLY_CHANNEL_NAMES` / `READ_ONLY_MUTE_CHANNEL_NAMES`（カンマ区切り）に完全一致するチャンネル名。
 - **権限内容**: `mention_everyone=False`, `manage_webhooks=False` 等を強制適用。

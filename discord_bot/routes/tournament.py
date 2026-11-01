@@ -25,11 +25,8 @@ _TOURNAMENT_WIN_COLOR = 0xFFD700  # 大会優勝系: ゴールド
 
 
 def _get_bot_token() -> str:
-    try:
-        with open("token.txt") as f:
-            return f.read().strip()
-    except Exception:
-        return ""
+    # ADR-023 / ADR-031: トークンは環境変数 DISCORD_TOKEN のみから読む。
+    return os.getenv("DISCORD_TOKEN", "").strip()
 
 
 def _current_user():

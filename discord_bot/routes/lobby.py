@@ -8,11 +8,8 @@ from services.lobby_service import LobbyService
 from services.bridge_client import BridgeUnavailableError
 
 def get_bot_token():
-    try:
-        with open('token.txt', 'r') as f:
-            return f.read().strip()
-    except Exception:
-        return None
+    # ADR-023 / ADR-031: トークンは環境変数 DISCORD_TOKEN のみから読む。
+    return os.getenv('DISCORD_TOKEN', '').strip() or None
 
 async def assign_winner_role_via_api(user_id: str, tournament_name: str, guild_id: str):
     token = get_bot_token()
