@@ -5,7 +5,14 @@
 
 ## [Unreleased]
 
-リポジトリ監査に基づく不要ファイルの削除と、Bot トークン取得経路の統一（ADR-031）。
+リポジトリ監査に基づく不要ファイルの削除と、Bot トークン取得経路の統一（ADR-031）。Webapp の認証強化と Bridge の非 root 化（ADR-032）。
+
+### Security
+
+- **ログイン CSRF**: Discord OAuth2 に `state` を追加し、`/callback` で検証（不一致・欠落は 400、一度きり）
+- **WebSocket の未認証接続**: `/ws/hyouibana` を未ログインなら 401 で拒否
+- **不要な CORS 許可**: `cors(app, allow_origin="*")` と `quart-cors` 依存を削除
+- **`database_bridge.service` を root で実行していた**: `User=devuser` に変更（デプロイ時はテスト環境で先に起動確認すること）
 
 ### Fixed
 

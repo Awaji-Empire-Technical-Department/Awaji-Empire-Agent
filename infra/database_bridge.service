@@ -4,7 +4,7 @@ After=network.target mariadb.service
 
 [Service]
 Type=simple
-User=root
+User=devuser
 WorkingDirectory=/Awaji-Empire-Agent
 EnvironmentFile=/Awaji-Empire-Agent/discord_bot/.env
 ExecStart=/Awaji-Empire-Agent/database_bridge/target/release/database_bridge
