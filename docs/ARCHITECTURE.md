@@ -290,3 +290,4 @@ push to master
 - [ラウンジシステム仕様](./LOUNGE_GUIDE.md)
 - [対戦ロビー機能](./features/FEATURE_LOBBY.md)
 - [アンケート機能](./features/FEATURE_SURVEY.md)
+- [監視（Zabbix 導入の構成案・監視設計・手順書。下書き）](./monitoring/README.md)
