@@ -64,7 +64,7 @@
 - **[K: キー]** はエージェントの標準キー。
 - **[U: キー]** は自作の UserParameter（定義は 4 章）。
 
-トリガー式は Zabbix 7.0 の書式で、ホスト名は `HOST` と書いた。導入時に Web UI で作るときの下書きであり、**式は Web UI の「Test」で確かめてから保存する**。
+トリガー式は Zabbix 8.0 の書式（7.0 から変わっていないことを導入時に確かめる【要確認】）で、ホスト名は `HOST` と書いた。導入時に Web UI で作るときの下書きであり、**式は Web UI の「Test」で確かめてから保存する**。
 
 ### A. Proxmox ホスト
 
@@ -108,7 +108,7 @@ INC-001 では、`.venv/bin/python3 → python → （実体なし）` となっ
 | C-8 | **待ち受けているポートの一覧** | 「外から届くのは Tunnel だけ、DB は 3306 だけ」という前提。意図しないサービスが待ち受けを始めたら気づく（構成案 3.5 の `0.0.0.0:5000` の件もここで見える） | [U: `awaji.listen.ports`]（1 時間ごと、テキスト） | 前回の値と違う | Information（手動クローズ） |
 | C-9 | systemd ユニットファイルの中身 | `infra/*.service` は CI が `/etc/systemd/system/` に上書きする（`scripts/setup-systemd.sh`）。`ExecStart` の Python のパスが変わると INC-001 の再発条件が変わる | [K: `vfs.file.cksum[/etc/systemd/system/discord_webapp.service,sha256]`] ほか 2 ユニット（1 時間ごと） | 前回の値と違う | Information（手動クローズ） |
 | C-10 | インストール済みパッケージの変化 | 障害が起きたとき「直前に何が変わったか」を Zabbix の履歴から引けるようにする | [K: `vfs.file.cksum[/var/lib/dpkg/status,sha256]`]（1 時間ごと） | **通知しない**（トリガーを作らず、履歴だけ残す）。apt を使うたびに変わるため | — |
-| C-11 | Zabbix・MariaDB・OS のサポート期限 | 「サポートされている版を使っている」という前提。Zabbix 7.0 のフルサポートは 2027-06-30 まで。8.0 は MariaDB の下限が 10.11 | 自動化しない。[zabbix-lessons.md](zabbix-lessons.md) の「期限の一覧」に日付を書き、カレンダーに入れる | 期限の 90 日前に作業を始める | — |
+| C-11 | Zabbix・MariaDB・OS のサポート期限 | 「サポートされている版を使っている」という前提。Zabbix 8.0 のフルサポートは 2029-11-30 まで。8.0 は MariaDB の下限が 10.11 で、Ubuntu 24.04 の apt 版はちょうど下限 | 自動化しない。[zabbix-lessons.md](zabbix-lessons.md) の「期限の一覧」に日付を書き、カレンダーに入れる | 期限の 90 日前に作業を始める | — |
 
 C-1〜C-3 はアプリ層のゲストだけに入れる。C-4〜C-8・C-10 は Linux のゲスト全部、C-9 はアプリ層だけに入れる。
 
@@ -184,7 +184,7 @@ F-1 の限界:
 ## 4. 自作の UserParameter
 
 アプリ層のゲストに `/etc/zabbix/zabbix_agent2.d/awaji.conf` として置く（手順は [zabbix-setup.md](zabbix-setup.md) の手順 8）。
-`/etc/zabbix/zabbix_agent2.conf` に `Include=/etc/zabbix/zabbix_agent2.d/*.conf` があることは、`zabbix-agent2_7.0.32-2+ubuntu24.04_amd64.deb` の中身で確認した。
+`/etc/zabbix/zabbix_agent2.conf` に `Include=/etc/zabbix/zabbix_agent2.d/*.conf` があることは、`zabbix-agent2_8.0.0-1+ubuntu24.04_amd64.deb` の中身で確認した（2026-11-06。8.0 では加えて `Include=/etc/zabbix/zabbix_agent2.d/plugins.d/*.conf` もある）。
 
 ```ini
 # /etc/zabbix/zabbix_agent2.d/awaji.conf
@@ -231,19 +231,19 @@ UserParameter=awaji.systemd.nrestarts[*],systemctl show -p NRestarts --value "$1
 
 ## 5. 使う公式テンプレートと出典
 
-| テンプレート | 対象 | 出典（Zabbix 公式リポジトリの GitHub ミラー、`release/7.0`） |
+| テンプレート | 対象 | 出典（Zabbix 公式リポジトリの GitHub ミラー、`release/8.0`） |
 |---|---|---|
-| Proxmox VE by HTTP | Proxmox ホスト（API） | <https://github.com/zabbix/zabbix/tree/release/7.0/templates/app/proxmox> |
-| Linux by Zabbix agent | 各ゲストの OS（Proxmox ホストは第 1 段階では API だけで見る。セットアップ手順 7） | <https://github.com/zabbix/zabbix/tree/release/7.0/templates/os/linux> |
-| Systemd by Zabbix agent 2 | アプリ層のサービス | <https://github.com/zabbix/zabbix/tree/release/7.0/templates/app/systemd> |
-| MySQL by Zabbix agent 2 | 本番 MariaDB | <https://github.com/zabbix/zabbix/tree/release/7.0/templates/db/mysql_agent2> |
-| Website certificate by Zabbix agent 2 | `dashboard.awajiempire.net` の証明書 | <https://github.com/zabbix/zabbix/tree/release/7.0/templates/app/certificate_agent2> |
+| Proxmox VE by HTTP | Proxmox ホスト（API） | <https://github.com/zabbix/zabbix/tree/release/8.0/templates/app/proxmox> |
+| Linux by Zabbix agent | 各ゲストの OS（Proxmox ホストは第 1 段階では API だけで見る。セットアップ手順 7） | <https://github.com/zabbix/zabbix/tree/release/8.0/templates/os/linux> |
+| Systemd by Zabbix agent 2 | アプリ層のサービス | <https://github.com/zabbix/zabbix/tree/release/8.0/templates/app/systemd> |
+| MySQL by Zabbix agent 2 | 本番 MariaDB | <https://github.com/zabbix/zabbix/tree/release/8.0/templates/db/mysql_agent2> |
+| Website certificate by Zabbix agent 2 | `dashboard.awajiempire.net` の証明書 | <https://github.com/zabbix/zabbix/tree/release/8.0/templates/app/certificate_agent2> |
 | Zabbix server health | Zabbix 自身 | Zabbix サーバーに既定で入っている |
-| Discord（メディアタイプ） | 通知 | <https://github.com/zabbix/zabbix/tree/release/7.0/templates/media/discord> |
+| Discord（メディアタイプ） | 通知 | <https://github.com/zabbix/zabbix/tree/release/8.0/templates/media/discord> |
 
-エージェントの標準キーの書式（`vfs.file.exists`・`vfs.file.cksum`・`system.sw.os`・`net.tcp.service` など）: <https://www.zabbix.com/documentation/7.0/en/manual/config/items/itemtypes/zabbix_agent>
+エージェントの標準キーの書式（`vfs.file.exists`・`vfs.file.cksum`・`system.sw.os`・`net.tcp.service` など）: <https://www.zabbix.com/documentation/8.0/en/manual/config/items/itemtypes/zabbix_agent>
 
-`web.page.get`・Web シナリオ・トリガー関数（`nodata`・`min`・`max`・`last`）の細かい書式は、導入時に Zabbix 7.0 のマニュアルで確かめ、Web UI の「Test」で動作を確かめる【要確認】。
+`web.page.get`・Web シナリオ・トリガー関数（`nodata`・`min`・`max`・`last`）の細かい書式は、導入時に Zabbix 8.0 のマニュアルで確かめ、Web UI の「Test」で動作を確かめる【要確認】。
 
 ---
 

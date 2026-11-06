@@ -1,8 +1,8 @@
-# Zabbix セットアップ手順（Proxmox VE 9.1 / Ubuntu 24.04 LXC / Zabbix 7.0 LTS）
+# Zabbix セットアップ手順（Proxmox VE 9.1 / Ubuntu 24.04 LXC / Zabbix 8.0 LTS）
 
 - **ステータス**: 下書き。**この手順はまだ誰も実機で通していない**。最初に通した人が、つまずいた点を [zabbix-lessons.md](zabbix-lessons.md) に書き、この手順を直す。
 - **作成日**: 2026-11-05
-- **前提の決定**: [構成案](zabbix-architecture.md)（専用の非特権 LXC / 専用 MariaDB / Web UI は LAN のみ / 7.0 LTS で開始）
+- **前提の決定**: [構成案](zabbix-architecture.md)（専用の非特権 LXC / 専用 MariaDB / Web UI は LAN のみ / 8.0 LTS で開始）
 - **監視項目**: [監視設計](monitoring-design.md)
 
 ---
@@ -14,9 +14,9 @@
 - `【要確認】` は、リポジトリや公式ドキュメントから確かめきれなかった点。手順 0 か、そのステップの実行前に埋める。
 - 手順の区切りで `pct snapshot` を取る。失敗したら最後のスナップショットに戻る（最後の「ロールバック」の章）。
 - コマンドの出典:
-  - リポジトリ設定パッケージの URL・パッケージ名・ファイルの置き場所・既定の設定値: `repo.zabbix.com` のパッケージ（`7.0.32-2+ubuntu24.04`）の中身を `dpkg -c` / `dpkg-deb` で確認した（2026-11-05）。
-  - DB の作り方: <https://www.zabbix.com/documentation/7.0/en/manual/appendix/install/db_scripts>
-  - 公式のダウンロードページ（<https://www.zabbix.com/download?zabbix=7.0&os_distribution=ubuntu&os_version=24.04&components=server_frontend_agent&db=mysql&ws=nginx>）は JavaScript で手順を生成するため、この文書の作成時には本文を取得できなかった。**実行前に、このページの手順と見比べる。** 食い違ったら公式に従い、この文書を直す。
+  - リポジトリ設定パッケージの URL・パッケージ名・ファイルの置き場所・既定の設定値: `repo.zabbix.com` の 8.0 のパッケージ（`zabbix-release` `1:8.0-0.5+ubuntu24.04`、各コンポーネント `8.0.0-1+ubuntu24.04`）の中身を `dpkg -c` / `dpkg-deb` で確認した（2026-11-06）。
+  - DB の作り方: <https://www.zabbix.com/documentation/8.0/en/manual/appendix/install/db_scripts>
+  - 公式のダウンロードページ（<https://www.zabbix.com/download?zabbix=8.0&os_distribution=ubuntu&os_version=24.04&components=server_frontend_agent&db=mysql&ws=nginx>）は JavaScript で手順を生成するため、この文書の作成時には本文を取得できなかった。**実行前に、このページの手順と見比べる。** 食い違ったら公式に従い、この文書を直す。
 
 ### プレースホルダの一覧（手順 0 で決める）
 
@@ -124,22 +124,31 @@ pct snapshot <CTID> s1-base --description "Ubuntu 24.04 + full-upgrade"
 ```bash
 # zabbix#
 cd /tmp
-wget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
-dpkg -i zabbix-release_latest_7.0+ubuntu24.04_all.deb
+wget https://repo.zabbix.com/zabbix/8.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_8.0+ubuntu24.04_all.deb
+
+# 入れる前に、中身の .sources がどこを指しているかを見る（構成案 2.3）
+dpkg-deb -f zabbix-release_latest_8.0+ubuntu24.04_all.deb Version
+dpkg-deb --fsys-tarfile zabbix-release_latest_8.0+ubuntu24.04_all.deb | tar -xO --wildcards '*.sources'
+
+dpkg -i zabbix-release_latest_8.0+ubuntu24.04_all.deb
 apt update
 ```
 
-- このパッケージは `/etc/apt/sources.list.d/zabbix-release.sources`（`https://repo.zabbix.com/zabbix/7.0/ubuntu`）と、署名鍵 `/usr/share/keyrings/zabbix.gpg` を置く（2026-11-05 にパッケージの中身で確認。中身のバージョンは `1:7.0-5+ubuntu24.04`）。
-- Ubuntu 標準のリポジトリにも Zabbix のパッケージはあるが、公式ドキュメントは「OS のリポジトリのパッケージは古いことがあり、サポート対象外」としている（<https://www.zabbix.com/documentation/7.0/en/manual/installation/install_from_packages/debian_ubuntu>）。
-
-> **8.0 で入れる場合**: URL が `https://repo.zabbix.com/zabbix/8.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_8.0+ubuntu24.04_all.deb` に変わる（パスに `release/` が入る）。2026-11-05 時点ではこのパッケージの中身が `1:8.0-0.4`（プレリリースの番号）で、`stable` ではなく `release` と `unstable` を指していた（構成案 2.3）。**入れる前に、ダウンロードページの手順と、`dpkg-deb -c` で中身の `.sources` が何を指しているかを確かめる。**
+- 7.0 と違い、URL のパスに **`release/`** が入る。
+- このパッケージは `/etc/apt/sources.list.d/` に `.sources` を、`/usr/share/keyrings/zabbix.gpg` に署名鍵を置く。2026-11-06 に確かめた中身（`1:8.0-0.5+ubuntu24.04`）は、次の 4 つを指していた:
+  - `https://repo.zabbix.com/zabbix/8.0/stable/ubuntu`（**正式版はここから来る**）
+  - `https://repo.zabbix.com/zabbix/8.0/release/ubuntu`（`zabbix-release` 自身の更新用。`Architectures: all`）
+  - `https://repo.zabbix.com/zabbix/8.0/unstable/ubuntu`（`Enabled: no`。**有効になっていたら入れない**）
+  - `https://repo.zabbix.com/zabbix-tools/debian-ubuntu`（周辺ツール用。`Architectures: all`）
+- 前日（2026-11-05）の同じパッケージは `1:8.0-0.4` で、`stable` を指さず `unstable` が有効だった。**`Version` が `0.5` より古いか、`unstable` が `Enabled: no` になっていなければ、入れずに止まる。**
+- Ubuntu 標準のリポジトリにも Zabbix のパッケージはあるが、公式ドキュメントは「OS のリポジトリのパッケージは古いことがあり、サポート対象外」としている（<https://www.zabbix.com/documentation/8.0/en/manual/installation/install_from_packages/debian_ubuntu>）。
 
 **確認方法**:
 
 ```bash
 # zabbix#
-cat /etc/apt/sources.list.d/zabbix-release.sources   # URIs: https://repo.zabbix.com/zabbix/7.0/ubuntu
-apt-cache policy zabbix-server-mysql                  # Candidate が 1:7.0.x で、repo.zabbix.com から来ている
+cat /etc/apt/sources.list.d/zabbix*.sources         # 8.0/stable がある。unstable は Enabled: no
+apt-cache policy zabbix-server-mysql                  # Candidate が 1:8.0.x で、repo.zabbix.com/zabbix/8.0/stable から来ている
 ```
 
 ---
@@ -169,7 +178,7 @@ systemctl restart mariadb
 
 ```bash
 # zabbix#
-mariadb --version                                   # 10.11.x（Zabbix 7.0 の対応範囲 10.5〜12.3 の中）
+mariadb --version                                   # 10.11.x（Zabbix 8.0 の対応範囲 10.11〜12.3 の中。下限ちょうど）
 ss -tlnp | grep 3306                                # 127.0.0.1:3306 だけで待ち受けている（0.0.0.0 ではない）
 mariadb -e "SELECT @@innodb_buffer_pool_size/1024/1024 AS MiB;"   # 512
 ```
@@ -185,7 +194,7 @@ mariadb -e "SELECT @@innodb_buffer_pool_size/1024/1024 AS MiB;"   # 512
 apt install -y zabbix-server-mysql zabbix-frontend-php zabbix-nginx-conf zabbix-sql-scripts zabbix-agent2
 ```
 
-- パッケージ名は `repo.zabbix.com` の 7.0 / `noble` の一覧で確認した。`zabbix-nginx-conf` は `nginx` と `php-fpm` を依存として連れてくる（パッケージの `Depends` で確認）。
+- パッケージ名は `repo.zabbix.com` の 8.0 / `noble`（`stable`）の一覧で確認した。`zabbix-nginx-conf` は `nginx` と `php-fpm` を依存として連れてくる（パッケージの `Depends` で確認）。
 - エージェントは `zabbix-agent` ではなく **`zabbix-agent2`** にする（Systemd・MySQL・証明書のテンプレートがエージェント 2 前提のため）。
 
 DB とユーザーを作る。パスワードはプロンプトで打つ（シェルのコマンドラインに書かない）:
@@ -204,17 +213,17 @@ SET GLOBAL log_bin_trust_function_creators = 1;
 QUIT;
 ```
 
-- `utf8mb4` / `utf8mb4_bin`・ユーザーを `localhost` に限る・`log_bin_trust_function_creators` を一時的に 1 にして取り込み後に 0 に戻す、はいずれも公式の DB 作成手順のとおり（<https://www.zabbix.com/documentation/7.0/en/manual/appendix/install/db_scripts>）。
+- `utf8mb4` / `utf8mb4_bin`・ユーザーを `localhost` に限る・`log_bin_trust_function_creators` を一時的に 1 にして取り込み後に 0 に戻す、はいずれも公式の DB 作成手順のとおり（<https://www.zabbix.com/documentation/8.0/en/manual/appendix/install/db_scripts>）。
 - MariaDB のプロンプトで打った文は履歴ファイルに残る。この手順の最後で消す。
 
 スキーマとデータを取り込む（数分かかる。パスワードを聞かれる）:
 
 ```bash
 # zabbix#
-zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mariadb --default-character-set=utf8mb4 -uzabbix -p zabbix
+zcat /usr/share/zabbix/sql-scripts/mysql/server.sql.gz | mariadb --default-character-set=utf8mb4 -uzabbix -p zabbix
 ```
 
-> **8.0 の場合**: ファイルの場所が `/usr/share/zabbix/sql-scripts/mysql/server.sql.gz` に変わる（8.0.0 のパッケージの中身で確認）。
+> **7.0 から場所が変わった**: 7.0 は `/usr/share/zabbix-sql-scripts/...`、8.0 は `/usr/share/zabbix/sql-scripts/...`（8.0.0 のパッケージの中身で確認）。7.0 向けの記事のコマンドをそのまま使うと「ファイルがない」で失敗する。
 
 取り込みが終わったら戻す:
 
@@ -236,7 +245,7 @@ mariadb -e "SELECT user, host FROM mysql.user WHERE user='zabbix';"             
 **スナップショット**:
 
 ```bash
-pct snapshot <CTID> s2-db-imported --description "Zabbix 7.0 packages + DB schema"
+pct snapshot <CTID> s2-db-imported --description "Zabbix 8.0 packages + DB schema"
 ```
 
 ---
@@ -310,8 +319,8 @@ LAN 内の PC のブラウザで `http://<ZBX_IP>:8080/` を開き、Zabbix の�
    - Zabbix server name: `awaji-zabbix`
    - タイムゾーン: `Asia/Tokyo`
 2. 初期の管理ユーザー（`Admin`）でログインし、**すぐにパスワードを変える**（*User settings → Profile*）。初期パスワードは公式ドキュメントのクイックスタートで確かめる。
-3. 自分用のユーザーを作り、`Super admin role` と `Zabbix administrators` グループに入れる。そのユーザーでログインし直せることを確かめてから、`Admin` を無効にする【要確認: 7.0 の Web UI での無効化の操作】。
-4. **MFA（TOTP）を有効にする**（*Users → Authentication* の MFA 設定）。自分のユーザーグループに割り当て、スマホの認証アプリで登録する（出典: <https://www.zabbix.com/documentation/7.0/en/manual/web_interface/frontend_sections/users/authentication/mfa>）。
+3. 自分用のユーザーを作り、`Super admin role` と `Zabbix administrators` グループに入れる。そのユーザーでログインし直せることを確かめてから、`Admin` を無効にする【要確認: 8.0 の Web UI での無効化の操作】。
+4. **MFA（TOTP）を有効にする**（*Users → Authentication* の MFA 設定）。自分のユーザーグループに割り当て、スマホの認証アプリで登録する（出典: <https://www.zabbix.com/documentation/8.0/en/manual/web_interface/frontend_sections/users/authentication/mfa>）。
 5. `guest` ユーザーが無効のままであることを確かめる。
 
 **確認方法**:
@@ -332,24 +341,25 @@ pct snapshot <CTID> s3-ui-secured --description "Web UI initial setup + MFA"
 
 対象: アプリ層のゲスト（`<APP_HOST>`）、MariaDB CT（`<DB_HOST>`）。
 
-Proxmox ホスト自身には**入れない**（第 1 段階）。ホストは Proxmox API（手順 9.1）で見る。ハイパーバイザに外部のリポジトリとエージェントを足さないため。必要になったら、Debian 13 向けのパッケージ（`zabbix-release_latest_7.0+debian13_all.deb`、2026-11-05 にリポジトリで存在を確認）で入れる。
+Proxmox ホスト自身には**入れない**（第 1 段階）。ホストは Proxmox API（手順 9.1）で見る。ハイパーバイザに外部のリポジトリとエージェントを足さないため。必要になったら、Debian 13 向けのパッケージ（`https://repo.zabbix.com/zabbix/8.0/release/debian/pool/main/z/zabbix-release/zabbix-release_latest_8.0+debian13_all.deb`、2026-11-06 にリポジトリで存在を確認）で入れる。
 
 各ホストで（ホストごとに繰り返す）:
 
 ```bash
 # 対象ホストで。OS が Ubuntu 24.04 の場合
 cd /tmp
-wget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
-dpkg -i zabbix-release_latest_7.0+ubuntu24.04_all.deb
+wget https://repo.zabbix.com/zabbix/8.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_8.0+ubuntu24.04_all.deb
+dpkg-deb --fsys-tarfile zabbix-release_latest_8.0+ubuntu24.04_all.deb | tar -xO --wildcards '*.sources'   # 手順 2 と同じ確認
+dpkg -i zabbix-release_latest_8.0+ubuntu24.04_all.deb
 apt update
 apt install -y zabbix-agent2
 ```
 
-> 対象ホストの OS が Ubuntu 26.04 なら、ファイル名の `ubuntu24.04` を `ubuntu26.04` にする（7.0 の 26.04 向けパッケージの存在を 2026-11-05 に確認）【要確認: 本番の OS バージョン（構成案 Q2）】。
+> 対象ホストの OS が Ubuntu 26.04 なら、ファイル名の `ubuntu24.04` を `ubuntu26.04` にする（8.0 の 26.04 向けパッケージ `zabbix-release_latest_8.0+ubuntu26.04_all.deb` の存在を 2026-11-06 に確認）【要確認: 本番の OS バージョン（構成案 Q2）】。
 
 ### 7.1 接続先とホスト名
 
-`/etc/zabbix/zabbix_agent2.conf` の既定値は `Server=127.0.0.1` / `ServerActive=127.0.0.1` / `Hostname=Zabbix server`（パッケージの中身で確認）。この 3 行を書き換える:
+`/etc/zabbix/zabbix_agent2.conf` の既定値は `Server=127.0.0.1` / `ServerActive=127.0.0.1` / `Hostname=Zabbix server`（8.0.0 のパッケージの中身で確認。7.0 と同じ）。この 3 行を書き換える:
 
 ```bash
 editor /etc/zabbix/zabbix_agent2.conf
@@ -357,11 +367,12 @@ editor /etc/zabbix/zabbix_agent2.conf
 
 ```ini
 Server=<ZBX_IP>
-ServerActive=<ZBX_IP>
+ServerActive=
 Hostname=<APP_HOST>
 ```
 
-`Hostname=` は Zabbix の Web UI に登録するホスト名と完全に一致させる。
+- `Hostname=` は Zabbix の Web UI に登録するホスト名と完全に一致させる。
+- **`ServerActive=` は空にする**（既定の `127.0.0.1` のままにも、`<ZBX_IP>` にもしない）。この構成はパッシブだけを使う（ADR-033 の決定 5）。`ServerActive` に値があると、エージェントが自分から Zabbix サーバーの 10051 へアクティブチェックの設定を取りに行く。ホストを Web UI に登録する前（手順 7.3 の前）だと、ログに `cannot connect to [<ZBX_IP>:10051]: ... SSL alert number 40`（PSK のハンドシェイクの失敗）と `active check configuration update ... started to fail` が出続ける。2026-11-06 の初回の導入で実際に起きた（[zabbix-lessons.md](zabbix-lessons.md)）。
 
 ### 7.2 PSK
 
@@ -383,7 +394,7 @@ systemctl restart zabbix-agent2
 systemctl enable zabbix-agent2
 ```
 
-- PSK の生成方法・パラメータ名・「Zabbix ユーザーだけが読めるように」は公式のとおり（<https://www.zabbix.com/documentation/7.0/en/manual/encryption/using_pre_shared_keys>）。パラメータ名は `zabbix_agent2.conf` の中のコメント（`# TLSConnect=` など）でも確認した。
+- PSK の生成方法・パラメータ名・「Zabbix ユーザーだけが読めるように」は公式のとおり（<https://www.zabbix.com/documentation/8.0/en/manual/security/using_pre_shared_keys>）。パラメータ名は `zabbix_agent2.conf` の中のコメント（`# TLSConnect=` など）でも確認した。
 - `zabbix_agent2.conf` に `Include=/etc/zabbix/zabbix_agent2.d/*.conf` がある（パッケージの中身で確認）ので、`10-tls.conf` は読み込まれる。
 - `TLSAccept=psk` だけにすると、暗号化していない接続は拒否される。
 - **PSK の値は、Zabbix の Web UI に貼るときだけ** `cat /etc/zabbix/zabbix_agent2.psk` で表示し、貼ったらターミナルを閉じる。チャットやメモ帳に貼らない。
@@ -403,7 +414,7 @@ Web UI の *Data collection → Hosts → Create host*:
 # 対象ホストで
 systemctl is-active zabbix-agent2                 # active
 ss -tlnp | grep 10050                             # 待ち受けている
-tail -n 20 /var/log/zabbix/zabbix_agent2.log      # 接続の失敗が出続けていない
+tail -n 20 /var/log/zabbix/zabbix_agent2.log      # 接続の失敗が出続けていない。とくに「cannot connect to [<ZBX_IP>:10051]」がない（出るなら 7.1 の ServerActive が空になっていない）
 ```
 
 ```bash
@@ -543,7 +554,7 @@ JSON が返り、有効期限が入っている。
 ## 手順 10: 通知（Discord）
 
 1. Discord に**通知用**と**変更記録用**の 2 つのチャンネルを作り、それぞれのチャンネル設定の「連携サービス → ウェブフック」で Webhook を作る。URL は秘密として扱う。
-2. Zabbix の *Alerts → Media types* に `Discord` があるか確かめる。なければ公式の定義を取り込む（<https://github.com/zabbix/zabbix/tree/release/7.0/templates/media/discord>）【要確認: 7.0 で既定で入っているか】。
+2. Zabbix の *Alerts → Media types* に `Discord` があるか確かめる。なければ公式の定義を取り込む（<https://github.com/zabbix/zabbix/tree/release/8.0/templates/media/discord>）【要確認: 8.0 で既定で入っているか】。
 3. グローバルマクロ `{$ZABBIX.URL}` に `http://<ZBX_IP>:8080` を入れる（Discord のメッセージから Zabbix の画面に飛べるようにする。メディアタイプのパラメータ `zabbix_url` がこのマクロを参照している）。
 4. 自分のユーザーの *Media* に Discord を 2 つ追加する（Send to にそれぞれの Webhook URL。重要度で分ける）:
    - 通知用: Disaster・High・Average・Warning
@@ -628,12 +639,10 @@ pct rollback <CTID> <スナップショット名> --start 1
 
 ---
 
-## 7.0 → 8.0 へ上げるとき（将来の作業。今回はやらない）
+## 8.0.x のマイナー更新（導入後の作業）
 
-構成案 2.3 の案 A を選んだ場合、2027-06-30（7.0 のフルサポート終了）より前に行う。これは別の ADR と手順書にする。少なくとも次を確かめる:
+8.0 LTS の中の更新（8.0.0 → 8.0.1 など）は `apt` で上がる。x.0.0 で始めたので、最初の数回の更新は不具合の修正が多いと見込む。
 
-- 8.0 のリポジトリ設定パッケージが `stable` を指す正式版になっているか
-- MariaDB の下限（8.0 は 10.11.00 以上）を満たすか
-- SQL スクリプトの置き場所が変わっている（`/usr/share/zabbix/sql-scripts/`）こと
-- DB のスキーマの更新は Zabbix サーバーが起動時に行う、と理解している【要確認: 公式のアップグレード手順】
-- 作業前に `pct snapshot` と DB のダンプを取る
+- 更新の前に `pct snapshot <CTID> before-8.0.x` を取り、Zabbix の DB をダンプする。
+- 更新したら `journalctl -u zabbix-server` に DB の更新の失敗がないかを見る【要確認: 公式のアップグレード手順にある、マイナー更新での DB の扱い】。
+- サポート期限（8.0 LTS: フルサポート 2029-11-30、限定サポート 2031-11-30）は [zabbix-lessons.md](zabbix-lessons.md) の期限の一覧に入れてある。

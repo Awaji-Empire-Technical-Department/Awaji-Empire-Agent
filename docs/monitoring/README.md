@@ -1,11 +1,12 @@
 # 監視 (Monitoring) ドキュメント
 
-自宅 Proxmox に Zabbix を導入し、Awaji Empire Agent の基盤とアプリを監視するためのドキュメント群です。
+自宅 Proxmox に Zabbix 8.0 と OpenTelemetry を導入し、Awaji Empire Agent の基盤とアプリを監視するためのドキュメント群です。
+Zabbix は「判断して知らせる」、OpenTelemetry は「集めて運ぶ」と役割を分けます（通知は Zabbix だけから出します）。
 
 - **ステータス**: 下書き（未導入。本人が手順書を見ながら導入する）
-- **作成日**: 2026-11-05
+- **作成日**: 2026-11-05（2026-11-06 に Zabbix 8.0 への変更と OpenTelemetry を追加）
 - **作成者**: Wanyaldee
-- **関連 ADR**: [ADR-033: Zabbix による監視基盤の導入](../adr/031-040/033-zabbix-monitoring-introduction.md)（提案中）
+- **関連 ADR**: [ADR-033: Zabbix による監視基盤の導入](../adr/031-040/033-zabbix-monitoring-introduction.md)（提案中）/ [ADR-034: OpenTelemetry の導入](../adr/031-040/034-opentelemetry-introduction.md)（提案中）
 
 ---
 
@@ -16,13 +17,14 @@
 | 1 | [zabbix-architecture.md](zabbix-architecture.md) | 構成の案（置き場所・DB・メモリ見積もり）、セキュリティ方針、既存 Grafana との関係 |
 | 2 | [monitoring-design.md](monitoring-design.md) | **監視設計（いちばん大事）**。何を・なぜ・どうなったらアラートにするか |
 | 3 | [zabbix-setup.md](zabbix-setup.md) | セットアップ手順（各ステップに確認方法）とロールバック |
-| 4 | [zabbix-lessons.md](zabbix-lessons.md) | 導入後に気づいたことを書き足す欄 |
+| 4 | [opentelemetry-setup.md](opentelemetry-setup.md) | OpenTelemetry の導入手順（Proxmox → Collector → Prometheus → Grafana を段階 1 として、各手順に確認方法）とロールバック。Zabbix との比べる観点 |
+| 5 | [zabbix-lessons.md](zabbix-lessons.md) | 導入後に気づいたことを書き足す欄（OpenTelemetry の分も） |
 
 ## このドキュメントの書き方の決まり
 
 - **【要確認】**: リポジトリから読み取れず、推測で埋めなかった事項。導入前に本人が実機で確認し、確認した値で書き換える。
 - **秘密の値は書かない**: パスワード・PSK・API トークン・Webhook URL は、すべて `<...>` のプレースホルダで書く。実際の値はサーバー上のファイルとパスワードマネージャーにだけ置く。
-- **出典**: Zabbix・Proxmox・Cloudflare の仕様は公式ドキュメントと公式リポジトリで確かめ、URL を付けた。確認日はすべて 2026-11-05。
+- **出典**: Zabbix・Proxmox・Cloudflare・OpenTelemetry の仕様は公式ドキュメントと公式リポジトリで確かめ、URL を付けた。確認日は 2026-11-05（Zabbix の初版）と 2026-11-06（Zabbix 8.0 への変更と OpenTelemetry）。
 
 ## 監視についての考え方（このドキュメント群の前提）
 

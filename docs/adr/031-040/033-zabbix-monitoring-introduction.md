@@ -1,7 +1,8 @@
 # ADR-033: Zabbix による監視基盤の導入（構成・DB・公開方法）
 
-- **ステータス**: 提案中（下書き。導入前。Zabbix のバージョンなど本人が決める点が残っている）
+- **ステータス**: 提案中（下書き。導入前）
 - **作成日**: 2026-11-05
+- **更新日**: 2026-11-06（Zabbix のバージョンを 8.0 LTS に決定。OpenTelemetry との役割分担を [ADR-034](034-opentelemetry-introduction.md) に分けた）
 - **作成者**: Wanyaldee
 - **ブランチ**: `Wanyaldee/zabbix-setup-doc`
 
@@ -39,7 +40,8 @@
 4. **Web UI は LAN 内からのみ**（`:8080`、Proxmox ファイアウォールで LAN のセグメントだけ許可）。外から見たくなったら、Cloudflare Tunnel + Cloudflare Access を別の ADR で決める。
 5. エージェントは**エージェント 2 をパッシブで**使い、**ホストごとに別の PSK で暗号化**する。Proxmox ホストにはエージェントを入れず、読み取り専用の API トークンで見る。
 6. 監視項目は「前提の崩れ」（INC-001 型）を独立した区分として持つ（[監視設計](../../monitoring/monitoring-design.md) の C 区分）。
-7. Zabbix のバージョンは**本人が決める**（下記「未決」）。手順書は 7.0 LTS で書いた。
+7. Zabbix のバージョンは **8.0 LTS** にする（2026-11-06 に本人が決定）。
+8. OpenTelemetry も並行して入れる。役割の分け方は [ADR-034](034-opentelemetry-introduction.md) で決める。
 
 詳しい内容は次のドキュメントにある。
 
@@ -51,7 +53,6 @@
 
 | 論点 | 案 | 推奨 |
 |---|---|---|
-| Zabbix のバージョン | A: 7.0 LTS で始めて後で 8.0 へ / B: 8.0 LTS で始める / C: 8.0.1 以降を待つ | A（理由は構成案 2.3） |
 | Zabbix・自宅回線が死んだことに誰が気づくか | 外部の死活監視サービス / デッドマンスイッチ / 当面は受け入れる | 未定（監視設計 H-3） |
 | テスト環境にもエージェントを入れるか | 入れる / 入れない | 入れる（アラートの試験をテスト環境でできるため。手順書の手順 11） |
 
@@ -90,14 +91,25 @@ innodb_buffer_pool_size = 512M
 
 - **本番の MariaDB に相乗りしない**: 「本番 DB が落ちた」ことを、落ちた DB に書こうとすることになる。また Zabbix は書き込みが多く、本番 DB と I/O やバッファプールを食い合う。
 - **PostgreSQL ではなく MariaDB**: このリポジトリの運用経験は MariaDB だけ。数百アイテムでは性能の差が出ないので、新しく覚えるものを Zabbix 本体に絞った。
-- **Ubuntu 24.04 の apt 版（10.11）**: Zabbix 7.0（10.5〜12.3）と 8.0（10.11〜12.3）の両方のサポート範囲に入るので、7.0 → 8.0 に上げるときに DB を入れ替えなくてよい。
+- **Ubuntu 24.04 の apt 版（10.11）**: Zabbix 8.0 のサポート範囲（10.11〜12.3）に入る。ただし**下限ちょうど**なので、Ubuntu を上げずに Zabbix だけ次の版へ上げると下限を割るおそれがある（監視設計 C-11）。
 - **設定は別ファイル（`60-zabbix.cnf`）**: Ubuntu のパッケージの設定ファイルを直接書き換えると、パッケージ更新のときに差分の確認を求められる。別ファイルなら、消せば元に戻る。
 
 ### 公開方法: LAN のみ
 
 - 自宅の IP を公開しない方針（ARCHITECTURE §6.2、ADR-029）を守る。ルーターのポートは開けない。
 - Cloudflare Tunnel で出すことはできるが、**Access を付けずに出すと Zabbix のログイン画面がインターネットに直接さらされる**。Access を付けるなら「誰を通すか」というポリシーの判断が増えるので、外から見る必要が出てから別の ADR で決める。
-- どの方法でも、Zabbix 側で初期の `Admin` のパスワードの変更と無効化、MFA（TOTP、7.0 から使える）を必須にする。
+- どの方法でも、Zabbix 側で初期の `Admin` のパスワードの変更と無効化、MFA（TOTP。7.0 から使え、8.0 にもある）を必須にする。
+
+### バージョン: 8.0 LTS
+
+```bash
+wget https://repo.zabbix.com/zabbix/8.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_8.0+ubuntu24.04_all.deb
+dpkg-deb --fsys-tarfile zabbix-release_latest_8.0+ubuntu24.04_all.deb | tar -xO --wildcards '*.sources'
+```
+
+- **7.0 で始めて後から上げる案をやめた**: 7.0 のフルサポートは 2027-06-30 まで。8.0 で始めれば 2029-11-30 まで上げ直しが要らない。
+- **前日に懸念していた点が解消していた**: 2026-11-05 の時点では、リポジトリ設定パッケージ（`1:8.0-0.4`）が `stable` を指さず `unstable` が有効だった。2026-11-06 に取り直すと `1:8.0-0.5` になり、`stable` を指して `unstable` は `Enabled: no` だった。手順書では、入れる前に `.sources` を表示して確かめる手順を残した。この値は日によって変わりうるため。
+- **OpenTelemetry と比べられる**: 8.0 から、OpenTelemetry のデータを Zabbix で扱う機能（APM）が入った。ADR-034 で入れる OpenTelemetry と比べる材料になる。ただし APM には proxy と ClickHouse が要るので、この ADR の範囲では入れない（ADR-034 の段階 4）。
 
 ### 前提の崩れを見る UserParameter（INC-001 への直接の答え）
 
@@ -147,7 +159,7 @@ UserParameter=awaji.systemd.nrestarts[*],systemctl show -p NRestarts --value "$1
 - **本番に手を入れるのは 2 か所**: アプリ層ゲストと DB の CT にエージェント 2 を入れること、本番 MariaDB に読み取り専用の監視ユーザー（`zbx_monitor`）を作ること。
 - 守るべき秘密が増える（Zabbix の DB パスワード、各ホストの PSK、Proxmox API トークン、MariaDB の監視ユーザーのパスワード、Discord Webhook URL）。どれもアプリの `.env` とは分けて管理する。
 - **Zabbix 自体や自宅の回線が止まったときには、Zabbix からの通知も止まる**。外部の見張りをどうするかは未決（監視設計 H-3）。
-- 7.0 LTS で始めた場合、2027-06-30（フルサポート終了）までに 8.0 へ上げる作業が必ず発生する。
+- 8.0.0（x.0.0）で始めるので、初期の不具合を踏む可能性がある。手順の区切りで `pct snapshot` を取って戻れるようにしてある。
 - Bot が Discord の Gateway から切れている状態は、この構成では検知できない（アプリのコード変更が要る）。
 
 ## 検証 (Verification)
@@ -158,7 +170,7 @@ UserParameter=awaji.systemd.nrestarts[*],systemctl show -p NRestarts --value "$1
 - **調査:** Zabbix の公式ライフサイクルのページで LTS の版とサポート期限を確認（8.0 LTS: 2026-11-05 リリース、7.0 LTS: フルサポート 2027-06-30 まで）。
 - **調査:** `repo.zabbix.com` から次のパッケージを取得し、`dpkg -c` / `dpkg-deb` で中身を確認した。
   - `zabbix-release_latest_7.0+ubuntu24.04_all.deb`（`1:7.0-5+ubuntu24.04`）: `https://repo.zabbix.com/zabbix/7.0/ubuntu` を指す
-  - `zabbix-release_latest_8.0+ubuntu24.04_all.deb`（`1:8.0-0.4+ubuntu24.04`）: `.../8.0/release/ubuntu` と `.../8.0/unstable/ubuntu` を指し、`stable` を指していない
+  - `zabbix-release_latest_8.0+ubuntu24.04_all.deb`（`1:8.0-0.4+ubuntu24.04`）: `.../8.0/release/ubuntu` と `.../8.0/unstable/ubuntu` を指し、`stable` を指していない（翌日に解消。下記）
   - `zabbix-sql-scripts` 7.0.32: `/usr/share/zabbix-sql-scripts/mysql/server.sql.gz`、8.0.0: `/usr/share/zabbix/sql-scripts/mysql/server.sql.gz`
   - `zabbix-agent2` 7.0.32: 既定値 `Server=127.0.0.1` / `ServerActive=127.0.0.1` / `Hostname=Zabbix server`、`Include=/etc/zabbix/zabbix_agent2.d/*.conf`
   - `zabbix-nginx-conf` 7.0.32: `listen 8080` と `server_name` がコメント、`postinst` が `/etc/nginx/conf.d/zabbix.conf` にリンクを作る
@@ -167,6 +179,15 @@ UserParameter=awaji.systemd.nrestarts[*],systemctl show -p NRestarts --value "$1
 - **調査:** Zabbix 7.0 / 8.0 の要件ページ（MariaDB の対応範囲、Small の目安、既定のポート、DB サイズの計算式）、PSK・MFA のページ、Proxmox の `pct`・`pveum` のマニュアル、Cloudflare Access のドキュメントを参照。
 
   Checked-by: Claude Opus 5.5 (AI agent)、2026-11-05
+- **調査（2026-11-06）:** 8.0 に決めたことを受けて、次を取り直した。
+  - `zabbix-release_latest_8.0+ubuntu24.04_all.deb`（`1:8.0-0.5+ubuntu24.04`）: `8.0/stable` と `8.0/release` を有効にし、`8.0/unstable` は `Enabled: no`。ほかに `zabbix-tools/debian-ubuntu` を追加する
+  - `8.0/stable` の `noble` に `8.0.0-1+ubuntu24.04` がある。`zabbix-agent2` 8.0.0 の既定値は 7.0 と同じ（`Server=127.0.0.1` / `ServerActive=127.0.0.1` / `Hostname=Zabbix server`）
+  - `zabbix-nginx-conf` 8.0.0: `listen 8080` と `server_name` がコメントのまま。`postinst` が `/etc/nginx/conf.d/zabbix.conf` にリンクを作る
+  - `zabbix-server-mysql` 8.0.0: `/etc/zabbix/zabbix_server.conf` は `-rw-------`。`TelemetryProvider`（ClickHouse のみ）と `StartTelemetryQueryPollers` が増えている
+  - 公式テンプレート（Proxmox VE、Linux、Systemd、MySQL agent 2、Website certificate agent 2、Discord）が GitHub ミラーの `release/8.0` にあること
+  - Debian 13・Ubuntu 26.04 向けの `zabbix-release_latest_8.0` があること
+
+  Checked-by: Claude Opus 5.5 (AI agent)、2026-11-06
 
 ### 未検証
 
@@ -183,4 +204,4 @@ UserParameter=awaji.systemd.nrestarts[*],systemctl show -p NRestarts --value "$1
 - インシデント: [INC-001](../../incidents/INC-001-ubuntu26-venv-broken.md)
 - 監視ドキュメント: [docs/monitoring/](../../monitoring/README.md)
 - Zabbix ライフサイクル: <https://www.zabbix.com/life_cycle_and_release_policy>
-- Zabbix 7.0 要件: <https://www.zabbix.com/documentation/7.0/en/manual/installation/requirements>
+- Zabbix 8.0 要件: <https://www.zabbix.com/documentation/8.0/en/manual/installation/requirements>

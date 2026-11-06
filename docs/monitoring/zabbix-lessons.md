@@ -1,7 +1,7 @@
-# Zabbix 導入で学んだこと（書き足していく記録）
+# Zabbix・OpenTelemetry 導入で学んだこと（書き足していく記録）
 
 - **作成日**: 2026-11-05（枠のみ。中身は導入後に書き足す）
-- **関連**: [構成案](zabbix-architecture.md) / [監視設計](monitoring-design.md) / [セットアップ手順](zabbix-setup.md) / [技術的教訓（Phase 3-C）](../technical_lessons.md)
+- **関連**: [構成案](zabbix-architecture.md) / [監視設計](monitoring-design.md) / [セットアップ手順](zabbix-setup.md) / [OpenTelemetry 導入手順](opentelemetry-setup.md) / [技術的教訓（Phase 3-C）](../technical_lessons.md)
 
 このファイルは「やってみて分かったこと」を残す場所です。
 手順書や設計を直したときは、**直した理由**をここに書いてから直す（直した結果は手順書・設計の側に反映する）。
@@ -15,6 +15,7 @@
 |---|---|---|---|---|---|
 | YYYY-MM-DD | 手順 0 | 事前確認 | | | |
 | | 手順 1 | | | | |
+| 2026-11-06 | 手順 7 | アプリ層ゲスト（01sv-ubuntu）にエージェント 2 を入れ、PSK を設定 | エージェントのログに `cannot connect to [<ZBX_IP>:10051]: ... SSL alert number 40` が出続けた | **手順書の誤り**。7.1 で `ServerActive=<ZBX_IP>` を書かせていたため、パッシブだけの設計（ADR-033 決定 5）なのにアクティブチェックを試みていた。`ServerActive=` を空にするよう手順書を直した | Wanyaldee |
 
 ## 2. 【要確認】の答え合わせ
 
@@ -26,12 +27,23 @@
 | 構成案 Q2 | 本番の OS バージョン | | | |
 | 監視設計 D-2 | `NRestarts` は手動 restart で 0 に戻るか | | | |
 | 監視設計 4 章 | 前処理 Simple change は、値が減ったときに差を捨てるか | | | |
+| OTel 手順 3 | `dpkg -i --force-confold` で、先に置いた `config.yaml` が残るか | | | |
+| OTel 手順 2 | Prometheus のユニットの防御設定が非特権 LXC で動くか | | | |
+| OTel 手順 5 | Proxmox が送るメトリクスの名前・ラベル・送る間隔 | | | |
 
 ## 3. 実測値
 
 構成案 2.5 の見積もりと比べる。
 
 | 日付 | Zabbix CT のメモリ使用 | アイテム数 | 1 秒あたりの値の数（NVPS） | DB のサイズ | キャッシュ使用率の最大 | メモ |
+|---|---|---|---|---|---|---|
+| | | | | | | |
+
+### 3.1 OpenTelemetry の実測値
+
+[OTel 手順](opentelemetry-setup.md) 1 章の見積もり（CT 1024 MiB、Collector の上限 200 MiB、30 日で 1 GiB 未満）と比べる。
+
+| 日付 | OTel CT のメモリ使用 | Collector の RSS | Prometheus の系列数 | `/var/lib/prometheus` のサイズ | アプリ層の Collector の RSS | メモ |
 |---|---|---|---|---|---|---|
 | | | | | | | |
 
@@ -62,8 +74,9 @@
 
 | 対象 | 期限 | 出典 | 作業を始める日 |
 |---|---|---|---|
-| Zabbix 7.0 LTS フルサポート終了 | 2027-06-30 | <https://www.zabbix.com/life_cycle_and_release_policy> | 2027-04-01 |
-| Zabbix 7.0 LTS 限定サポート終了 | 2029-06-30 | 同上 | — |
+| Zabbix 8.0 LTS フルサポート終了 | 2029-11-30 | <https://www.zabbix.com/life_cycle_and_release_policy> | 2029-09-01 |
+| Zabbix 8.0 LTS 限定サポート終了 | 2031-11-30 | 同上 | — |
+| MariaDB の下限（Zabbix 8.0 は 10.11.00 以上） | 次の Zabbix の版に上げるとき | 構成案 2.4 | 上げる前 |
 | Ubuntu 24.04 LTS の標準サポート終了 | 【要確認: Ubuntu の公式のリリース周期のページ】 | | |
 | Proxmox VE 9 のサポート終了 | 【要確認: Proxmox の公式ページ】 | | |
 
@@ -88,4 +101,4 @@ Zabbix で自動化しないと決めたもの（監視設計で理由を書い�
 - [ ] Bot が Discord の Gateway から切れたことを検知する方法（監視設計 D 章の「見えていないもの」。アプリのコード変更が要る）
 - [ ] Zabbix 自体が止まったことに気づく方法（監視設計 H-3）
 - [ ] Web UI を外から見るか（構成案 3.2 の案 B。別の ADR にする）
-- [ ] 7.0 → 8.0 のアップグレード（別の ADR と手順書にする）
+- [ ] OpenTelemetry と比べた結果を書く（[OpenTelemetry 導入手順](opentelemetry-setup.md) の「比べる観点」）

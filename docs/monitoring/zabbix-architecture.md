@@ -103,45 +103,47 @@ graph TD
 OS は **Ubuntu 24.04 LTS** の LXC テンプレートにする。理由:
 
 - 本番（`ARCHITECTURE.md` 上は 24.04）と揃えると、Ubuntu の癖を一つ覚えれば済む。
-- Zabbix 公式リポジトリに 7.0 / 8.0 とも `noble`（24.04）向けのパッケージがある（2026-11-05 に `repo.zabbix.com` で確認）。
-- Ubuntu 24.04 の apt の MariaDB は 10.11 系で、Zabbix 7.0（MariaDB 10.5〜12.3）と 8.0（10.11〜12.3）の両方のサポート範囲に入る（出典: 下記 2.4）。
+- Zabbix 公式リポジトリに 8.0 の `noble`（24.04）向けのパッケージがある（2026-11-06 に `repo.zabbix.com` で確認）。
+- Ubuntu 24.04 の apt の MariaDB は 10.11 系で、Zabbix 8.0 のサポート範囲（10.11〜12.3）に入る（出典: 下記 2.4）。
 
-### 2.3 Zabbix のバージョン: 本人が決める
+### 2.3 Zabbix のバージョン: 8.0 LTS で始める（2026-11-06 に決定）
 
 2026-11-05 時点の公式ライフサイクル（<https://www.zabbix.com/life_cycle_and_release_policy>）:
 
 | バージョン | リリース日 | フルサポート終了 | 限定サポート終了 |
 |---|---|---|---|
-| **8.0 LTS** | **2026-11-05（この文書の作成日）** | 2029-11-30 | 2031-11-30 |
+| **8.0 LTS** | **2026-11-05** | 2029-11-30 | 2031-11-30 |
 | 7.4（非 LTS） | 2025-07-01 | 2026-11-12 | 2027-05-31 |
-| **7.0 LTS** | 2024-06-04 | 2027-06-30 | 2029-06-30 |
+| 7.0 LTS | 2024-06-04 | 2027-06-30 | 2029-06-30 |
 
-`repo.zabbix.com` を直接確かめた結果（2026-11-05）:
-
-- 7.0 は `7.0.32` が `noble` 向けに出ている。リポジトリ設定パッケージ `zabbix-release_latest_7.0+ubuntu24.04_all.deb`（中身のバージョンは `1:7.0-5+ubuntu24.04`）は `https://repo.zabbix.com/zabbix/7.0/ubuntu` を指す。
-- 8.0 は `8.0.0` のパッケージが `https://repo.zabbix.com/zabbix/8.0/stable/ubuntu` に出ている（`noble` の `Release` の日付は 2026-11-05 07:33 UTC）。**ただし同日時点のリポジトリ設定パッケージ `zabbix-release_latest_8.0+ubuntu24.04_all.deb` の中身は `1:8.0-0.4+ubuntu24.04`（プレリリースの番号）で、`.../8.0/release/ubuntu` と `.../8.0/unstable/ubuntu` を指し、`stable` を指していない。** このパッケージで入れたときに 8.0.0 の正式版が入るかどうか、まだはっきりしない。
-- 7.0 と 8.0 で SQL スクリプトの置き場所が違う（7.0: `/usr/share/zabbix-sql-scripts/mysql/server.sql.gz`、8.0: `/usr/share/zabbix/sql-scripts/mysql/server.sql.gz`。両パッケージの中身を `dpkg -c` で確認）。**記憶や古い記事の手順をそのまま 8.0 に当てると、この時点で失敗する。**
+検討した案:
 
 | 案 | 長所 | 短所 |
 |---|---|---|
-| **A. 7.0 LTS で始め、8.0.x が落ち着いたら 8.0 へ上げる（推奨）** | 手順と情報が揃っていて詰まりにくい。7.0 → 8.0 のアップグレードを自分でやること自体が「Zabbix サーバーのリプレイス」の練習になる | 7.0 のフルサポートは 2027-06-30 まで。それまでに上げる作業が必ず発生する |
-| B. 8.0 LTS で始める | サポートが 2031 年まで長い。上げ直しが要らない | リリース当日で、リポジトリ設定パッケージがまだプレリリースの番号。x.0.0 の不具合を踏む可能性がある。情報がまだ少ない |
-| C. 8.0.1 か 8.0.2 が出るまで待つ | B の短所が減る | いつ始められるかが Zabbix 側の都合で決まる |
+| A. 7.0 LTS で始め、後で 8.0 へ上げる | 手順と情報が揃っている。7.0 → 8.0 の作業が「リプレイス」の練習になる | 2027-06-30 までに上げる作業が必ず発生する |
+| **B. 8.0 LTS で始める（採用）** | サポートが 2029-11 / 2031-11 まで長く、上げ直しが要らない。**OpenTelemetry のデータを Zabbix で扱う機能（APM）が 8.0 から入った**ので、[OpenTelemetry 導入](opentelemetry-setup.md)と比べる材料になる | x.0.0 の不具合を踏む可能性がある。日本語の情報がまだ少ない |
+| C. 8.0.1 以降を待つ | B の短所が減る | 始める時期が Zabbix 側の都合で決まる |
 
-手順書（[zabbix-setup.md](zabbix-setup.md)）は案 A（7.0）で書き、8.0 で違うところは注記する。
+**B にした理由**: 2026-11-05 の時点で懸念していた「リポジトリ設定パッケージがプレリリース版で `stable` を指していない」問題が、翌日に解消していた（下記）。残る短所は x.0.0 の不具合だけで、これは手順の途中で `pct snapshot` を取って戻れるようにしてあるので受け入れる。
+
+`repo.zabbix.com` を直接確かめた結果:
+
+- **2026-11-06**: `zabbix-release_latest_8.0+ubuntu24.04_all.deb` の中身は `1:8.0-0.5+ubuntu24.04`。`.sources` は `https://repo.zabbix.com/zabbix/8.0/stable/ubuntu` と `.../8.0/release/ubuntu` を有効にし、`.../8.0/unstable/ubuntu` は `Enabled: no`。あわせて `https://repo.zabbix.com/zabbix-tools/debian-ubuntu` も追加する。`stable` には `8.0.0-1+ubuntu24.04` のパッケージが出ている。
+- 2026-11-05（前日）: 同じパッケージは `1:8.0-0.4+ubuntu24.04` で、`release` と `unstable` を指し、`stable` を指していなかった。**入れる直前に、もう一度 `.sources` の中身を確かめる**（セットアップ手順 2）。
+- 7.0 と 8.0 では SQL スクリプトの置き場所が違う（7.0: `/usr/share/zabbix-sql-scripts/mysql/server.sql.gz`、8.0: `/usr/share/zabbix/sql-scripts/mysql/server.sql.gz`。両方のパッケージの中身を `dpkg -c` で確認した）。**7.0 向けの記事の手順をそのまま 8.0 に当てると、ここで失敗する。**
 
 ### 2.4 DB の選択: Zabbix CT の中に専用の MariaDB を入れる
 
 | 案 | 評価 |
 |---|---|
-| **Zabbix CT 内に専用の MariaDB（推奨）** | 監視対象（本番の MariaDB CT）が止まっても、監視の記録と通知は止まらない。Ubuntu 24.04 の apt の MariaDB 10.11 は、7.0（10.5.00〜12.3.X）と 8.0（10.11.00〜12.3.X）両方のサポート範囲 |
+| **Zabbix CT 内に専用の MariaDB（推奨）** | 監視対象（本番の MariaDB CT）が止まっても、監視の記録と通知は止まらない。Ubuntu 24.04 の apt の MariaDB 10.11 は、8.0 のサポート範囲（10.11.00〜12.3.X）に入る |
 | 本番の MariaDB CT に `zabbix` DB を相乗り | **不採用**。「DB が落ちた」ことを、落ちた DB に書こうとすることになる。Zabbix は書き込みが多く、本番 DB の I/O とバッファプールを食い合う。本番 DB の権限設計にも手が入る |
 | PostgreSQL（+ TimescaleDB） | 大規模では有利だが、このリポジトリは MariaDB の運用経験しかない。数百アイテムの規模では差が出ない。新しく覚えるものを Zabbix 本体に絞るため不採用 |
 
 8.0 は MariaDB の下限を 10.11.00 に上げている。Ubuntu 24.04 の 10.11 はちょうど下限にいる。**Ubuntu の次の LTS へ上げずに Zabbix だけ 8.x の先へ上げ続けると、いつか下限を割る**。これも「前提の崩れ」の一つとして監視設計に入れた（monitoring-design.md C-6）。
 
 出典:
-- Zabbix 7.0 要件: <https://www.zabbix.com/documentation/7.0/en/manual/installation/requirements>
+- Zabbix 7.0 要件: <https://www.zabbix.com/documentation/8.0/en/manual/installation/requirements>
 - Zabbix 8.0 要件: <https://www.zabbix.com/documentation/8.0/en/manual/installation/requirements>
 
 ### 2.5 リソースの見積もり
@@ -194,7 +196,7 @@ OS は **Ubuntu 24.04 LTS** の LXC テンプレートにする。理由:
 
 - 初期の `Admin` ユーザーのパスワードを、最初のログイン直後に変える。
 - 自分用の管理ユーザーを作り、`Admin` は無効にする。
-- **MFA（TOTP）を有効にする**。Zabbix 7.0 から MFA（TOTP / Duo）がある。*Users → Authentication* で有効にし、ユーザーグループ単位で割り当てる（出典: <https://www.zabbix.com/documentation/7.0/en/manual/web_interface/frontend_sections/users/authentication/mfa>）。
+- **MFA（TOTP）を有効にする**。Zabbix は 7.0 から MFA（TOTP / Duo）がある（8.0 にもある）。*Users → Authentication* で有効にし、ユーザーグループ単位で割り当てる（出典: <https://www.zabbix.com/documentation/8.0/en/manual/web_interface/frontend_sections/users/authentication/mfa>）。
 - ゲストユーザー（`guest`）が無効のままであることを確かめる。
 
 ### 3.3 エージェントとの通信
@@ -209,9 +211,9 @@ OS は **Ubuntu 24.04 LTS** の LXC テンプレートにする。理由:
 | UserParameter | 決め打ちのコマンドだけを書く（[monitoring-design.md](monitoring-design.md) 参照）。`UnsafeUserParameters=0`（既定）のまま | 引数にシェルの特殊文字を通さない |
 | root で動かさない | エージェントは `zabbix` ユーザーで動く（パッケージの既定）。監視のために sudo 権限を与えない | INC-001 で問題になった `visudo -c` のように root が要る確認は、Zabbix ではなく手順書・CI 側で行う |
 
-ポート（出典: 7.0 要件ページ「Default ports」）: エージェント / エージェント 2 は `10050/TCP`（サーバーから接続される）、サーバーは `10051/TCP`（アクティブエージェント・送信ツール・フロントエンドから接続される）。
+ポート（出典: 8.0 要件ページ「Default ports」）: エージェント / エージェント 2 は `10050/TCP`（サーバーから接続される）、サーバーは `10051/TCP`（アクティブエージェント・送信ツール・フロントエンドから接続される）。
 
-PSK の仕様（出典: <https://www.zabbix.com/documentation/7.0/en/manual/encryption/using_pre_shared_keys>）:
+PSK の仕様（出典: <https://www.zabbix.com/documentation/8.0/en/manual/security/using_pre_shared_keys>）:
 - 生成: `openssl rand -hex 32`（256 ビット）。最小は 128 ビット（16 進 32 文字）。
 - PSK ファイルは Zabbix ユーザーだけが読めるようにする。
 
